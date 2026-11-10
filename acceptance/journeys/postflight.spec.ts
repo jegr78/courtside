@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readLedger, replay } from "../lib/ledger";
 import { openAs, xsrf } from "../lib/session";
-import { adminDelete, adminPut, apiAs } from "../lib/api";
+import { adminDelete, adminPost, adminPut, apiAs } from "../lib/api";
 import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
@@ -13,7 +13,7 @@ import { personaUsernames } from "../lib/attendance";
 import { erase, runSql } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 import { readPeriods, restorePeriods } from "../lib/retention";
-import { comparablePeriods, periodSnapshots, retentionRestorations } from "../lib/core.mjs";
+import { comparablePeriods, creditRestoration, periodSnapshots, retentionRestorations } from "../lib/core.mjs";
 import { readMembershipPeriods, restoreMembershipPeriods, type MembershipPeriod } from "../lib/membership";
 import { readGuardianships, removeGuardianships } from "../lib/guardianship";
 
@@ -148,6 +148,23 @@ test("when the run ends, then no guardian relationship this run created is left"
   // then
   expect(outcome.filter((removal) => removal.status >= 300 && removal.status !== 404), "every removal of this run's relationship is accepted").toEqual([]);
   expect(left, "no relationship of this run is left").toEqual([]);
+});
+
+test("when the run ends, then the external player's balance is back where the run found it", async () => {
+  // given
+  const entry = readLedger().find((candidate) => candidate.kind === "credit");
+  test.skip(entry === undefined, "the PayPal walk did not start, so no balance was recorded");
+  const treasurer = await apiAs("treasurer");
+  // when
+  const path = `/api/treasury/credit/accounts/${entry!.id}/entries`;
+  const balance = async () => (await (await treasurer.get(path)).json() as { balanceMinor: number }).balanceMinor;
+  const found = await balance();
+  const restoration = creditRestoration(entry!.before ?? 0, found, readFileSync(runPath("run-started"), "utf8").trim());
+  const answer = restoration ? await adminPost(treasurer, path, restoration) : undefined;
+  const after = await balance();
+  writeFileSync(runPath("postflight-credit.json"), JSON.stringify({ accountId: entry!.id, before: entry!.before, found, restoration, status: answer?.status() ?? null, after }, null, 2));
+  // then
+  expect(after, "the external player's balance is what the run found").toBe(entry!.before);
 });
 
 test("when the run ends, then nothing the run delivered to the personas or cancelled for them is left", async () => {

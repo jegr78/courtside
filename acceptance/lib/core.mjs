@@ -380,7 +380,6 @@ export function backupReadingProblems(backup, checkedAt) {
 // An instance before dated periods answers no membershipCurrent; there a set type without an end is the membership.
 export const holdsMembership = (entry) => entry.membershipCurrent ?? Boolean(entry.membershipTypeId && !entry.membershipEndedOn);
 
-export const barsCourtBooking = (rules) => (rules ?? []).some((rule) => rule.ruleType === "NO_COURT_BOOKING");
 
 const samePeriod = (a, b) => a.membershipTypeId === b.membershipTypeId && a.startedOn === b.startedOn && (a.endedOn ?? null) === (b.endedOn ?? null);
 const periodBody = (period) => ({ membershipTypeId: period.membershipTypeId, startedOn: period.startedOn, endedOn: period.endedOn ?? null });
@@ -439,3 +438,14 @@ export const relationshipsBetween = (relationships, one, other) => relationships
 
 export const confirmationsOf = (items, startsAt) => items
   .filter((item) => item.kind === "BOOKING_CONFIRMED" && item.booking && Date.parse(item.booking.startsAt) === startsAt.getTime());
+
+// A run that broke between a payment and the treasurer's return leaves the external player's balance above where it began.
+export function creditRestoration(before, balanceMinor, run) {
+  if (balanceMinor === before) return null;
+  const note = `acceptance run ${run}: restores the balance it found`;
+  return balanceMinor > before
+    ? { kind: "PAYOUT", amountMinor: balanceMinor - before, note }
+    : { kind: "CREDIT", amountMinor: before - balanceMinor, note };
+}
+
+export const holdersWithEmail = (holders, email) => holders.filter((holder) => email && holder.email.toLowerCase() === email.toLowerCase());

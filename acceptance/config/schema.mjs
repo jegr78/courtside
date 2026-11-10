@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export const PERSONA_KEYS = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings", "welcomeAccounts", "erasure"];
+const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings", "welcomeAccounts", "erasure", "paypal"];
 
 export class ConfigError extends Error {
   constructor(field, problem) {
@@ -48,7 +48,7 @@ export function parseConfig(raw, env) {
     resetCodesPerHour: 5
   };
   const personas = object(input.personas, "personas");
-  onlyKeys(personas, [...PERSONA_KEYS, "restricted"], "personas");
+  onlyKeys(personas, [...PERSONA_KEYS, "restricted", "external"], "personas");
   const seen = new Set();
   for (const key of PERSONA_KEYS) {
     const many = key === "disposable" && Array.isArray(personas[key]);
@@ -65,6 +65,12 @@ export function parseConfig(raw, env) {
     const restricted = text(personas.restricted, "personas.restricted");
     if (seen.has(restricted)) throw new ConfigError("personas.restricted", "repeats another actor's username");
     config.personas.restricted = restricted;
+    seen.add(restricted);
+  }
+  if (personas.external !== undefined) {
+    const external = text(personas.external, "personas.external");
+    if (seen.has(external)) throw new ConfigError("personas.external", "repeats another actor's username");
+    config.personas.external = external;
   }
   if (input.timeZone !== undefined) {
     try { new Intl.DateTimeFormat("en", { timeZone: text(input.timeZone, "timeZone") }); } catch (error) {
@@ -134,6 +140,13 @@ export function parseConfig(raw, env) {
     if (!name.test(text(erasure.ssh, "erasure.ssh"))) throw new ConfigError("erasure.ssh", "must be an ssh host name");
     if (!name.test(text(erasure.container, "erasure.container"))) throw new ConfigError("erasure.container", "must be a container name");
     config.erasure = { ssh: erasure.ssh, container: erasure.container };
+  }
+  if (input.paypal !== undefined) {
+    const paypal = object(input.paypal, "paypal");
+    onlyKeys(paypal, ["buyer"], "paypal");
+    if (!/^[^@\s]+@[^@\s]+$/.test(text(paypal.buyer, "paypal.buyer"))) throw new ConfigError("paypal.buyer", "must be the e-mail address of a PayPal sandbox account");
+    if (config.personas.external === undefined) throw new ConfigError("paypal", "needs personas.external, the account that pays");
+    config.paypal = { buyer: paypal.buyer, password: text(env.ACCEPTANCE_PAYPAL_BUYER_PASSWORD, "ACCEPTANCE_PAYPAL_BUYER_PASSWORD") };
   }
   if (input.notifyClubBookings !== undefined) {
     if (typeof input.notifyClubBookings !== "boolean") throw new ConfigError("notifyClubBookings", "must be true or false");

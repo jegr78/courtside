@@ -53,6 +53,26 @@ test("given a minimal configuration, when parsed, then defaults are filled and t
   assert.equal(config.notifyClubBookings, false, "club bookings are protected unless the operator says otherwise");
 });
 
+test("given a PayPal buyer with an external persona and its password in the environment, when parsed, then both are kept", () => {
+  // given
+  const raw = { ...valid(), personas: { ...valid().personas, external: "jane.external" }, paypal: { buyer: "buyer@example.org" } };
+  // when
+  const config = parseConfig(raw, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" });
+  // then
+  assert.equal(config.personas.external, "jane.external");
+  assert.deepEqual(config.paypal, { buyer: "buyer@example.org", password: "buyer-secret" });
+});
+
+test("given a PayPal buyer without its password, without an external persona or without an address, when parsed, then each refusal names the field", () => {
+  // given
+  const withExternal = { ...valid(), personas: { ...valid().personas, external: "jane.external" } };
+  // when / then
+  assert.equal(field({ ...withExternal, paypal: { buyer: "buyer@example.org" } }), "ACCEPTANCE_PAYPAL_BUYER_PASSWORD");
+  assert.equal(field({ ...valid(), paypal: { buyer: "buyer@example.org" } }, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }), "paypal");
+  assert.equal(field({ ...withExternal, paypal: { buyer: "not an address" } }, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }), "paypal.buyer");
+  assert.equal(field({ ...valid(), personas: { ...valid().personas, external: "jane.admin" } }), "personas.external");
+});
+
 test("given notifyClubBookings, when parsed, then true is kept and anything but a boolean is refused", () => {
   // when / then
   assert.equal(parseConfig({ ...valid(), notifyClubBookings: true }, env).notifyClubBookings, true);
@@ -109,7 +129,7 @@ test("given the example configuration, when parsed, then it is valid", () => {
   // given
   const example = JSON.parse(readFileSync(new URL("../acceptance/config.example.json", import.meta.url), "utf8"));
   // when / then
-  assert.doesNotThrow(() => parseConfig(example, env));
+  assert.doesNotThrow(() => parseConfig(example, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }));
 });
 
 import { addDays, defaultWindowStart, localDate, resolveWindowStart, windowDays, weekdayOf, zonedInstant } from "../acceptance/config/calendar.mjs";
@@ -156,7 +176,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { availabilityConflicts, governingHours, journeysOf, LaneError, laterOpeningOf, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
+import { availabilityConflicts, courtRotations, firstUsableWeek, governingHours, journeysOf, LaneError, lastBookableDay, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -171,13 +191,70 @@ test("when the lanes are planned, then no two slots overlap and each lies inside
   assert.deepEqual(slots.filter((slot) => slot.start < "08:00" || slot.end > "23:00"), []);
 });
 
-test("when the lanes are planned, then weekday lanes use the first two courts and only the opening journey uses the weekend", () => {
+test("when the lanes are planned, then weekday lanes use the first two courts, the PayPal lanes the third, and only the opening journey uses the weekend", () => {
   // when
   const lanes = plan();
   // then
-  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date < lanes.saturday).map((s) => s.court))].sort(), [1, 3]);
+  const paypal = lanes.slots.filter((s) => PAYPAL_JOURNEYS.includes(s.journey));
+  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date < lanes.saturday && !paypal.includes(s)).map((s) => s.court))].sort(), [1, 3]);
+  assert.deepEqual(paypal.map((s) => [s.profile, s.journey, s.date, s.court]), [
+    [PAYPAL_PROFILE, "paypal-pay", lanes.days[0], 2], [PAYPAL_PROFILE, "paypal-credit", lanes.days[0], 2]]);
   assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date >= lanes.saturday).map((s) => s.journey))], ["saturday-opening"]);
   assert.deepEqual([...new Set(lanes.slots.filter((s) => s.journey === "saturday-opening").map((s) => s.court))].sort(), [1, 2, 3]);
+});
+
+test("given weeks with occupied lanes, when the window is chosen, then the first free week inside the advance window wins", () => {
+  // given
+  const weeks = [
+    { start: "2030-03-11", courts: [1, 2, 3], lastDay: "2030-03-27", occupied: ["desktop-chrome/rebook 2030-03-11 10:00 court 1: seed"] },
+    { start: "2030-03-11", courts: [2, 3, 1], lastDay: "2030-03-27", occupied: [] },
+    { start: "2030-03-18", courts: [1, 2, 3], lastDay: "2030-04-03", occupied: [] }
+  ];
+  // when / then
+  assert.deepEqual(firstUsableWeek(weeks, "2030-04-05"), { start: "2030-03-11", courts: [2, 3, 1] });
+  assert.deepEqual(firstUsableWeek(weeks.slice(2), null), { start: "2030-03-18", courts: [1, 2, 3] }, "a club without an advance window takes the first free week");
+});
+
+test("given a club booking that holds one court every Monday at 10:00 and every Wednesday at 08:00 and 14:00, when the courts are rotated, then for each court one order keeps every lane off it", () => {
+  // given
+  const hoursOf = () => ({ opensAt: "07:00:00", closesAt: "23:00:00" });
+  const held = (slot) => (slot.date === "2030-03-11" && slot.start === "10:00") || (slot.date === "2030-03-13" && ["08:00", "14:00"].includes(slot.start));
+  // when / then
+  for (const court of [1, 2, 3]) {
+    const free = courtRotations([1, 2, 3]).filter((order) => !planLanes({ start: "2030-03-11", courts: order, hoursOf }).slots.some((slot) => slot.court === court && held(slot)));
+    assert.ok(free.length > 0, `some court order keeps the lanes off court ${court} at the club's own hours`);
+  }
+});
+
+test("given an advance window of 21 days, when the last bookable day is read, then it is the twentieth day ahead because the rule refuses the twenty-first", () => {
+  // when / then
+  assert.equal(lastBookableDay("2030-03-01", 21, addDays), "2030-03-21");
+  assert.equal(lastBookableDay("2030-03-01", null, addDays), null, "a club without an advance window has no last bookable day");
+  assert.throws(() => firstUsableWeek([{ start: "2030-03-04", courts: [1, 2, 3], lastDay: "2030-03-22", occupied: [] }], lastBookableDay("2030-03-01", 21, addDays)), LaneError,
+    "a week whose last journey day is the twenty-first day ahead is refused");
+});
+
+test("given free weeks beyond the advance window only, when the window is chosen, then the refusal names each week and why", () => {
+  // given
+  const weeks = [
+    { start: "2030-03-11", courts: [1, 2, 3], lastDay: "2030-03-27", occupied: ["ipad/youth 2030-03-13 09:00 court 3: seed"] },
+    { start: "2030-03-18", courts: [1, 2, 3], lastDay: "2030-04-03", occupied: [] }
+  ];
+  // when / then
+  assert.throws(() => firstUsableWeek(weeks, "2030-03-30"), (error) => error instanceof LaneError
+    && /2030-03-11 courts 1\/2\/3: occupied ipad\/youth/.test(error.message) && /2030-03-18 courts 1\/2\/3: its last journey day 2030-04-03 is after the last bookable day 2030-03-30/.test(error.message));
+});
+
+test("given rule sets with and without advance windows, when the shortest is read, then only active sets count", () => {
+  // given
+  const sets = [
+    { active: true, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 30 } }] },
+    { active: true, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 21 } }, { ruleType: "NO_COURT_BOOKING", params: {} }] },
+    { active: false, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }] }
+  ];
+  // when / then
+  assert.equal(shortestAdvanceWindow(sets), 21);
+  assert.equal(shortestAdvanceWindow([{ active: true, rules: [] }]), null);
 });
 
 test("given every profile, when its journeys are resolved, then each has a slot and unknown pairs are refused", () => {
@@ -1117,7 +1194,7 @@ test("given the same WebKit page error from two instances, when collected, then 
   assert.equal(first[0].title, second[0].title, "the host is not part of the title");
 });
 
-import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
+import { parseArguments, secretsOf, waitForLoad } from "../acceptance/run.mjs";
 
 test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
   // when / then
@@ -1569,7 +1646,7 @@ test("given the retention journey, when its source is read, then it lets no run 
   assert.doesNotMatch(source, /previews\/\$\{preview\.previewId\}\/run/, "the journey never runs the preview it took");
 });
 
-import { barsCourtBooking, comparablePeriods, holdsMembership, membershipPeriodProblems, periodRestorations, periodSnapshots } from "../acceptance/lib/core.mjs";
+import { comparablePeriods, holdsMembership, membershipPeriodProblems, periodRestorations, periodSnapshots } from "../acceptance/lib/core.mjs";
 
 const period = (id, startedOn, endedOn, state, membershipTypeId = "type-a") => ({ id, membershipTypeId, startedOn, endedOn, state });
 
@@ -1655,13 +1732,6 @@ test("given a roster entry with and without the membership flag, when read, then
   assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: null }), true);
   assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: "2020-01-01" }), false);
   assert.equal(holdsMembership({ membershipTypeId: null }), false);
-});
-
-test("given a rule set's rules, when read, then only NO_COURT_BOOKING bars booking", () => {
-  // then
-  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }, { ruleType: "NO_COURT_BOOKING", params: {} }]), true);
-  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]), false);
-  assert.equal(barsCourtBooking(undefined), false);
 });
 
 test("given the membership period journey, when its source is read, then it puts the periods back in a finally block", () => {
@@ -1790,9 +1860,15 @@ test("given the runner, when its phases are read, then the matrix only masks and
   // given
   const source = readFileSync(new URL("../acceptance/run.mjs", import.meta.url), "utf8");
   // then
-  assert.match(source, /exit = playwright\(run, projects\);\n\s*redactRun\(run, config\.password\);/, "the matrix masks its artefacts and still lets the postflight clean up");
-  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*secureRun\(run, config\.password\);/, "the postflight fails the run on a leak");
-  assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
+  assert.match(source, /exit = playwright\(run, projects\);\n\s*for \(const secret of secretsOf\(config\)\) redactRun\(run, secret\);/, "the matrix masks its artefacts and still lets the postflight clean up");
+  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*for \(const secret of secretsOf\(config\)\) secureRun\(run, secret\);/, "the postflight fails the run on a leak");
+  assert.match(source, /phase === "report"\) \{\n\s*for \(const secret of secretsOf\(config\)\) secureRun\(run, secret\)/, "the report phase secures a run before it reads it");
+});
+
+test("given a configuration with a PayPal buyer, when its secrets are listed, then the shared and the buyer's password are both masked", () => {
+  // then
+  assert.deepEqual(secretsOf({ password: "shared-secret" }), ["shared-secret"]);
+  assert.deepEqual(secretsOf({ password: "shared-secret", paypal: { buyer: "buyer@example.org", password: "buyer-secret" } }), ["shared-secret", "buyer-secret"]);
 });
 
 const encodedForms = (secret) => {
@@ -2046,4 +2122,24 @@ test("given the captures whose state sits below the top of the page, when the jo
     assert.match(journeys, new RegExp(`capture\\(\\w+, "${label}", \\{[^}]*subject: `), `the ${label} capture names its subject`);
   }
   assert.match(journeys, /fill\("Richard Roe"\);\s*\}, \{ filledSubject: /, "the guest booking's filled dialog names the guest as its subject");
+});
+
+import { creditRestoration, holdersWithEmail } from "../acceptance/lib/core.mjs";
+
+test("given holders whose names or addresses contain the username, when the external player's account is resolved, then only the exact address matches", () => {
+  // given
+  const holders = [
+    { accountId: "a", email: "jane.external.parent@example.org" },
+    { accountId: "b", email: "Jane.External@example.org" }
+  ];
+  // when / then
+  assert.deepEqual(holdersWithEmail(holders, "jane.external@example.org").map((holder) => holder.accountId), ["b"]);
+  assert.deepEqual(holdersWithEmail(holders, null), [], "a player without an address matches nobody");
+});
+
+test("given the external player's balance before and after a run, when it is restored, then the difference is paid out or credited and an equal balance needs nothing", () => {
+  // then
+  assert.deepEqual(creditRestoration(0, 1500, "run-a"), { kind: "PAYOUT", amountMinor: 1500, note: "acceptance run run-a: restores the balance it found" });
+  assert.deepEqual(creditRestoration(1500, 750, "run-a"), { kind: "CREDIT", amountMinor: 750, note: "acceptance run run-a: restores the balance it found" });
+  assert.equal(creditRestoration(750, 750, "run-a"), null);
 });

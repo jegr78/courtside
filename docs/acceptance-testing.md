@@ -99,12 +99,12 @@ created.
   and the run button disabled, and only a preview id nobody created is sent to the run endpoint to
   read its typed refusal. The journey puts both periods back in the same test, and the postflight
   does so again from the ledger after an interrupted run, so the club keeps the periods it had.
-- For the membership period journey, a rule set bound for people without a membership type that
-  carries `NO_COURT_BOOKING`, and a first disposable member who holds one membership period running
+- For the membership period journey, a first disposable member who holds one membership period running
   today that lasts past the tenth day after the window and none scheduled. The first court has to
   be free at opening on that tenth day. On desktop-chrome the journey records the member's periods
   in the ledger, and the admin moves the running period's start to tomorrow on the person page. The
-  member's booking of that court is then refused with `booking.rule.noCourtBooking`. A period
+  member's booking of that court on the member card is then refused with `card-role-required`, because
+  that card admits only people whose membership runs today. A period
   overlapping the scheduled one is refused with `membership-periods-overlap`. After the start is
   moved to today, the same booking is accepted and the member cancels it. The journey puts every
   period back in the same test and the postflight does so again from the ledger. A scheduled
@@ -157,24 +157,51 @@ court is never touched. The postflight fails when any of these rows is left, and
 cleanup section names the counts. Without `erasure` the run writes the statement to
 `erase-persona-residue.sql`.
 
+## The PayPal sandbox walk
+
+With `paypal` and `personas.external` configured, desktop-chrome walks an external player through
+the club's PayPal sandbox on two lanes of the third court: the player pays a booking at PayPal,
+cancels it, pays the next booking from the credit that left, cancels that one, and the treasurer
+returns the PayPal payment through PayPal. After each step the journey reads the player's ledger
+and balance; the run ends with the balance it began with. The ledger records the player's credit
+account, found by its exact e-mail address, and that balance; the postflight pays out or credits
+any difference an interrupted run left. Each run adds its
+ledger lines to the player's history.
+
+The instance needs:
+
+- PayPal set to `SANDBOX`, switched on, and credentials that pass **Verbindung prüfen**. The
+  preflight refuses `LIVE`, so the walk never moves real money.
+- An active card whose roles include `EXTERNAL`, which records no players and carries a price for
+  external players, and **Externe Buchungen zulassen** in the club profile.
+- An external account that may book: no rule set for people without a membership type may carry
+  `NO_COURT_BOOKING`, and the account holds no credit.
+- At least three courts in `courts`.
+
+PayPal's checkout pages are not Courtside's. The journey finds their steps by PayPal's own ids and
+the pay button's name; a failure on them is a harness finding with the step and a trace, and their
+console output stays out of the captures.
+
 ## Configuration
 
 `ACCEPTANCE_CONFIG` names a JSON file outside the repository. `ACCEPTANCE_PASSWORD` carries the
-shared password of the test accounts; it never appears in the file. `acceptance/config.example.json`
+shared password of the test accounts; it never appears in the file. With `paypal` configured,
+`ACCEPTANCE_PAYPAL_BUYER_PASSWORD` carries the sandbox buyer's password the same way. `acceptance/config.example.json`
 shows the shape with placeholder accounts.
 
 | Field | Meaning | Required |
 | --- | --- | --- |
 | `baseUrl` | Instance under test | yes |
 | `expectedVersion` | Version the preflight must read from the instance | yes |
-| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours | yes, `restricted` no |
+| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours; `external` names an external account that shares the password | yes, `restricted` and `external` no |
 | `timeZone` | Club time zone; default the zone the instance reports | no |
-| `window.start` | Monday of the booking window; default the first Monday after the run starts | no |
+| `window.start` | Monday of the booking window; default the first of the next eight weeks, in any rotation of `courts`, whose lanes are free and whose last journey day, ten days after its Sunday, is still bookable under the shortest active advance window, whose last bookable day is one before its limit | no |
+| `paypal.buyer` | E-mail of the PayPal sandbox account that pays; needs `personas.external` | no |
 | `courts` | Court numbers the journeys use; default the first three active courts | no |
 | `mail.url` | Mailpit API | no |
 | `logs.app`, `logs.proxy` | Log files the operator writes alongside the run | no |
 | `metrics.url` | Prometheus query endpoint for request latency around failures | no |
-| `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox | no |
+| `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox, which on macOS starts with a home of its own in the temp directory | no |
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
@@ -220,12 +247,13 @@ of it, or if a trace cannot be read.
 - `--phase report --run <dir>` renders the report again, for example after the review.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
-hour. Preflight then proves every lane slot free before a journey starts.
+hour. Without `window.start` it also writes `window-choice.json`, the week and court order it took and why each
+earlier week was refused. Preflight then proves every lane slot free before a journey starts.
 
 The harness cancels only bookings, removes only opening weeks, holidays and court closures and
 resets only message wordings and retention periods it recorded in its ledger. A booking or week of
 the club in its way stops the preflight or the journey that needs it and is never touched; choose
-another `window.start` or other `courts`. Each opening week a journey schedules is followed the next
+another `window.start`, leave it out so discovery picks a free week, or choose other `courts`. Each opening week a journey schedules is followed the next
 day by a copy of the hours in force, so the change governs one day. The availability and
 closure-notice journeys remove their holidays, court closures and bookings themselves; the
 postflight removes any the ledger still holds, a booking beyond the window included, and fails when

@@ -7,6 +7,8 @@ const MEMBER_PROFILES = ["desktop-chrome", "desktop-firefox", "pixel-7", "iphone
 const ROLE_PROFILES = ["desktop-chrome", "desktop-firefox", "desktop-safari", "ipad", "pixel-7"];
 const OFFLINE_PROFILES = ["desktop-chrome", "pixel-7"];
 const WEEKEND_PROFILES = ["desktop-chrome", "desktop-firefox", "desktop-safari", "ipad", "pixel-7"];
+export const PAYPAL_PROFILE = "desktop-chrome";
+export const PAYPAL_JOURNEYS = ["paypal-pay", "paypal-credit"];
 const WEEKDAY_PAIRS = [["desktop-chrome", "desktop-firefox"], ["iphone-15-landscape", "desktop-safari"], ["pixel-7", "ipad"], ["narrow", "iphone-se"], ["iphone-15-de", "iphone-15-en"]];
 
 export class LaneError extends Error {}
@@ -87,6 +89,13 @@ export function planLanes({ start, courts, hoursOf }) {
       journeys.forEach((journey, index) => slots.push({ profile, journey, date, court: courts[side], start: hh(first + index), end: hh(first + index + 1) }));
     });
   });
+  // The PayPal lanes take the third court on the PayPal profile's own day, which the weekday pairs leave free.
+  if (courts.length >= 3) {
+    const date = days[WEEKDAY_PAIRS.findIndex((pair) => pair.includes(PAYPAL_PROFILE))];
+    const { first, last } = firstHour(hoursOf, date);
+    if (first + PAYPAL_JOURNEYS.length > last) throw new LaneError(`${PAYPAL_PROFILE} needs ${PAYPAL_JOURNEYS.length} PayPal hours on ${date} from ${hh(first)}, the club closes at ${hh(last)}`);
+    PAYPAL_JOURNEYS.forEach((journey, index) => slots.push({ profile: PAYPAL_PROFILE, journey, date, court: courts[2], start: hh(first + index), end: hh(first + index + 1) }));
+  }
   const saturday = days[5];
   const { first, last } = firstHour(hoursOf, saturday);
   WEEKEND_PROFILES.forEach((profile, index) => {
@@ -101,4 +110,27 @@ export function slotIn(plan, profile, journey) {
   const slot = plan.slots.find((candidate) => candidate.profile === profile && candidate.journey === journey);
   if (!slot) throw new LaneError(`${journey} does not run on ${profile}`);
   return slot;
+}
+
+// The journeys reach ten days past the window's Sunday: holidays, a court closure and a period change.
+export const LAST_JOURNEY_DAY_AFTER_SUNDAY = 10;
+
+export const shortestAdvanceWindow = (ruleSets) => ruleSets
+  .filter((set) => set.active)
+  .flatMap((set) => set.rules.filter((rule) => rule.ruleType === "ADVANCE_WINDOW").map((rule) => rule.params.maxDays))
+  .reduce((shortest, days) => shortest === null || days < shortest ? days : shortest, null);
+
+// The advance rule refuses a booking maxDays or more days ahead, so the last bookable day is one before.
+export const lastBookableDay = (today, maxDays, addDays) => maxDays === null ? null : addDays(today, maxDays - 1);
+
+export const courtRotations = (courts) => courts.map((_, shift) => [...courts.slice(shift), ...courts.slice(0, shift)]);
+
+export function firstUsableWeek(weeks, latestBookable) {
+  const reasons = [];
+  for (const week of weeks) {
+    const tooFar = latestBookable !== null && week.lastDay > latestBookable;
+    if (!tooFar && week.occupied.length === 0) return { start: week.start, courts: week.courts };
+    reasons.push(`${week.start} courts ${week.courts.join("/")}: ${tooFar ? `its last journey day ${week.lastDay} is after the last bookable day ${latestBookable}` : `occupied ${week.occupied.join(", ")}`}`);
+  }
+  throw new LaneError(`no week has free lanes inside the advance window; ${reasons.join("; ")}`);
 }

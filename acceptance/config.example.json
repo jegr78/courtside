@@ -15,7 +15,8 @@
       "john.major",
       "mary.roe",
       "richard.doe"
-    ]
+    ],
+    "external": "jane.external"
   },
   "courts": [
     1,
@@ -31,5 +32,8 @@
   },
   "metrics": {
     "url": "http://127.0.0.1:9090/api/v1/query"
+  },
+  "paypal": {
+    "buyer": "buyer@example.org"
   }
 }

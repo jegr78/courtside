@@ -28,7 +28,7 @@ async function book(member: Api, slot: Slot) {
   }, { "Idempotency-Key": randomUUID() });
   const body = await answer.json().catch(() => ({}));
   if (answer.ok() && body.id) recordCreated({ kind: "booking", id: body.id, by: "disposable", project: projectName(), date: slot.day });
-  return { status: answer.status(), id: body.id as string | undefined, codes: violationCodes(body) as string[] };
+  return { status: answer.status(), id: body.id as string | undefined, codes: violationCodes(body) as string[], type: body.type as string | undefined };
 }
 
 async function moveStart(page: Page, periodId: string, startedOn: string, state: string) {
@@ -73,7 +73,7 @@ test("given the disposable member's running membership, when the board moves its
 
     // then
     const refused = await book(await apiAsAgain("disposable"), slot);
-    expect(refused.codes, `product: a period that begins tomorrow grants no booking today (answered ${refused.status})`).toContain("booking.rule.noCourtBooking");
+    expect(refused.type, `product: a period that begins tomorrow leaves the member card closed today (answered ${refused.status})`).toBe("urn:courtside:error:card-role-required");
     expect(refused.id, "product: the refused booking is not written").toBeUndefined();
 
     await step("admin", "membership period overlap refused", async () => {

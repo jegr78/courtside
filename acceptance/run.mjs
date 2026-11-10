@@ -37,6 +37,8 @@ export async function waitForLoad({ limit, loadavg = systemLoad, sleep = (ms) =>
   }
 }
 
+export const secretsOf = (config) => [config.password, config.paypal?.password].filter(Boolean);
+
 export const resultsFileFor = (projects) => projects.length === 1 && projects[0] === "postflight" ? "postflight-results.json" : "results.json";
 
 function playwright(run, projects) {
@@ -58,14 +60,14 @@ async function main() {
     await waitForLoad({ limit: config.loadLimit });
     const projects = args.projects.length ? args.projects : PROFILE_NAMES;
     exit = playwright(run, projects);
-    redactRun(run, config.password);
+    for (const secret of secretsOf(config)) redactRun(run, secret);
   }
   if (args.phase === "all" || args.phase === "postflight") {
     exit = playwright(run, ["postflight"]) || exit;
-    secureRun(run, config.password);
+    for (const secret of secretsOf(config)) secureRun(run, secret);
   }
   if (args.phase === "all" || args.phase === "report") {
-    secureRun(run, config.password);
+    for (const secret of secretsOf(config)) secureRun(run, secret);
     await analyse(run, config);
     const sheets = contactSheets(run);
     const commit = existsSync(join(run, "source.json")) ? JSON.parse(readFileSync(join(run, "source.json"), "utf8")).commit : harnessCommit(new URL(".", import.meta.url));
