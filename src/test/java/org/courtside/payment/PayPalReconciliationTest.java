@@ -21,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -68,9 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=3s"})
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
-        CreditTestFixture.class, PaymentTestFixture.class})
+        "courtside.payment.paypal.request-timeout=1s"})
 class PayPalReconciliationTest extends AbstractIntegrationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -941,7 +938,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     private void timeOutTheCapture(UUID booking) throws Exception {
         PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
         PAYPAL.replyAfter(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")),
-                Duration.ofSeconds(5));
+                Duration.ofSeconds(2));
         captureRequest().andExpect(jsonPath("$.outcome").value("PROCESSING"));
     }
 
