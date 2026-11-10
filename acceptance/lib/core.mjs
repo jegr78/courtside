@@ -447,3 +447,5 @@ export function creditRestoration(before, balanceMinor, run) {
     ? { kind: "PAYOUT", amountMinor: balanceMinor - before, note }
     : { kind: "CREDIT", amountMinor: before - balanceMinor, note };
 }
+
+export const holdersWithEmail = (holders, email) => holders.filter((holder) => email && holder.email.toLowerCase() === email.toLowerCase());

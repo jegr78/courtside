@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { config, disposables, persona, runPath, type PersonaKey } from "../lib/context";
 import { addDays, defaultWindowStart, localDate, resolveWindowStart, zonedInstant } from "../config/calendar.mjs";
-import { firstUsableWeek, governingHours, LAST_JOURNEY_DAY_AFTER_SUNDAY, planLanes, shortestAdvanceWindow } from "../config/lanes.mjs";
+import { firstUsableWeek, governingHours, LAST_JOURNEY_DAY_AFTER_SUNDAY, lastBookableDay, planLanes, shortestAdvanceWindow } from "../config/lanes.mjs";
 import { occupying } from "../lib/core.mjs";
 import { openAs } from "../lib/session";
 import { apiAs, readRoster } from "../lib/api";
@@ -27,7 +27,8 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
   const cards = await (await api.get("/api/admin/booking-cards")).json();
   const participantCards = await (await api.get("/api/admin/participant-cards")).json();
   const roster = { entries: await readRoster(await apiAs("admin")) };
-  const keys: PersonaKey[] = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
+  const keys: PersonaKey[] = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable",
+    ...(config.personas.external ? ["external" as const] : [])];
   const entryOf = (key: PersonaKey) => roster.entries.find((e) => e.username === persona(key).username)!;
   const entryNamed = (username: string) => roster.entries.find((e) => e.username === username)!;
   const days = Object.fromEntries(await Promise.all(lanes.days.map(async (date: string) =>
@@ -61,7 +62,7 @@ async function firstFreeWeek(api: Lookup, { timeZone, courts, hoursOf }: { timeZ
   const ruleSets = await Promise.all((await (await api.get("/api/admin/rule-sets")).json() as { id: string; active: boolean }[])
     .map(async (set) => ({ ...set, rules: await (await api.get(`/api/admin/rule-sets/${set.id}/rules`)).json() })));
   const advance = shortestAdvanceWindow(ruleSets);
-  const latestBookable = advance === null ? null : addDays(localDate(new Date(), timeZone), advance);
+  const latestBookable = lastBookableDay(localDate(new Date(), timeZone), advance, addDays);
   const first = defaultWindowStart(new Date(), timeZone);
   const days = new Map<string, unknown>();
   const weeks = [];

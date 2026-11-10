@@ -120,6 +120,9 @@ export const shortestAdvanceWindow = (ruleSets) => ruleSets
   .flatMap((set) => set.rules.filter((rule) => rule.ruleType === "ADVANCE_WINDOW").map((rule) => rule.params.maxDays))
   .reduce((shortest, days) => shortest === null || days < shortest ? days : shortest, null);
 
+// The advance rule refuses a booking maxDays or more days ahead, so the last bookable day is one before.
+export const lastBookableDay = (today, maxDays, addDays) => maxDays === null ? null : addDays(today, maxDays - 1);
+
 export function firstUsableWeek(weeks, latestBookable) {
   const reasons = [];
   for (const week of weeks) {

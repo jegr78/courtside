@@ -156,14 +156,14 @@ test("when the run ends, then the external player's balance is back where the ru
   test.skip(entry === undefined, "the PayPal walk did not start, so no balance was recorded");
   const treasurer = await apiAs("treasurer");
   // when
-  const search = async () => (await (await treasurer.post("/api/treasury/credit/account-search", { query: entry!.id })).json() as { accountId: string; balanceMinor: number }[])[0];
-  const account = await search();
-  const restoration = account ? creditRestoration(entry!.before ?? 0, account.balanceMinor, readFileSync(runPath("run-started"), "utf8").trim()) : null;
-  const answer = account && restoration ? await adminPost(treasurer, `/api/treasury/credit/accounts/${account.accountId}/entries`, restoration) : undefined;
-  const after = account ? (await search())?.balanceMinor : undefined;
-  writeFileSync(runPath("postflight-credit.json"), JSON.stringify({ username: entry!.id, before: entry!.before, found: account?.balanceMinor ?? null, restoration, status: answer?.status() ?? null, after }, null, 2));
+  const path = `/api/treasury/credit/accounts/${entry!.id}/entries`;
+  const balance = async () => (await (await treasurer.get(path)).json() as { balanceMinor: number }).balanceMinor;
+  const found = await balance();
+  const restoration = creditRestoration(entry!.before ?? 0, found, readFileSync(runPath("run-started"), "utf8").trim());
+  const answer = restoration ? await adminPost(treasurer, path, restoration) : undefined;
+  const after = await balance();
+  writeFileSync(runPath("postflight-credit.json"), JSON.stringify({ accountId: entry!.id, before: entry!.before, found, restoration, status: answer?.status() ?? null, after }, null, 2));
   // then
-  expect(account, "the external player's credit account is found").toBeTruthy();
   expect(after, "the external player's balance is what the run found").toBe(entry!.before);
 });
 

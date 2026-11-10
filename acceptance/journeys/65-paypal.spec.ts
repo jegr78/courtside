@@ -5,6 +5,7 @@ import { config, persona } from "../lib/context";
 import { discovery, openSlot, projectName, submitBooking } from "../lib/journey";
 import { lanePlan } from "../lib/lanes";
 import { recordCreated } from "../lib/ledger";
+import { holdersWithEmail } from "../lib/core.mjs";
 import { approveAtPayPal, creditOf, externalCard, type Credit } from "../lib/paypal";
 import { precondition } from "../lib/precondition";
 import { openAs, reauthenticateIfAsked } from "../lib/session";
@@ -35,7 +36,9 @@ test("given an external player and the club's PayPal sandbox, when the player pa
   const creditSlot = await lanes.take("paypal-credit");
   const player = await apiAs("external");
   const start = await creditOf(player);
-  recordCreated({ kind: "credit", id: persona("external").username, before: start.balanceMinor, by: "external", project: projectName() });
+  const holders = holdersWithEmail(await (await (await apiAs("treasurer")).post("/api/treasury/credit/account-search", { query: persona("external").username })).json(), discovery.emails.external);
+  expect(holders, "the treasurer's search finds exactly the external player's account").toHaveLength(1);
+  recordCreated({ kind: "credit", id: holders[0].accountId, before: start.balanceMinor, by: "external", project: projectName() });
   const origin = new URL(config.baseUrl).origin;
   const page = await openAs(browser, "external");
   let treasurer: Page | undefined;
@@ -95,14 +98,15 @@ test("given an external player and the club's PayPal sandbox, when the player pa
       await treasurer!.goto("/admin/credit");
       await expect(treasurer!.getByTestId("admin-credit-view"), "product: the treasurer reaches the credit page").toBeVisible();
       await treasurer!.getByTestId("credit-search").fill(persona("external").username);
-      await treasurer!.getByTestId("credit-holder-open").first().click();
+      await expect(treasurer!.getByTestId("credit-holder"), "product: the search narrows the holders to the external player").toHaveCount(1);
+      await treasurer!.getByTestId("credit-holder-open").click();
       await expect(treasurer!.getByTestId("credit-balance"), "product: the treasurer sees the player's balance").toHaveAttribute("data-balance-minor", String(beforeReturn.balanceMinor));
       const payment = treasurer!.locator('[data-testid="credit-entry"][data-kind="PAYPAL_PAYMENT"]').filter({ has: treasurer!.getByTestId("paypal-refund") }).first();
       await expect(payment, "product: the paid and cancelled booking offers a return through PayPal").toBeVisible();
       await payment.getByTestId("paypal-refund").click();
       await treasurer!.getByTestId("paypal-refund-confirm").click();
       await reauthenticateIfAsked(treasurer!);
-      await expect(treasurer!.getByTestId("paypal-refund-outcome"), "product: the return is confirmed").toBeVisible();
+      await expect(treasurer!.getByTestId("paypal-refund-outcome"), "product: the treasurer sees the outcome of the return").toBeVisible();
       await capture(treasurer!, "paypal-refund");
     });
     // then

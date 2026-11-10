@@ -176,7 +176,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { availabilityConflicts, firstUsableWeek, governingHours, journeysOf, LaneError, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
+import { availabilityConflicts, firstUsableWeek, governingHours, journeysOf, LaneError, lastBookableDay, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -213,6 +213,14 @@ test("given weeks with occupied lanes, when the window is chosen, then the first
   // when / then
   assert.equal(firstUsableWeek(weeks, "2030-04-05"), "2030-03-18");
   assert.equal(firstUsableWeek(weeks, null), "2030-03-18", "a club without an advance window takes the first free week");
+});
+
+test("given an advance window of 21 days, when the last bookable day is read, then it is the twentieth day ahead because the rule refuses the twenty-first", () => {
+  // when / then
+  assert.equal(lastBookableDay("2030-03-01", 21, addDays), "2030-03-21");
+  assert.equal(lastBookableDay("2030-03-01", null, addDays), null, "a club without an advance window has no last bookable day");
+  assert.throws(() => firstUsableWeek([{ start: "2030-03-04", lastDay: "2030-03-22", occupied: [] }], lastBookableDay("2030-03-01", 21, addDays)), LaneError,
+    "a week whose last journey day is the twenty-first day ahead is refused");
 });
 
 test("given free weeks beyond the advance window only, when the window is chosen, then the refusal names each week and why", () => {
@@ -2105,7 +2113,18 @@ test("given the captures whose state sits below the top of the page, when the jo
   assert.match(journeys, /fill\("Richard Roe"\);\s*\}, \{ filledSubject: /, "the guest booking's filled dialog names the guest as its subject");
 });
 
-import { creditRestoration } from "../acceptance/lib/core.mjs";
+import { creditRestoration, holdersWithEmail } from "../acceptance/lib/core.mjs";
+
+test("given holders whose names or addresses contain the username, when the external player's account is resolved, then only the exact address matches", () => {
+  // given
+  const holders = [
+    { accountId: "a", email: "jane.external.parent@example.org" },
+    { accountId: "b", email: "Jane.External@example.org" }
+  ];
+  // when / then
+  assert.deepEqual(holdersWithEmail(holders, "jane.external@example.org").map((holder) => holder.accountId), ["b"]);
+  assert.deepEqual(holdersWithEmail(holders, null), [], "a player without an address matches nobody");
+});
 
 test("given the external player's balance before and after a run, when it is restored, then the difference is paid out or credited and an equal balance needs nothing", () => {
   // then

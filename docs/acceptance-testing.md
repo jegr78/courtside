@@ -163,8 +163,9 @@ With `paypal` and `personas.external` configured, desktop-chrome walks an extern
 the club's PayPal sandbox on two lanes of the third court: the player pays a booking at PayPal,
 cancels it, pays the next booking from the credit that left, cancels that one, and the treasurer
 returns the PayPal payment through PayPal. After each step the journey reads the player's ledger
-and balance; the run ends with the balance it began with. The ledger records that balance, and
-the postflight pays out or credits any difference an interrupted run left. Each run adds its
+and balance; the run ends with the balance it began with. The ledger records the player's credit
+account, found by its exact e-mail address, and that balance; the postflight pays out or credits
+any difference an interrupted run left. Each run adds its
 ledger lines to the player's history.
 
 The instance needs:
@@ -194,7 +195,7 @@ shows the shape with placeholder accounts.
 | `expectedVersion` | Version the preflight must read from the instance | yes |
 | `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours; `external` names an external account that shares the password | yes, `restricted` and `external` no |
 | `timeZone` | Club time zone; default the zone the instance reports | no |
-| `window.start` | Monday of the booking window; default the first of the next eight weeks whose lanes are free and whose last journey day, ten days after its Sunday, lies inside the shortest active advance window | no |
+| `window.start` | Monday of the booking window; default the first of the next eight weeks whose lanes are free and whose last journey day, ten days after its Sunday, is still bookable under the shortest active advance window, whose last bookable day is one before its limit | no |
 | `paypal.buyer` | E-mail of the PayPal sandbox account that pays; needs `personas.external` | no |
 | `courts` | Court numbers the journeys use; default the first three active courts | no |
 | `mail.url` | Mailpit API | no |
