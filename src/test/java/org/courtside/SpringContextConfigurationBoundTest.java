@@ -8,6 +8,7 @@ import org.springframework.test.context.BootstrapUtils;
 import org.springframework.test.context.BootstrapWith;
 import org.springframework.test.context.MergedContextConfiguration;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +55,7 @@ class SpringContextConfigurationBoundTest {
             }
         };
         scanner.addIncludeFilter((reader, factory) -> reader.getClassMetadata().getClassName().matches(".*Tests?$"));
-        List<Class<?>> classes = new java.util.ArrayList<>();
+        List<Class<?>> classes = new ArrayList<>();
         for (var definition : scanner.findCandidateComponents("org.courtside")) {
             Class<?> candidate = Class.forName(definition.getBeanClassName());
             if (MergedAnnotations.from(candidate, MergedAnnotations.SearchStrategy.TYPE_HIERARCHY).isPresent(BootstrapWith.class)) {

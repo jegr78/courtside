@@ -128,8 +128,9 @@ fails on the missing `BuildProperties` bean.
   with a focused test before a fix; neither a blind rerun nor a larger timeout is a remedy for a
   test that fails or hangs. A job's `timeout-minutes` is a guard against a hung run, not a cap on
   how long a growing suite may take: set it about twice the job's usual duration and raise it when
-  the suite outgrows it. A scheduled run that uses more than two thirds of it fails its
-  `Check timeout headroom` step, so the nightly tracker reports the growth before a cancellation.
+  the suite outgrows it. When a guarded job of a scheduled run uses more than two thirds of it, the
+  workflow's `timeout-headroom` job fails, so the nightly tracker reports the growth before a
+  cancellation while nothing that depends on the measured job is held back.
 * **A change to the scanner normalizers is unverified until the assessment has run.**
   `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
   assert wordings somebody has already observed — so it is structurally unable to show that the
