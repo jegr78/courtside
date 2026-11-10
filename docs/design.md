@@ -399,8 +399,11 @@ time, the account that recorded it and the reason, which lives in `credit_entry_
 anonymising the account can delete it while the entry stays. The balance is the sum of the entries
 in the club currency. `TREASURER` and `ADMIN` record a `CREDIT`, open only to an account holding
 `EXTERNAL`, or a `PAYOUT` of at most the balance, each between 0.01 and 10,000.00 with a reason of at
-most 200 characters and after a re-authentication no older than five minutes. A correction is an
-entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
+most 200 characters and after a re-authentication no older than five minutes. An attempt may carry an
+`Idempotency-Key`, which the treasury form always sends; the entry stores it with a fingerprint of account, kind, amount and reason, so a
+resubmitted request returns the entry the first one recorded and the same key with another request
+is refused with `credit.idempotencyKey.reused`. A request without a key appends as before. The treasury form keeps a key until the server has
+answered it. A correction is an entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
 it reads the balance, so two writes against one account run one after the other and a balance never
 goes below zero. `credit.entry.recorded` names the account, the entry, its kind, amount, currency
 and booking, never the reason. The account holder reads its balance and entries, most recent first with

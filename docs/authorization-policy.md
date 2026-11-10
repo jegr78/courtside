@@ -444,7 +444,7 @@ A credit reaches only an account holding EXTERNAL that is not anonymised, a payo
 
 Attributes: `role`, `target-account`.
 
-Production: `src/main/java/org/courtside/credit/internal/CreditLedger.java#append`, `src/main/java/org/courtside/credit/internal/CreditLedger.java#insert`.
+Production: `src/main/java/org/courtside/credit/internal/CreditLedger.java#appendEntry`, `src/main/java/org/courtside/credit/internal/CreditLedger.java#insertEntry`.
 
 Positive tests: `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds`.
 

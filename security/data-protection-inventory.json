@@ -1302,6 +1302,14 @@
       "paypal_order_id": {
         "level": "operational",
         "lifecycle": "credit-ledger"
+      },
+      "idempotency_key": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "request_fingerprint": {
+        "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
       }
     },
     "credit_entry_note": {

@@ -26,3 +26,14 @@ ALTER TABLE notification
 
 DELETE FROM credit_account a
 WHERE NOT EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = a.account_id);
+
+ALTER TABLE credit_entry
+    ADD COLUMN idempotency_key text,
+    ADD COLUMN request_fingerprint text,
+    ADD CONSTRAINT credit_entry_idempotency_complete CHECK (
+        (idempotency_key IS NULL) = (request_fingerprint IS NULL)),
+    ADD CONSTRAINT credit_entry_idempotency_key_length CHECK (
+        idempotency_key IS NULL OR length(idempotency_key) BETWEEN 1 AND 128);
+
+CREATE UNIQUE INDEX credit_entry_idempotency_by_recorder ON credit_entry (recorded_by, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;

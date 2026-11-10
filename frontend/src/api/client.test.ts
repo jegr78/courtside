@@ -1103,13 +1103,14 @@ it("given a credit entry, when it is recorded, then the account's entries receiv
   server.use(http.post("/api/treasury/credit/accounts/33333333-3333-3333-3333-333333333333/entries", async ({ request }) => {
     expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
     expect(request.headers.get("Content-Type")).toBe("application/json");
+    expect(request.headers.get("Idempotency-Key"), "a resubmitted entry is recorded once").toBe("entry-attempt-1");
     expect(await request.json()).toEqual({ kind: "CREDIT", amountMinor: 1250, note: "Cash at the desk" });
     return HttpResponse.json(entry, { status: 201 });
   }));
 
   // when
   const recorded = await api.recordCreditEntry("33333333-3333-3333-3333-333333333333",
-    { kind: "CREDIT", amountMinor: 1250, note: "Cash at the desk" });
+    { kind: "CREDIT", amountMinor: 1250, note: "Cash at the desk" }, "entry-attempt-1");
 
   // then
   expect(recorded).toEqual(entry);

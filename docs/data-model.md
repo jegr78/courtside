@@ -437,7 +437,7 @@ a different file than the one previewed is visible after the fact.
 | Table | Holds | References |
 |---|---|---|
 | `credit_account` | One row per account that ever had a ledger entry; its row lock serialises every write to that account's balance | `user_account` |
-| `credit_entry` | One change of a balance: kind, signed amount in the minor unit, currency, when it was recorded and by which account, in the order of `position`, and for a booking's payment or refund the booking | `credit_account` |
+| `credit_entry` | One change of a balance: kind, signed amount in the minor unit, currency, when it was recorded and by which account, in the order of `position`, for a booking's payment or refund the booking, and for an entry the treasury recorded the request's idempotency key and fingerprint | `credit_account` |
 | `credit_entry_note` | The reason given for an entry | `credit_entry` |
 
 Entries are appended and never changed: the trigger `credit_entry_append_only` refuses every
@@ -448,7 +448,8 @@ positive like a `CREDIT`, `PAYPAL_REFUND` is negative like a `PAYOUT`.
 `credit_entry_booking_reference` requires `booking_id` exactly on the booking and PayPal kinds,
 `credit_entry_paypal_order_reference` requires `paypal_order_id` exactly on the four PayPal kinds, the
 unique index `credit_entry_paypal_order` allows an order one payment or late capture,
-`credit_entry_paypal_order_kind` one entry of each kind per order, and the unique index
+`credit_entry_paypal_order_kind` one entry of each kind per order, the unique index
+`credit_entry_idempotency_by_recorder` one entry per recording account and idempotency key, and the unique index
 `credit_entry_booking_kind` allows one debit and one refund per booking. The balance is the sum of an
 account's entries in the club currency and is stored nowhere. The reason sits in its own table because it is
 free text that may name somebody: anonymising the account deletes it and leaves the entry.

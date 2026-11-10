@@ -12,7 +12,9 @@ import org.courtside.identity.CurrentUser;
 import org.courtside.identity.RecentAuthentication;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
+import org.courtside.shared.SqlConstraintViolation;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,9 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -27,6 +32,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Currency;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,6 +44,7 @@ public class CreditLedger implements BookingPayments {
     public static final int MAX_AMOUNT_MINOR = 1_000_000;
     public static final int MAX_NOTE_LENGTH = 200;
     private static final int HOLDER_SEARCH_LIMIT = 20;
+    private static final String IDEMPOTENCY_INDEX = "credit_entry_idempotency_by_recorder";
 
     private static final String ENTRIES = """
             SELECT e.id, e.position, e.kind, e.amount_minor, e.currency, e.recorded_at, e.booking_id, e.paypal_order_id,
@@ -56,13 +63,28 @@ public class CreditLedger implements BookingPayments {
     private final Clock clock;
 
     @Transactional
-    public LedgerEntry record(UUID accountId, CreditEntryKind kind, int amountMinor, String note) {
+    public LedgerEntry record(UUID accountId, CreditEntryKind kind, int amountMinor, String note,
+                              @Nullable String idempotencyKey) {
         recentAuthentication.requireRecent();
-        return append(accountId, kind, amountMinor, note);
+        if (idempotencyKey == null) {
+            return appendEntry(accountId, kind, amountMinor, note, null);
+        }
+        if (idempotencyKey.isEmpty() || idempotencyKey.length() > 128
+                || idempotencyKey.chars().anyMatch(character -> character < '!' || character > '~')) {
+            throw new IllegalStateException("The idempotency key must be 1 to 128 visible ASCII characters");
+        }
+        UUID actor = currentUser.accountId().orElseThrow(() -> new IllegalStateException(
+                "A credit entry is recorded by a signed-in account"));
+        return appendEntry(accountId, kind, amountMinor, note, new Request(actor, idempotencyKey));
     }
 
     @Transactional
     public LedgerEntry append(UUID accountId, CreditEntryKind kind, int amountMinor, String note) {
+        return appendEntry(accountId, kind, amountMinor, note, null);
+    }
+
+    private LedgerEntry appendEntry(UUID accountId, CreditEntryKind kind, int amountMinor, String note,
+                                    @Nullable Request request) {
         if (accountId == null || kind == null || kind.forBooking()) {
             throw new IllegalStateException("An account and a kind not tied to a booking are required");
         }
@@ -84,13 +106,29 @@ public class CreditLedger implements BookingPayments {
             throw new CreditAccountNotExternalException();
         }
         lock(accountId);
+        String fingerprint = fingerprint(accountId, kind, amountMinor, reason);
+        if (request != null) {
+            Optional<LedgerEntry> earlier = earlier(request, fingerprint);
+            if (earlier.isPresent()) {
+                return earlier.get();
+            }
+        }
         String currency = clubCurrency.currency().getCurrencyCode();
         long balance = balance(accountId, currency);
         int signed = kind == CreditEntryKind.CREDIT ? amountMinor : -amountMinor;
         if (balance + signed < 0) {
             throw new CreditInsufficientException(balance, currency);
         }
-        Recorded recorded = insert(accountId, kind, signed, currency, null, reason, null);
+        Recorded recorded;
+        try {
+            recorded = insertEntry(accountId, kind, signed, currency, null, reason, null,
+                    request == null ? null : request.key(), request == null ? null : fingerprint);
+        } catch (DataIntegrityViolationException reused) {
+            if (SqlConstraintViolation.matches(reused, SqlConstraintViolation.UNIQUE_VIOLATION, IDEMPOTENCY_INDEX)) {
+                throw new CreditIdempotencyKeyReusedException();
+            }
+            throw reused;
+        }
         return new LedgerEntry(recorded.id(), kind, signed, currency, balance + signed, recorded.at(), reason, null,
                 null);
     }
@@ -262,6 +300,7 @@ public class CreditLedger implements BookingPayments {
         }
     }
 
+    // Shares the account row, so a closure underway finishes first and its anonymisation is seen.
     private boolean anonymised(UUID accountId) {
         return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :account FOR SHARE")
                 .param("account", accountId).query(Boolean.class).optional().orElse(true);
@@ -269,12 +308,48 @@ public class CreditLedger implements BookingPayments {
 
     private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,
                             @Nullable UUID bookingId, @Nullable String reason, @Nullable String orderId) {
+        return insertEntry(accountId, kind, signed, currency, bookingId, reason, orderId, null, null);
+    }
+
+    // The same key under the same lock returns what the first request recorded; another request is refused.
+    private Optional<LedgerEntry> earlier(Request request, String fingerprint) {
+        return jdbc.sql("""
+                        SELECT account_id, request_fingerprint, id FROM credit_entry
+                        WHERE recorded_by = :actor AND idempotency_key = :key
+                        """)
+                .param("actor", request.actor()).param("key", request.key())
+                .query((rs, row) -> {
+                    if (!fingerprint.equals(rs.getString("request_fingerprint"))) {
+                        throw new CreditIdempotencyKeyReusedException();
+                    }
+                    return jdbc.sql("SELECT * FROM (" + ENTRIES + ") t WHERE t.id = :id")
+                            .param("account", rs.getObject("account_id", UUID.class))
+                            .param("id", rs.getObject("id", UUID.class))
+                            .query(CreditLedger::entry).single();
+                })
+                .optional();
+    }
+
+    private static String fingerprint(UUID accountId, CreditEntryKind kind, int amountMinor, String reason) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(
+                    (accountId + "\n" + kind + "\n" + amountMinor + "\n" + reason).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException missing) {
+            throw new IllegalStateException("SHA-256 is part of every Java platform", missing);
+        }
+    }
+
+    private Recorded insertEntry(UUID accountId, CreditEntryKind kind, int signed, String currency,
+                                 @Nullable UUID bookingId, @Nullable String reason, @Nullable String orderId,
+                                 @Nullable String idempotencyKey, @Nullable String fingerprint) {
         UUID entryId = UUID.randomUUID();
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         jdbc.sql("""
                         INSERT INTO credit_entry (id, account_id, kind, amount_minor, currency, recorded_at, recorded_by,
-                                                  booking_id, paypal_order_id)
-                        VALUES (:id, :account, :kind, :amount, :currency, :at, :by, :booking, :order)
+                                                  booking_id, paypal_order_id, idempotency_key, request_fingerprint)
+                        VALUES (:id, :account, :kind, :amount, :currency, :at, :by, :booking, :order, :key,
+                                :fingerprint)
                         """)
                 .param("id", entryId)
                 .param("account", accountId)
@@ -285,6 +360,8 @@ public class CreditLedger implements BookingPayments {
                 .param("by", currentUser.accountId().orElse(null))
                 .param("booking", bookingId)
                 .param("order", orderId)
+                .param("key", idempotencyKey)
+                .param("fingerprint", fingerprint)
                 .update();
         if (reason != null) {
             jdbc.sql("INSERT INTO credit_entry_note (entry_id, reason_text) VALUES (:id, :note)")
@@ -397,6 +474,9 @@ public class CreditLedger implements BookingPayments {
     }
 
     private record Recorded(UUID id, Instant at) {
+    }
+
+    private record Request(UUID actor, String key) {
     }
 
     private record Debit(UUID accountId, int amountMinor, String currency) {

@@ -11,6 +11,7 @@ import org.courtside.api.CreditApi;
 import org.courtside.credit.CreditEntryKind;
 import org.courtside.credit.internal.CreditLedger;
 import org.courtside.identity.CurrentUser;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,9 +57,10 @@ class CreditController implements CreditApi {
     }
 
     @Override
-    public ResponseEntity<ApiCreditEntry> recordCreditEntry(UUID accountId, ApiCreditEntryRequest request) {
+    public ResponseEntity<ApiCreditEntry> recordCreditEntry(UUID accountId, ApiCreditEntryRequest request,
+                                                            @Nullable String idempotencyKey) {
         CreditLedger.LedgerEntry entry = ledger.record(accountId, CreditEntryKind.valueOf(request.getKind().getValue()),
-                request.getAmountMinor(), request.getNote());
+                request.getAmountMinor(), request.getNote(), idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED).body(entry(entry));
     }
 

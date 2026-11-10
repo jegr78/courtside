@@ -8873,7 +8873,10 @@ paths:
         `PAYOUT` larger than the balance is refused with `urn:courtside:error:credit-insufficient`.
         An anonymised account is refused with `urn:courtside:error:account-anonymised`. Requires a
         re-authentication no older than five minutes. The audit record carries the amount and
-        kind, never the reason.
+        kind, never the reason. An attempt may carry an idempotency key; repeating the same request
+        with the same key returns the entry the first one recorded instead of appending a second,
+        and the same key with another request is refused with
+        `urn:courtside:error:idempotency-key-reused`. Without a key every request appends an entry.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8882,6 +8885,15 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: An opaque key unique to this entry attempt for the authenticated account.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[\x21-\x7E]+$'
       requestBody:
         required: true
         content:

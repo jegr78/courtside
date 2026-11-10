@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "c62d07509697ebdd9c43cc8c14d2e134ac9da92c947d73d60b6eed55a951db83",
+  "openApiFieldInventorySha256": "380a7d632d557e8bd74c1bf637cf499c5ca0cc68192a3a6dac7e3550c76aa2f8",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "a45d3afeaa869cdecb6f0915ec2d9f070a531bac0318a1469d1201029bbb5fe9",
+  "productionAuthorizationSha256": "cab1243caf32db2d054e43d77b8799d0a10aa82807e583da2e85a05efb90f79e",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -3127,6 +3127,7 @@
     "recordAttendance:response:Violation.code",
     "recordAttendance:response:Violation.params",
     "recordAttendance:response:Violation.params.*",
+    "recordCreditEntry:parameter:$parameter.header.Idempotency-Key",
     "recordCreditEntry:parameter:$parameter.path.accountId",
     "recordCreditEntry:request:CreditEntryRequest.amountMinor",
     "recordCreditEntry:request:CreditEntryRequest.kind",
@@ -6038,8 +6039,8 @@
         "target-account"
       ],
       "productionPaths": [
-        "src/main/java/org/courtside/credit/internal/CreditLedger.java#append",
-        "src/main/java/org/courtside/credit/internal/CreditLedger.java#insert"
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#appendEntry",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#insertEntry"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds"

@@ -1560,6 +1560,7 @@ const de = {
   "booking.series.moveConflict": "Einige Termine dieser Serie können nicht auf die gewünschte Zeit verschoben werden.",
   "booking.series.cardTracksPlayers": "Die Karte {{cardLabel}} erfasst Spieler; das kann eine Serie noch nicht. Bitte eine Karte ohne Spielererfassung verwenden.",
   "booking.idempotencyKey.reused": "Dieser Idempotenzschlüssel gehört bereits zu einer anderen Buchungsanfrage.",
+  "credit.idempotencyKey.reused": "Dieser Idempotenzschlüssel gehört bereits zu einer anderen Guthabenbuchung.",
   "card.inactive": "Diese Buchungskarte ist nicht aktiv.",
   "card.unknown": "Diese Buchungskarte gibt es nicht.",
   "court.inactive": "Dieser Platz ist nicht aktiv.",

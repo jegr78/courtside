@@ -332,6 +332,67 @@ class CreditLedgerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:credit-account-not-found"));
     }
 
+    @Test
+    void givenARecordedCredit_whenTheSameRequestIsSentAgainWithItsKey_thenTheFirstEntryAnswersAndNothingDoubles()
+            throws Exception {
+        // given
+        String first = record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        String again = record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(again).as("the resubmission answers with the entry it repeats").isEqualTo(first);
+        assertThat(entries(johnAccount)).as("a resubmitted cash credit is recorded once").isEqualTo(1);
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(1500);
+    }
+
+    @Test
+    void givenAClientWithoutAKey_whenItRecordsTheSameCreditTwice_thenBothAreRecordedAsBefore() throws Exception {
+        // when
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, null)
+                .andExpect(status().isCreated());
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, null)
+                .andExpect(status().isCreated());
+
+        // then
+        assertThat(entries(johnAccount)).as("without a key every request is a new entry").isEqualTo(2);
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(3000);
+    }
+
+    @Test
+    void givenARecordedCredit_whenItsKeyComesBackWithAnotherReason_thenItIsRefusedAsAnotherRequest()
+            throws Exception {
+        // given
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated());
+
+        // when / then
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Season refund", true, "entry-1")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"))
+                .andExpect(jsonPath("$.violations[0].code").value("credit.idempotencyKey.reused"));
+        assertThat(entries(johnAccount)).isEqualTo(1);
+    }
+
+    @Test
+    void givenARecordedCredit_whenAnotherRequestReusesItsKey_thenItIsRefusedAndNothingIsRecorded() throws Exception {
+        // given
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated());
+
+        // when / then
+        record("miles.richard", johnAccount, "CREDIT", 2000, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"))
+                .andExpect(jsonPath("$.violations[0].code").value("credit.idempotencyKey.reused"));
+        assertThat(entries(johnAccount)).isEqualTo(1);
+    }
+
     private org.springframework.test.web.servlet.RequestBuilder search(String query, UserDetails treasurer) {
         return post("/api/treasury/credit/account-search").with(user(treasurer)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"query\":\"%s\"}".formatted(query));
@@ -339,12 +400,20 @@ class CreditLedgerTest extends AbstractIntegrationTest {
 
     private ResultActions record(String username, UUID account, String kind, int amountMinor, String note,
                                  boolean recentlyProven) throws Exception {
+        return record(username, account, kind, amountMinor, note, recentlyProven, UUID.randomUUID().toString());
+    }
+
+    private ResultActions record(String username, UUID account, String kind, int amountMinor, String note,
+                                 boolean recentlyProven, String idempotencyKey) throws Exception {
         var request = post("/api/treasury/credit/accounts/{id}/entries", account)
                 .with(user(userDetails.loadUserByUsername(username))).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"kind\":\"%s\",\"amountMinor\":%d,\"note\":\"%s\"}".formatted(kind, amountMinor, note));
         if (recentlyProven) {
             request.sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli());
+        }
+        if (idempotencyKey != null) {
+            request.header("Idempotency-Key", idempotencyKey);
         }
         return mockMvc.perform(request);
     }

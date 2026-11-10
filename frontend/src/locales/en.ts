@@ -1562,6 +1562,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.series.moveConflict": "Some occurrences of this series cannot move to the requested time.",
   "booking.series.cardTracksPlayers": "The card {{cardLabel}} records players, which a series cannot yet do. Use a card that does not track players.",
   "booking.idempotencyKey.reused": "This idempotency key already belongs to another booking request.",
+  "credit.idempotencyKey.reused": "This idempotency key already belongs to another credit entry request.",
   "card.inactive": "This booking card is not active.",
   "card.unknown": "This booking card does not exist.",
   "court.inactive": "This court is not active.",

@@ -784,10 +784,10 @@ export const api = {
   }),
   creditEntries: (accountId: string, options: CreditPageOptions = {}) => request<CreditLedgerPage>(
     `/api/treasury/credit/accounts/${encodeURIComponent(accountId)}/entries?${creditPageQuery(options)}`),
-  recordCreditEntry: (accountId: string, entry: CreditEntryRequest) => request<CreditEntry>(
+  recordCreditEntry: (accountId: string, entry: CreditEntryRequest, idempotencyKey: string) => request<CreditEntry>(
     `/api/treasury/credit/accounts/${encodeURIComponent(accountId)}/entries`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
       body: JSON.stringify(entry)
     }),
   payPalRefundOptions: (accountId: string) => request<PayPalRefundOptions>(
