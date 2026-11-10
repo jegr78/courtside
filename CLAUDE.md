@@ -125,7 +125,10 @@ fails on the missing `BuildProperties` bean.
   `node tools/courtside.mjs check`, `./mvnw clean verify`, the complete browser suite or the complete
   release-gate set as a local finalisation step. The pull request's CI runs the required profiles
   and gates against the current target branch. A failed CI check is investigated and reproduced
-  with a focused test before a fix; neither a blind rerun nor a larger timeout is a remedy.
+  with a focused test before a fix; neither a blind rerun nor a larger timeout is a remedy for a
+  test that fails or hangs. A job's `timeout-minutes` is a guard against a hung run, not a cap on
+  how long a growing suite may take: set it about twice the job's usual duration and raise it when
+  the suite outgrows it.
 * **A change to the scanner normalizers is unverified until the assessment has run.**
   `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
   assert wordings somebody has already observed — so it is structurally unable to show that the

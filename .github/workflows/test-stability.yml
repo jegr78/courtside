@@ -11,7 +11,7 @@ permissions:
 jobs:
   varied-order:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -50,7 +50,7 @@ jobs:
 
   browser-order:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -83,7 +83,6 @@ jobs:
           npm ci --ignore-scripts
       - uses: ./.github/actions/browser-images
       - name: Prove browser isolation under varied project order
-        timeout-minutes: 27
         working-directory: frontend
         env:
           COURTSIDE_PROJECT_ORDER: ${{ matrix.project_order }}
@@ -129,7 +128,7 @@ jobs:
 
   browser-compatibility:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

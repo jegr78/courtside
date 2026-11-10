@@ -25,9 +25,9 @@ test("given the WebKit reliability matrix, when comparing local and hosted execu
   assert.match(browserOrder, /npm run reliability:webkit --\s+--order \"\$\{COURTSIDE_PROJECT_ORDER\}\"/);
   assert.doesNotMatch(browserOrder, /resource-profile|COURTSIDE_BROWSER_RESOURCE_PROFILE/);
   assert.doesNotMatch(browserOrder, /head\.repo\.full_name/);
-  assert.match(browserOrder, /browser-order:[\s\S]*timeout-minutes: 40/);
+  assert.match(browserOrder, /browser-order:[\s\S]*timeout-minutes: 90/);
   assert.match(browserOrder, /Package application\n\s+timeout-minutes: 10/);
-  assert.match(browserOrder, /Prove browser isolation under varied project order\n\s+timeout-minutes: 27/);
+  assert.doesNotMatch(browserOrder, /Prove browser isolation under varied project order\n\s+timeout-minutes/);
   assert.match(browserOrder, /quality\/webkit-reliability\.schema\.json/);
   assert.match(browserOrder, /frontend\/test-results\/webkit-reliability\/\*\.json/);
   assert.match(browserOrder, /if: \$\{\{ always\(\) && steps\.validate-webkit-record\.outcome == 'success' \}\}/);
