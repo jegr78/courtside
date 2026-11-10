@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = {
+        "courtside.login-protection.verification-concurrency=1",
         "courtside.login-protection.address.max-failures=2",
         "courtside.login-protection.global.threshold=20"
 })

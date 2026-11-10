@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.SqlStatementCounter;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -25,7 +25,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@ClockAt("2026-04-01T10:00:00Z")
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

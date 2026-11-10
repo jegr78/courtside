@@ -1,5 +1,6 @@
 package org.courtside.member.web;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-05-11T22:30:00Z")
+@ClockAt("2026-05-11T22:30:00Z")
 class MembershipPeriodStateControllerTest extends AbstractIntegrationTest {
 
     private static final String ACTIVE = "cccccccc-0000-0000-0000-000000000001";

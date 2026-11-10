@@ -14,8 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -33,9 +31,6 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     private SentMail mail;
 

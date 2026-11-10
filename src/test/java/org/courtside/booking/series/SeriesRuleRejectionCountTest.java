@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -25,7 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@ClockAt("2026-04-01T10:00:00Z")
 class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");

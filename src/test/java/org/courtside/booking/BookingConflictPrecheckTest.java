@@ -18,7 +18,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,10 +48,10 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
     @Autowired
     private BookingService service;
 
-    @MockitoSpyBean
+    @Autowired
     private BookingRepository bookings;
 
-    @MockitoSpyBean
+    @Autowired
     private CourtAllocationRepository allocations;
 
     @Autowired

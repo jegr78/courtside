@@ -13,9 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Set;
@@ -30,9 +28,6 @@ import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
 class ClubWordingMessageTest extends AbstractIntegrationTest {
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private ApplicationEventPublisher events;

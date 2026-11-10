@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.Booking;
@@ -16,8 +17,6 @@ import org.junit.jupiter.api.Timeout;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -40,7 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@ClockAt("2026-04-01T10:00:00Z")
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
 
@@ -54,7 +53,7 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     @Autowired
     private BookingService bookingService;
 
-    @MockitoSpyBean
+    @Autowired
     private BookingRepository bookings;
 
     @Autowired
@@ -63,7 +62,7 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
-    @MockitoSpyBean
+    @Autowired
     private FacilityService facility;
 
     private UUID court;

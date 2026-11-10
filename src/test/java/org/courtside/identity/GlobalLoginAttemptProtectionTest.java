@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = {
-        "courtside.login-protection.address.max-failures=20",
+        "courtside.login-protection.address.max-failures=100",
         "courtside.login-protection.global.threshold=2"
 })
 class GlobalLoginAttemptProtectionTest extends AbstractIntegrationTest {

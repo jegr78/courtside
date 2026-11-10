@@ -17,8 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -48,9 +46,6 @@ class BookingReminderTest extends AbstractIntegrationTest {
     private static final Instant IN_SIX_WEEKS = Instant.parse("2026-06-24T16:00:00Z");
     private static final Instant A_DAY_AHEAD = Instant.parse("2026-05-13T10:00:00Z");
     private static final Instant A_WEEK_EARLIER = Instant.parse("2026-05-05T10:00:00Z");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private BookingService bookings;

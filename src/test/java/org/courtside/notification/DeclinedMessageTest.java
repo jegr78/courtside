@@ -22,8 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -45,9 +43,6 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final Instant SIX_PM = Instant.parse("2026-05-12T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-12T17:00:00Z");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private BookingService bookings;

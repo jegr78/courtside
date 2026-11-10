@@ -17,9 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -45,9 +43,6 @@ class ExternalDoorCodeMessageTest extends AbstractIntegrationTest {
     private static final String HALL_CODE = "864200";
     private static final TimeSlot EVENING =
             new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z"));
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;

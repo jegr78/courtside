@@ -19,8 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -48,9 +46,6 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
             new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z"));
     private static final String OLD_CODE = "135790";
     private static final String NEW_CODE = "975310";
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private BookingService bookings;

@@ -1,6 +1,5 @@
 package org.courtside.payment;
 
-import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.PendingPayments;
@@ -14,7 +13,6 @@ import org.courtside.payment.internal.PayPalCheckout;
 import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +25,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -62,9 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(OutputCaptureExtension.class)
-@TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=1s"})
-class PayPalCheckoutTest extends AbstractIntegrationTest {
+class PayPalCheckoutTest extends PayPalIntegrationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ORDER = FakePayPal.ORDER;
@@ -76,7 +69,6 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     private static final String DECLINED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"declined\","
             + "\"details\":[{\"issue\":\"INSTRUMENT_DECLINED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
-    private static final FakePayPal PAYPAL = new FakePayPal();
 
     @Autowired
     private WebApplicationContext context;
@@ -111,21 +103,8 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     private UUID johnAccount;
     private UUID winterHall;
 
-    @DynamicPropertySource
-    static void endpoints(DynamicPropertyRegistry registry) {
-        String base = "http://127.0.0.1:" + PAYPAL.port();
-        registry.add("courtside.payment.paypal.sandbox-endpoint", () -> base + "/sandbox");
-        registry.add("courtside.payment.paypal.live-endpoint", () -> base + "/live");
-    }
-
-    @AfterAll
-    static void stop() {
-        PAYPAL.stop();
-    }
-
     @BeforeEach
     void setUp() {
-        PAYPAL.reset();
         PAYPAL.reply(TOKEN, 200, "{\"access_token\":\"token-1\",\"expires_in\":3600}");
         PAYPAL.reply("POST /live/v1/oauth2/token", 200, "{\"access_token\":\"token-2\",\"expires_in\":3600}");
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

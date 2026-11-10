@@ -8,9 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,9 +27,6 @@ import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
 class WelcomeMessageTest extends AbstractIntegrationTest {
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private IdentityTestFixture identity;

@@ -1,6 +1,5 @@
 package org.courtside.payment;
 
-import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
@@ -25,9 +24,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -62,12 +58,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Two admission slots and a larger pool let two treasurers' returns meet at the order's row lock.
-@TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=1s", "courtside.admission.classes[payment-provider-check].cost=5",
-        "courtside.admission.classes[payment-provider-check].concurrency=2",
-        "spring.datasource.hikari.maximum-pool-size=6"})
-class PayPalRefundTest extends AbstractIntegrationTest {
+class PayPalRefundTest extends PayPalIntegrationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ORDER = FakePayPal.ORDER;
@@ -85,7 +76,6 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
     private static final Duration UNTIL_CONTENTION = Duration.ofSeconds(4);
     private static final ExecutorService THREADS = Executors.newCachedThreadPool();
-    private static final FakePayPal PAYPAL = new FakePayPal();
 
     @Autowired
     private WebApplicationContext context;
@@ -121,22 +111,13 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     private UUID richardAccount;
     private UUID winterHall;
 
-    @DynamicPropertySource
-    static void endpoints(DynamicPropertyRegistry registry) {
-        String base = "http://127.0.0.1:" + PAYPAL.port();
-        registry.add("courtside.payment.paypal.sandbox-endpoint", () -> base + "/sandbox");
-        registry.add("courtside.payment.paypal.live-endpoint", () -> base + "/live");
-    }
-
     @AfterAll
     static void stop() {
-        PAYPAL.stop();
         THREADS.close();
     }
 
     @BeforeEach
     void setUp() {
-        PAYPAL.reset();
         PAYPAL.reply(TOKEN, 200, "{\"access_token\":\"token-1\",\"expires_in\":3600}");
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         courtId = facility.createCourt(1, "Court 1");

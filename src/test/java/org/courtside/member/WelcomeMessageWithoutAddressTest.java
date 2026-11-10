@@ -6,8 +6,6 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
 import java.util.Set;
@@ -21,9 +19,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 class WelcomeMessageWithoutAddressTest extends AbstractIntegrationTest {
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private IdentityTestFixture identity;

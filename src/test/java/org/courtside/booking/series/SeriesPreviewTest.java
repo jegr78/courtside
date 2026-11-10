@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -19,9 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -36,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@ClockAt("2026-04-01T10:00:00Z")
 class SeriesPreviewTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -62,7 +61,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
     @Autowired
     private RulesTestFixture rules;
 
-    @MockitoSpyBean
+    @Autowired
     private CourtAllocationRepository allocations;
 
     @Autowired

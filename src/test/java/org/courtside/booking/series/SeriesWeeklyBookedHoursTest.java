@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import org.courtside.ClockAt;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.card.testfixture.CardTestFixture;
@@ -13,7 +14,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@ClockAt("2026-04-01T10:00:00Z")
 class SeriesWeeklyBookedHoursTest extends AbstractIntegrationTest {
 
     private static final Set<Role> TRAINER = Set.of(Role.TRAINER);

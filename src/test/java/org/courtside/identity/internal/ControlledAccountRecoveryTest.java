@@ -49,8 +49,6 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     @Autowired private AccountCredentialIssuer credentials;
     @Autowired private org.courtside.identity.AccountCredentials credentialRequests;
     @Autowired private AccountRecoveryService ordinaryRecovery;
-    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
-    private org.springframework.mail.javamail.JavaMailSender sender;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name = "mailOutboxExecutor")
     private org.springframework.core.task.TaskExecutor mailExecutor;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean

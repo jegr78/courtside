@@ -1,5 +1,12 @@
 package org.courtside;
 
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.internal.CourtAllocationRepository;
+import org.courtside.booking.internal.SeriesOccurrenceCancellation;
+import org.courtside.facility.FacilityService;
+import org.courtside.shared.BookingAnnouncer;
+import org.courtside.shared.SecurityEventLog;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.courtside.access.testfixture.AccessTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
@@ -19,8 +26,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +38,9 @@ import java.util.Set;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@MockitoSpyBean(types = {BookingAnnouncer.class, BookingRepository.class, CourtAllocationRepository.class,
+        FacilityService.class, SeriesOccurrenceCancellation.class, SecurityEventLog.class,
+        JdbcIndexedSessionRepository.class})
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
         QuietMailConfiguration.class, SqlCountingConfiguration.class,
         SafePasswordLookupConfiguration.class,
@@ -54,6 +67,12 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private TestClock testClock;
+
+    @MockitoSpyBean
+    protected JavaMailSender sender;
+
     @BeforeAll
     static synchronized void captureDatabaseBaseline(@Autowired JdbcClient jdbc) {
         jdbc.sql("CREATE SCHEMA IF NOT EXISTS " + BASELINE_SCHEMA).update();
@@ -67,6 +86,18 @@ public abstract class AbstractIntegrationTest {
                 .forEach(table -> jdbc.sql("CREATE TABLE " + BASELINE_SCHEMA + "." + table
                         + " AS TABLE public." + table + (SEEDED_TABLES.contains(table) ? "" : " WITH NO DATA"))
                         .update());
+    }
+
+    @BeforeEach
+    void setTestClock() {
+        for (Class<?> type = getClass(); type != null; type = type.getEnclosingClass()) {
+            ClockAt at = type.getAnnotation(ClockAt.class);
+            if (at != null) {
+                testClock.set(Instant.parse(at.value()));
+                return;
+            }
+        }
+        testClock.reset();
     }
 
     @BeforeEach

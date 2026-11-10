@@ -21,8 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -59,9 +57,6 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     private static final Instant EARLIER = Instant.parse("2026-05-12T09:00:00Z");
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     private static final String NOT_FOUND = "urn:courtside:error:notification-not-found";
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private WebApplicationContext context;
