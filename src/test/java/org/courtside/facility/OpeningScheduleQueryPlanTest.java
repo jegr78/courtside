@@ -2,14 +2,12 @@ package org.courtside.facility;
 
 import jakarta.persistence.EntityManagerFactory;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.SqlCountingConfiguration;
 import org.courtside.SqlStatementCounter;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -18,7 +16,6 @@ import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(SqlCountingConfiguration.class)
 class OpeningScheduleQueryPlanTest extends AbstractIntegrationTest {
 
     @Autowired

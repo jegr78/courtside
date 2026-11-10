@@ -4,14 +4,12 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(IdentityTestFixture.class)
 class IdentityTestFixtureTest extends AbstractIntegrationTest {
 
     @Autowired
