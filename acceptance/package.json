@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "ACCEPTANCE_CONFIG=config.example.json ACCEPTANCE_PASSWORD=unused ACCEPTANCE_RUN_DIR=../build/acceptance-selftest playwright test --config test/playwright.config.ts",
+    "test": "ACCEPTANCE_CONFIG=config.example.json ACCEPTANCE_PASSWORD=unused ACCEPTANCE_PAYPAL_BUYER_PASSWORD=unused ACCEPTANCE_RUN_DIR=../build/acceptance-selftest playwright test --config test/playwright.config.ts",
     "typecheck": "tsc -p .",
     "device": "node device/iphone.mjs"
   },
