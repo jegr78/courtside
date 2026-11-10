@@ -380,7 +380,6 @@ export function backupReadingProblems(backup, checkedAt) {
 // An instance before dated periods answers no membershipCurrent; there a set type without an end is the membership.
 export const holdsMembership = (entry) => entry.membershipCurrent ?? Boolean(entry.membershipTypeId && !entry.membershipEndedOn);
 
-export const barsCourtBooking = (rules) => (rules ?? []).some((rule) => rule.ruleType === "NO_COURT_BOOKING");
 
 const samePeriod = (a, b) => a.membershipTypeId === b.membershipTypeId && a.startedOn === b.startedOn && (a.endedOn ?? null) === (b.endedOn ?? null);
 const periodBody = (period) => ({ membershipTypeId: period.membershipTypeId, startedOn: period.startedOn, endedOn: period.endedOn ?? null });

@@ -99,12 +99,12 @@ created.
   and the run button disabled, and only a preview id nobody created is sent to the run endpoint to
   read its typed refusal. The journey puts both periods back in the same test, and the postflight
   does so again from the ledger after an interrupted run, so the club keeps the periods it had.
-- For the membership period journey, a rule set bound for people without a membership type that
-  carries `NO_COURT_BOOKING`, and a first disposable member who holds one membership period running
+- For the membership period journey, a first disposable member who holds one membership period running
   today that lasts past the tenth day after the window and none scheduled. The first court has to
   be free at opening on that tenth day. On desktop-chrome the journey records the member's periods
   in the ledger, and the admin moves the running period's start to tomorrow on the person page. The
-  member's booking of that court is then refused with `booking.rule.noCourtBooking`. A period
+  member's booking of that court on the member card is then refused with `card-role-required`, because
+  that card admits only people whose membership runs today. A period
   overlapping the scheduled one is refused with `membership-periods-overlap`. After the start is
   moved to today, the same booking is accepted and the member cancels it. The journey puts every
   period back in the same test and the postflight does so again from the ledger. A scheduled

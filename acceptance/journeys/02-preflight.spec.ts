@@ -9,7 +9,7 @@ import { addDays, zonedInstant } from "../config/calendar.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { DISPOSABLE_PROFILES, disposableFor, profilesOf, resetQuota } from "../config/disposables.mjs";
-import { attendanceErasureSql, barsCourtBooking, foreignImportSources, membershipPeriodProblems, foreignWordings, periodsOf, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, foreignImportSources, membershipPeriodProblems, foreignWordings, periodsOf, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
 import { noShowLimitFor, personaUsernames } from "../lib/attendance";
 import { readLedger } from "../lib/ledger";
 import { erase } from "../lib/erasure";
@@ -86,10 +86,6 @@ test("when the environment is checked before a run, then every precondition hold
     const periodWalker = (await readRoster(admin)).find((entry) => entry.username === disposableFor(PERIOD_PROFILE, disposables));
     const periodsAnswer = periodWalker ? await admin.get(`/api/admin/roster/${periodWalker.personId}/membership-periods`) : undefined;
     checks.membershipPeriods = periodsAnswer?.ok() ? membershipPeriodProblems(await periodsAnswer.json(), noticeDay) : [`answered ${periodsAnswer?.status() ?? "no person"}`];
-    const club = await (await admin.get("/api/admin/config")).json() as { noMembershipTypeRuleSetId?: string | null };
-    checks.withoutTypeBarsBooking = club.noMembershipTypeRuleSetId
-      ? barsCourtBooking(await (await admin.get(`/api/admin/rule-sets/${club.noMembershipTypeRuleSetId}/rules`)).json())
-      : false;
     const periodDay = await (await admin.get(`/api/bookings?date=${noticeDay}`)).json();
     const { opensAt: periodOpensAt } = governingHours(noticeGrid, noticeDay);
     const periodStart = periodOpensAt ? zonedInstant(noticeDay, periodOpensAt.slice(0, 5), plan.timeZone) : undefined;
@@ -144,7 +140,6 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
   expect.soft(checks.foreignImportSources, "PRECONDITION: no acceptance import source of an earlier run is left, so this run removes only the one it describes").toEqual([]);
   expect.soft(checks.membershipPeriods, `PRECONDITION: the disposable member of ${PERIOD_PROFILE} holds one running membership period that lasts past the tenth day after the window and none scheduled`).toEqual([]);
-  expect.soft(checks.withoutTypeBarsBooking, "PRECONDITION: the club binds a rule set for people without a membership type that carries NO_COURT_BOOKING").toBe(true);
   expect.soft(checks.periodBookingSlot, "PRECONDITION: the first court is free at opening on the tenth day after the window").toEqual([]);
   expect.soft(checks.activeMembershipType, "PRECONDITION: the club has an active membership type the acceptance import source can default to").toBe(true);
   expect.soft((checks.retentionPeriods as { status: number }).status, "PRECONDITION: the admin reads the retention periods, which the retention journey sets and puts back").toBe(200);

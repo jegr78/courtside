@@ -1569,7 +1569,7 @@ test("given the retention journey, when its source is read, then it lets no run 
   assert.doesNotMatch(source, /previews\/\$\{preview\.previewId\}\/run/, "the journey never runs the preview it took");
 });
 
-import { barsCourtBooking, comparablePeriods, holdsMembership, membershipPeriodProblems, periodRestorations, periodSnapshots } from "../acceptance/lib/core.mjs";
+import { comparablePeriods, holdsMembership, membershipPeriodProblems, periodRestorations, periodSnapshots } from "../acceptance/lib/core.mjs";
 
 const period = (id, startedOn, endedOn, state, membershipTypeId = "type-a") => ({ id, membershipTypeId, startedOn, endedOn, state });
 
@@ -1655,13 +1655,6 @@ test("given a roster entry with and without the membership flag, when read, then
   assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: null }), true);
   assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: "2020-01-01" }), false);
   assert.equal(holdsMembership({ membershipTypeId: null }), false);
-});
-
-test("given a rule set's rules, when read, then only NO_COURT_BOOKING bars booking", () => {
-  // then
-  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }, { ruleType: "NO_COURT_BOOKING", params: {} }]), true);
-  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]), false);
-  assert.equal(barsCourtBooking(undefined), false);
 });
 
 test("given the membership period journey, when its source is read, then it puts the periods back in a finally block", () => {
