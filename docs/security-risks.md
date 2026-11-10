@@ -128,9 +128,20 @@ membership ends keeps knowing the code until the board changes it at its keypad.
 also keeps the last answer in the browser cache, without an end of validity, until the next
 successful refresh, sign-out or the cache's seven-day limit, so a device that stays offline keeps
 showing it. Reading the cached code needs the unlocked device or its browser profile. Changing the
-code tells every current member the new one and nobody else. Reconsider if a club needs a door that
-stops opening for a departed member on the day the membership ends, which only a per-member dynamic
-code can do.
+code tells every current member the new one, and every outsider who may read it at that moment.
+Reconsider if a club needs a door that stops opening for a departed member on the day the membership
+ends, which only a per-member dynamic code can do.
+
+## An external booker reads the members' door code from confirmation on
+
+When a club opens bookings to external players, anybody with a verified email address can register.
+Such an outsider reads the static code of every access point open to members as soon as it holds a
+confirmed booking on a card that grants access, however far ahead that booking starts. It may then
+cancel before the cancellation deadline, get the price back as credit and keep knowing the code until
+the board changes it at its keypad. The exposure needs a verified mailbox and a booking the club's
+rules accept, and it exists only in a club that switches external bookings on and opens a door to
+members. Reconsider if a club reports a stranger at a members' door, or if outsiders should read the
+code only once a cancellation can no longer return the price.
 
 ## An emergency code is a permanent shared code
 
