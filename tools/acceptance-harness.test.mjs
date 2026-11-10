@@ -176,7 +176,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { availabilityConflicts, firstUsableWeek, governingHours, journeysOf, LaneError, lastBookableDay, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
+import { availabilityConflicts, courtRotations, firstUsableWeek, governingHours, journeysOf, LaneError, lastBookableDay, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -206,32 +206,43 @@ test("when the lanes are planned, then weekday lanes use the first two courts, t
 test("given weeks with occupied lanes, when the window is chosen, then the first free week inside the advance window wins", () => {
   // given
   const weeks = [
-    { start: "2030-03-11", lastDay: "2030-03-27", occupied: ["desktop-chrome/rebook 2030-03-11 10:00 court 1: seed"] },
-    { start: "2030-03-18", lastDay: "2030-04-03", occupied: [] },
-    { start: "2030-03-25", lastDay: "2030-04-10", occupied: [] }
+    { start: "2030-03-11", courts: [1, 2, 3], lastDay: "2030-03-27", occupied: ["desktop-chrome/rebook 2030-03-11 10:00 court 1: seed"] },
+    { start: "2030-03-11", courts: [2, 3, 1], lastDay: "2030-03-27", occupied: [] },
+    { start: "2030-03-18", courts: [1, 2, 3], lastDay: "2030-04-03", occupied: [] }
   ];
   // when / then
-  assert.equal(firstUsableWeek(weeks, "2030-04-05"), "2030-03-18");
-  assert.equal(firstUsableWeek(weeks, null), "2030-03-18", "a club without an advance window takes the first free week");
+  assert.deepEqual(firstUsableWeek(weeks, "2030-04-05"), { start: "2030-03-11", courts: [2, 3, 1] });
+  assert.deepEqual(firstUsableWeek(weeks.slice(2), null), { start: "2030-03-18", courts: [1, 2, 3] }, "a club without an advance window takes the first free week");
+});
+
+test("given a club booking that holds one court every Monday at 10:00 and every Wednesday at 08:00 and 14:00, when the courts are rotated, then for each court one order keeps every lane off it", () => {
+  // given
+  const hoursOf = () => ({ opensAt: "07:00:00", closesAt: "23:00:00" });
+  const held = (slot) => (slot.date === "2030-03-11" && slot.start === "10:00") || (slot.date === "2030-03-13" && ["08:00", "14:00"].includes(slot.start));
+  // when / then
+  for (const court of [1, 2, 3]) {
+    const free = courtRotations([1, 2, 3]).filter((order) => !planLanes({ start: "2030-03-11", courts: order, hoursOf }).slots.some((slot) => slot.court === court && held(slot)));
+    assert.ok(free.length > 0, `some court order keeps the lanes off court ${court} at the club's own hours`);
+  }
 });
 
 test("given an advance window of 21 days, when the last bookable day is read, then it is the twentieth day ahead because the rule refuses the twenty-first", () => {
   // when / then
   assert.equal(lastBookableDay("2030-03-01", 21, addDays), "2030-03-21");
   assert.equal(lastBookableDay("2030-03-01", null, addDays), null, "a club without an advance window has no last bookable day");
-  assert.throws(() => firstUsableWeek([{ start: "2030-03-04", lastDay: "2030-03-22", occupied: [] }], lastBookableDay("2030-03-01", 21, addDays)), LaneError,
+  assert.throws(() => firstUsableWeek([{ start: "2030-03-04", courts: [1, 2, 3], lastDay: "2030-03-22", occupied: [] }], lastBookableDay("2030-03-01", 21, addDays)), LaneError,
     "a week whose last journey day is the twenty-first day ahead is refused");
 });
 
 test("given free weeks beyond the advance window only, when the window is chosen, then the refusal names each week and why", () => {
   // given
   const weeks = [
-    { start: "2030-03-11", lastDay: "2030-03-27", occupied: ["ipad/youth 2030-03-13 09:00 court 3: seed"] },
-    { start: "2030-03-18", lastDay: "2030-04-03", occupied: [] }
+    { start: "2030-03-11", courts: [1, 2, 3], lastDay: "2030-03-27", occupied: ["ipad/youth 2030-03-13 09:00 court 3: seed"] },
+    { start: "2030-03-18", courts: [1, 2, 3], lastDay: "2030-04-03", occupied: [] }
   ];
   // when / then
   assert.throws(() => firstUsableWeek(weeks, "2030-03-30"), (error) => error instanceof LaneError
-    && /2030-03-11: occupied ipad\/youth/.test(error.message) && /2030-03-18: its last journey day 2030-04-03 is after the last bookable day 2030-03-30/.test(error.message));
+    && /2030-03-11 courts 1\/2\/3: occupied ipad\/youth/.test(error.message) && /2030-03-18 courts 1\/2\/3: its last journey day 2030-04-03 is after the last bookable day 2030-03-30/.test(error.message));
 });
 
 test("given rule sets with and without advance windows, when the shortest is read, then only active sets count", () => {

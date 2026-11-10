@@ -123,12 +123,14 @@ export const shortestAdvanceWindow = (ruleSets) => ruleSets
 // The advance rule refuses a booking maxDays or more days ahead, so the last bookable day is one before.
 export const lastBookableDay = (today, maxDays, addDays) => maxDays === null ? null : addDays(today, maxDays - 1);
 
+export const courtRotations = (courts) => courts.map((_, shift) => [...courts.slice(shift), ...courts.slice(0, shift)]);
+
 export function firstUsableWeek(weeks, latestBookable) {
   const reasons = [];
   for (const week of weeks) {
     const tooFar = latestBookable !== null && week.lastDay > latestBookable;
-    if (!tooFar && week.occupied.length === 0) return week.start;
-    reasons.push(`${week.start}: ${tooFar ? `its last journey day ${week.lastDay} is after the last bookable day ${latestBookable}` : `occupied ${week.occupied.join(", ")}`}`);
+    if (!tooFar && week.occupied.length === 0) return { start: week.start, courts: week.courts };
+    reasons.push(`${week.start} courts ${week.courts.join("/")}: ${tooFar ? `its last journey day ${week.lastDay} is after the last bookable day ${latestBookable}` : `occupied ${week.occupied.join(", ")}`}`);
   }
   throw new LaneError(`no week has free lanes inside the advance window; ${reasons.join("; ")}`);
 }
