@@ -15,4 +15,8 @@ interface ClubConfigurationRepository extends JpaRepository<ClubConfiguration, U
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT configuration FROM ClubConfiguration configuration WHERE configuration.id = :id")
     Optional<ClubConfiguration> lockById(@Param("id") UUID id);
+
+    @Query("SELECT new org.courtside.config.internal.ClubShellText(configuration.clubName, "
+            + "configuration.defaultLocale) FROM ClubConfiguration configuration WHERE configuration.id = :id")
+    Optional<ClubShellText> findShellTextById(@Param("id") UUID id);
 }

@@ -794,7 +794,10 @@ The application shell names the club too. Every client route answers `index.html
 set to the club's language and a `<meta name="description">` built from the club name in that
 language, the same text the manifest's description carries. The server writes both, because link
 previews and most crawlers run no JavaScript, and it sends no `Last-Modified` for the shell, since
-a renamed club changes the document without changing the file. An installed app's service worker
+a renamed club changes the document without changing the file. When the database cannot answer the
+lookup of the club's name and language, an anonymous request gets the shell as built, once the
+connection pool has waited out its connection timeout (30 seconds by default). A signed-in request
+reads its session from the database before it reaches the shell and still fails. An installed app's service worker
 answers navigations from the `index.html` it cached at build time, which carries neither; the
 frontend sets the language there once it starts.
 
