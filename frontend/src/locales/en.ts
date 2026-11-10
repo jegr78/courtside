@@ -1222,6 +1222,7 @@ const en: Record<keyof typeof de, string> = {
   "payment.paypal.unavailable": "PayPal cannot take the payment right now. Try again in a few minutes.",
   "error.type.paypal-unavailable": "PayPal cannot take the payment right now. Try again in a few minutes.",
   "payment.paypal.refund.notRefundable": "This payment cannot be returned through PayPal. Only a payment whose booking was cancelled and credited back can.",
+  "payment.paypal.refund.notCredited": "This payment never became credit. Return it in the club's PayPal account.",
   "payment.paypal.refund.alreadyRefunded": "This payment was already returned through PayPal.",
   "payment.paypal.refund.creditSpent": "The credit from this payment was spent, so the balance no longer covers it.",
   "payment.paypal.refund.unavailable": "PayPal is switched off or set to another environment. Pay the amount out by hand.",

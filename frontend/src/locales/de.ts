@@ -1220,6 +1220,7 @@ const de = {
   "payment.paypal.unavailable": "PayPal kann die Zahlung gerade nicht annehmen. Versuch es in ein paar Minuten noch einmal.",
   "error.type.paypal-unavailable": "PayPal kann die Zahlung gerade nicht annehmen. Versuch es in ein paar Minuten noch einmal.",
   "payment.paypal.refund.notRefundable": "Diese Zahlung lässt sich nicht über PayPal zurückzahlen. Das geht nur, wenn die Buchung storniert und als Guthaben gutgeschrieben wurde.",
+  "payment.paypal.refund.notCredited": "Diese Zahlung wurde nie zu Guthaben. Zahl sie im PayPal-Konto des Vereins zurück.",
   "payment.paypal.refund.alreadyRefunded": "Diese Zahlung wurde schon über PayPal zurückgezahlt.",
   "payment.paypal.refund.creditSpent": "Das Guthaben aus dieser Zahlung wurde schon ausgegeben, der Kontostand deckt sie nicht mehr.",
   "payment.paypal.refund.unavailable": "PayPal ist ausgeschaltet oder auf eine andere Umgebung gestellt. Zahl den Betrag von Hand aus.",

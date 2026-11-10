@@ -171,6 +171,15 @@ final class FakePayPal {
         return refunded;
     }
 
+    static String partlyRefundedOrder(UUID booking, String refundStatus, String refundValue) {
+        String partly = order("COMPLETED", booking, "15.00", capture("PARTIALLY_REFUNDED", "15.00"))
+                .replace("}]}}],\"links\"", "}],\"refunds\":[{\"id\":\"REFUND9\",\"status\":\"" + refundStatus
+                        + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + refundValue
+                        + "\"}}]}}],\"links\"");
+        assertThat(partly).as("the refund is listed in the order").contains("\"refunds\":[{\"id\":\"REFUND9");
+        return partly;
+    }
+
     static String capture(String status, String value) {
         return "{\"id\":\"CAPTURE1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
                 + value + "\"}}";

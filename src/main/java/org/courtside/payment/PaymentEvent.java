@@ -72,7 +72,7 @@ public sealed interface PaymentEvent extends DomainEventRecord {
     }
 
     record PayPalLateCapture(UUID bookingId, String orderId, String captureId, int amountMinor, String currency,
-                             boolean credited) implements PaymentEvent {
+                             boolean credited, String reason) implements PaymentEvent {
 
         static final String TYPE = "payment.paypal.lateCapture";
 

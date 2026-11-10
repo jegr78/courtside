@@ -747,6 +747,27 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAVoidedOrderWithACaptureAttempt_whenPayPalShowsTheCapturePartlyRefunded_thenTheRestBecomesCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, null));
+        cancel().andExpect(jsonPath("$.outcome").value("REJECTED"));
+        age(Duration.ofMinutes(6));
+        PAYPAL.replaceReply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "5.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1000));
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("PARTLY_REFUNDED"));
+    }
+
+    @Test
     void givenAVoidedOrderWithoutACaptureAttempt_whenTheJobRuns_thenPayPalIsNotAsked() throws Exception {
         // given
         UUID booking = bookWithOrder();

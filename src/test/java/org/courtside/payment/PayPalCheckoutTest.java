@@ -676,6 +676,85 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenACaptureRefundedAtPayPal_whenThePayerReturns_thenTheOrderEndsWithoutCreditAndIsNotReadAgain()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("REFUNDED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(orderStatus()).as("a refunded capture is final").isEqualTo("REJECTED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("the money went back to the payer").isEmpty();
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("CAPTURE_REFUNDED"));
+        int reads = PAYPAL.seen(READ).size();
+        assertThat(checkout.reconcile(ORDER, UNRESOLVED_RELEASE).outcome()).isEqualTo(PayPalCheckout.Outcome.REJECTED);
+        assertThat(PAYPAL.seen(READ)).as("a final order is not read again").hasSize(reads);
+    }
+
+    @Test
+    void givenACapturePartlyRefundedAtPayPal_whenThePayerReturns_thenTheRetainedRestBecomesCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "5.00"));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(bookingStatus(booking)).as("a partly returned payment never confirms the booking")
+                .isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("the club kept 15.00 less the 5.00 PayPal returned")
+                .containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1000));
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement().satisfies(payload -> {
+            assertThat(payload.get("credited").asBoolean()).isTrue();
+            assertThat(payload.get("amountMinor").asInt()).isEqualTo(1000);
+            assertThat(payload.get("reason").asString()).isEqualTo("PARTLY_REFUNDED");
+        });
+        assertThat(audit("booking.booking.confirmed", booking)).isEmpty();
+    }
+
+    @Test
+    void givenACapturePartlyRefundedWithARefundStillPending_whenThePayerReturns_thenItIsLeftToTheTreasurer()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "PENDING", "5.00"));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("what the club keeps is not known while PayPal still refunds").isEmpty();
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement().satisfies(payload -> {
+            assertThat(payload.get("credited").asBoolean()).isFalse();
+            assertThat(payload.get("reason").asString()).isEqualTo("REFUND_PENDING");
+        });
+    }
+
+    @Test
+    void givenACaptureAfterTheHoldEnded_whenItIsRecorded_thenTheAuditNamesWhyItIsLate() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        assertThat(pendingPayments.release(booking)).isTrue();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_ENDED"));
+    }
+
+    @Test
     void givenAPendingCapture_whenCapturing_thenTheCourtStaysHeld() throws Exception {
         // given
         UUID booking = bookWithOrder();

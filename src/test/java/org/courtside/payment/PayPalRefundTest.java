@@ -640,6 +640,44 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenACapturePartlyRefundedAtPayPal_whenTheRestIsReturned_thenTheCreditedRestGoesBack() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "5.00"));
+        capture().andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1000);
+        PAYPAL.reply(REFUND, 201, FakePayPal.refund("COMPLETED", "10.00"));
+        option().andExpect(jsonPath("$.items[0].refundable").value(true));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(refundRow()).containsEntry("amount_minor", 1000);
+    }
+
+    @Test
+    void givenALateCaptureThatNeverBecameCredit_whenReturning_thenTheReasonSaysToSettleItInPayPal()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "PENDING", "5.00"));
+        capture().andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+        option().andExpect(jsonPath("$.items[0].blockedBy").value("payment.paypal.refund.notCredited"));
+
+        // when
+        refused(refund("miles.richard", ORDER, true), "urn:courtside:error:paypal-refund-refused",
+                "payment.paypal.refund.notCredited");
+
+        // then
+        assertThat(PAYPAL.seen(REFUND)).isEmpty();
+        assertThat(refunds()).isZero();
+    }
+
+    @Test
     void givenTwoConcurrentReturns_whenBothRun_thenOnePayPalRefundAndOneEntry() throws Exception {
         // given
         UUID booking = paidAndCancelled();

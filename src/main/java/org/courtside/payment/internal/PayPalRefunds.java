@@ -33,6 +33,7 @@ import java.util.UUID;
 public class PayPalRefunds {
 
     static final String NOT_REFUNDABLE = "payment.paypal.refund.notRefundable";
+    static final String NOT_CREDITED = "payment.paypal.refund.notCredited";
     static final String ALREADY_REFUNDED = "payment.paypal.refund.alreadyRefunded";
     static final String CREDIT_SPENT = "payment.paypal.refund.creditSpent";
     static final String UNAVAILABLE = "payment.paypal.refund.unavailable";
@@ -105,7 +106,7 @@ public class PayPalRefunds {
                     ALREADY_REFUNDED);
         }
         Optional<PayPalCredit> credit = creditOf(order);
-        if (credit.isEmpty()) return blocked(order, NOT_REFUNDABLE);
+        if (credit.isEmpty()) return blocked(order, neverCredited(order) ? NOT_CREDITED : NOT_REFUNDABLE);
         if (active.filter(credentials -> credentials.environment() == order.environment()).isEmpty()) {
             return blocked(order, UNAVAILABLE);
         }
@@ -124,7 +125,8 @@ public class PayPalRefunds {
     private Reserved reserve(String orderId, UUID actor) {
         StoredOrder order = orders.lock(orderId).filter(PayPalRefunds::captured)
                 .orElseThrow(PayPalRefundException::notRefundable);
-        PayPalCredit credit = creditOf(order).orElseThrow(PayPalRefundException::notRefundable);
+        PayPalCredit credit = creditOf(order).orElseThrow(() -> neverCredited(order)
+                ? PayPalRefundException.notCredited() : PayPalRefundException.notRefundable());
         if (refunds.ofOrder(orderId).isPresent()) throw PayPalRefundException.alreadyRefunded();
         PayPalClient.Credentials active = credentials.active(order.environment()).orElseThrow(() -> {
             log.info("PayPal order {} is not refunded: no active {} credentials", orderId, order.environment());
@@ -143,6 +145,11 @@ public class PayPalRefunds {
                 refund.amountMinor(), refund.currency().getCurrencyCode()));
         log.info("PayPal refund {} of order {} took its credit back and goes to PayPal", refund.id(), orderId);
         return new Reserved(refund, order, active);
+    }
+
+    /** A late capture Courtside kept no credit for, which only the club's PayPal account can return. */
+    private boolean neverCredited(StoredOrder order) {
+        return order.status() == Status.LATE_CAPTURED && bookingPayments.payPalCreditOf(order.orderId()).isEmpty();
     }
 
     private Optional<PayPalCredit> creditOf(StoredOrder order) {

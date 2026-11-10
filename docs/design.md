@@ -499,9 +499,14 @@ Capture and cancel answer one of four outcomes. `CONFIRMED` means the booking is
 amount differed: the booking stays released and the amount is appended to the booker's credit as
 `PAYPAL_LATE_CAPTURE` and audited as `payment.paypal.lateCapture`, so money is never neither a
 booking nor credit. When the account was anonymised or the club currency changed since, the order is
-marked `LATE_CAPTURED` without credit and the audit says so, for the treasurer to return it.
-`REJECTED` means no money moved and the court is free: PayPal declined, the order did not match or
-the payer turned back. `PROCESSING` means the outcome is not known yet, because PayPal did not
+marked `LATE_CAPTURED` without credit and the audit says so, for the treasurer to return it. A
+capture PayPal shows as partly refunded, which only a refund in the club's PayPal account causes,
+releases its booking and becomes `LATE_CAPTURED` with the captured amount less the refunds PayPal
+lists as completed as credit. While PayPal lists such a refund as still pending, the club's share is
+not known yet, so the order is marked without credit for the treasurer. The audit's `reason` tells
+the cases apart: `HOLD_ENDED`, `CAPTURE_DIFFERS`, `PARTLY_REFUNDED` or `REFUND_PENDING`.
+`REJECTED` means no money moved and the court is free: PayPal declined, PayPal shows the capture fully
+refunded, the order did not match or the payer turned back. `PROCESSING` means the outcome is not known yet, because PayPal did not
 answer, the capture timed out, a capture is still pending at PayPal or the credentials are no longer
 active; the order stays open and the court stays held for the reconciliation. A PayPal refusal with
 HTTP 409, `DUPLICATE_REQUEST_ID` or `PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a
@@ -545,6 +550,7 @@ A payment can be returned when its order is `CAPTURED` and its booking was cance
 no refund in any status; when the payer's balance still covers the amount of the order's credit
 entry; and when PayPal is on with the environment the order was created in. Otherwise
 `POST /api/treasury/paypal/refunds` refuses it with `payment.paypal.refund.notRefundable`,
+`payment.paypal.refund.notCredited` for a late capture Courtside kept no credit for,
 `payment.paypal.refund.alreadyRefunded`, `payment.paypal.refund.creditSpent` with amount, balance
 and currency, or `payment.paypal.refund.unavailable`, and writes nothing. The request needs a
 recent authentication.

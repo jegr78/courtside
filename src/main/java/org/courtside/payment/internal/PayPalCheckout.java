@@ -12,6 +12,7 @@ import org.courtside.payment.PaymentEvent;
 import org.courtside.payment.internal.PayPalOrders.Status;
 import org.courtside.payment.internal.PayPalOrders.StoredOrder;
 import org.courtside.shared.InstanceAddress;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -22,6 +23,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Currency;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +38,7 @@ public class PayPalCheckout {
     private static final String RETURN_PATH = "/payment/paypal/return";
     private static final String CANCEL_PATH = "/payment/paypal/cancel";
     private static final Set<String> UNCAPTURED = Set.of("APPROVED", "CREATED", "PAYER_ACTION_REQUIRED", "VOIDED");
+    private static final Set<String> RETAINED = Set.of("COMPLETED", "PARTIALLY_REFUNDED");
 
     private final PayPalClient client;
     private final PayPalOrders orders;
@@ -162,7 +165,9 @@ public class PayPalCheckout {
 
     private Settlement decide(StoredOrder stored, Optional<PendingBooking> pending, PayPalClient.Order order) {
         Optional<PayPalClient.Capture> capture = order.capture();
-        if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order).isEmpty());
+        if (capture.isPresent()) {
+            return settle(stored, capture.get(), mismatch(stored, order).isEmpty(), order.refunds());
+        }
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
         Instant now = clock.instant();
         boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(now)).isPresent();
@@ -223,8 +228,9 @@ public class PayPalCheckout {
             log.warn("Voided PayPal order {} could not be read: {}", orderId, refused.getMessage());
             return true;
         }
-        order.capture().filter(capture -> capture.status().equals("COMPLETED"))
-                .ifPresent(capture -> record(stored.get(), capture, mismatch(stored.get(), order).isEmpty()));
+        order.capture().filter(capture -> RETAINED.contains(capture.status()))
+                .ifPresent(capture -> settle(stored.get(), capture, mismatch(stored.get(), order).isEmpty(),
+                        order.refunds()));
         return true;
     }
 
@@ -232,7 +238,8 @@ public class PayPalCheckout {
         Optional<PayPalClient.Order> order = read(stored, readable);
         if (order.isEmpty()) return processing(stored);
         if (order.get().capture().isPresent()) {
-            return settle(stored, order.get().capture().get(), mismatch(stored, order.get()).isEmpty());
+            return settle(stored, order.get().capture().get(), mismatch(stored, order.get()).isEmpty(),
+                    order.get().refunds());
         }
         return UNCAPTURED.contains(order.get().status()) ? voided(stored, reason) : processing(stored);
     }
@@ -277,7 +284,7 @@ public class PayPalCheckout {
     private Settlement settle(StoredOrder stored, PayPalClient.Credentials active, PayPalClient.Order order) {
         Optional<Rejection> mismatch = mismatch(stored, order);
         if (order.status().equals("COMPLETED")) {
-            return order.capture().map(capture -> settle(stored, capture, mismatch.isEmpty()))
+            return order.capture().map(capture -> settle(stored, capture, mismatch.isEmpty(), order.refunds()))
                     .orElseGet(() -> processing(stored));
         }
         if (mismatch.isPresent()) return reject(stored, mismatch.get());
@@ -300,7 +307,7 @@ public class PayPalCheckout {
             return orders.find(stored.orderId()).flatMap(PayPalCheckout::settled).orElseGet(() -> processing(stored));
         }
         try {
-            return settle(stored, client.captureOrder(credentials, stored.orderId()), true);
+            return settle(stored, client.captureOrder(credentials, stored.orderId()), true, null);
         } catch (PayPalUnavailableException unknown) {
             log.warn("The capture of PayPal order {} of booking {} has no known outcome yet", stored.orderId(),
                     stored.bookingId());
@@ -311,7 +318,7 @@ public class PayPalCheckout {
         }
         try {
             PayPalClient.Order order = client.getOrder(credentials, stored.orderId());
-            if (order.capture().isPresent()) return settle(stored, order.capture().get(), true);
+            if (order.capture().isPresent()) return settle(stored, order.capture().get(), true, order.refunds());
             return UNCAPTURED.contains(order.status()) ? reject(stored, Rejection.CAPTURE_REFUSED) : processing(stored);
         } catch (PayPalUnavailableException | PayPalRefusedException failed) {
             log.warn("PayPal order {} of booking {} could not be read after its capture: {}", stored.orderId(),
@@ -320,12 +327,49 @@ public class PayPalCheckout {
         }
     }
 
-    private Settlement settle(StoredOrder stored, PayPalClient.Capture capture, boolean orderMatches) {
+    /** Settles by the capture; {@code refunds} is null when only the capture is known, not the order's refunds. */
+    private Settlement settle(StoredOrder stored, PayPalClient.Capture capture, boolean orderMatches,
+                              @Nullable List<PayPalClient.ListedRefund> refunds) {
         return switch (capture.status()) {
             case "COMPLETED" -> record(stored, capture, orderMatches);
+            case "PARTIALLY_REFUNDED" -> refunds == null ? processing(stored) : partlyRefunded(stored, capture, refunds);
             case "DECLINED", "FAILED" -> reject(stored, Rejection.CAPTURE_DECLINED);
+            case "REFUNDED" -> reject(stored, Rejection.CAPTURE_REFUNDED);
             default -> processing(stored);
         };
+    }
+
+    private Settlement partlyRefunded(StoredOrder stored, PayPalClient.Capture capture,
+                                      List<PayPalClient.ListedRefund> refunds) {
+        int retained = retained(capture, refunds);
+        return transactions.execute(status -> {
+            StoredOrder locked = lock(stored);
+            if (locked.status() == Status.CAPTURED || locked.status() == Status.LATE_CAPTURED) {
+                return settled(locked).orElseThrow();
+            }
+            pendingPayments.release(locked.bookingId());
+            if (retained > 0) {
+                return lateCapture(locked, capture, Currency.getInstance(capture.currency()), retained,
+                        LateReason.PARTLY_REFUNDED);
+            }
+            orders.mark(locked.orderId(), Status.LATE_CAPTURED, capture.id());
+            events.publishEvent(new PaymentEvent.PayPalLateCapture(locked.bookingId(), locked.orderId(), capture.id(),
+                    capture.amountMinor(), capture.currency(), false, LateReason.REFUND_PENDING.name()));
+            log.warn("PayPal is still refunding part of the capture of order {} of booking {}; the treasurer settles"
+                    + " the rest", locked.orderId(), locked.bookingId());
+            return new Settlement(locked.bookingId(), Outcome.LATE_CREDITED);
+        });
+    }
+
+    /** The captured amount less the refunds PayPal completed; zero while any refund is still open. */
+    private static int retained(PayPalClient.Capture capture, List<PayPalClient.ListedRefund> refunds) {
+        int refunded = 0;
+        for (PayPalClient.ListedRefund refund : refunds) {
+            if (refund.status().equals("FAILED") || refund.status().equals("CANCELLED")) continue;
+            if (!refund.status().equals("COMPLETED") || !refund.currency().equals(capture.currency())) return 0;
+            refunded += refund.amountMinor();
+        }
+        return Math.max(capture.amountMinor() - refunded, 0);
     }
 
     private Settlement record(StoredOrder stored, PayPalClient.Capture capture, boolean orderMatches) {
@@ -358,17 +402,19 @@ public class PayPalCheckout {
                         locked.bookingId());
                 pendingPayments.release(locked.bookingId());
             }
-            return lateCapture(locked, capture, currency);
+            return lateCapture(locked, capture, currency, capture.amountMinor(),
+                    paysTheBooking ? LateReason.HOLD_ENDED : LateReason.CAPTURE_DIFFERS);
         });
     }
 
-    private Settlement lateCapture(StoredOrder locked, PayPalClient.Capture capture, Currency currency) {
-        boolean credited = capture.amountMinor() > 0 && currency.equals(clubCurrency.currency())
+    private Settlement lateCapture(StoredOrder locked, PayPalClient.Capture capture, Currency currency,
+                                   int amountMinor, LateReason reason) {
+        boolean credited = amountMinor > 0 && currency.equals(clubCurrency.currency())
                 && bookingPayments.creditLateCapture(locked.accountId(), locked.bookingId(), locked.orderId(),
-                        capture.amountMinor(), currency);
+                        amountMinor, currency);
         orders.mark(locked.orderId(), Status.LATE_CAPTURED, capture.id());
         events.publishEvent(new PaymentEvent.PayPalLateCapture(locked.bookingId(), locked.orderId(), capture.id(),
-                capture.amountMinor(), capture.currency(), credited));
+                amountMinor, capture.currency(), credited, reason.name()));
         if (credited) {
             log.info("PayPal order {} of booking {} was captured after the hold ended and became credit",
                     locked.orderId(), locked.bookingId());
@@ -441,8 +487,11 @@ public class PayPalCheckout {
     }
 
     private enum Rejection {
-        BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED, CAPTURE_REFUSED
+        BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED, CAPTURE_REFUSED,
+        CAPTURE_REFUNDED
     }
+
+    private enum LateReason { HOLD_ENDED, CAPTURE_DIFFERS, PARTLY_REFUNDED, REFUND_PENDING }
 
     private enum VoidReason { ABANDONED, HOLD_EXPIRED, BOOKING_RELEASED, CREDENTIALS_CHANGED }
 
