@@ -4,6 +4,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.BookingPayments;
 import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
@@ -20,8 +21,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -29,6 +32,7 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -44,6 +48,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.courtside.payment.FakePayPal.CAPTURE;
 import static org.courtside.payment.FakePayPal.CREATE;
 import static org.courtside.payment.FakePayPal.ORDER;
@@ -142,6 +150,37 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
                 Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
         assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
         assertThat(captureAttempted()).as("the attempt is stored before the capture is sent").isTrue();
+    }
+
+    @Test
+    void givenACaptureWhoseRecordFailed_whenTheJobRunsNext_thenTheBookingIsConfirmedWithOnePayment() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        doThrow(new UncategorizedSQLException("pay by PayPal", "INSERT INTO credit_entry",
+                new SQLException("ledger write failed", "XX000")))
+                .doCallRealMethod().when(AopTestUtils.<BookingPayments>getUltimateTargetObject(bookingPayments))
+                .payByPayPal(any(), any(), anyString(), anyInt(), any());
+        captureRequest().andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:internal-error"));
+        assertThat(orderStatus()).as("the failed record rolled back").isEqualTo("CREATED");
+        assertThat(captureAttempted()).isTrue();
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
+        age(Duration.ofMinutes(6));
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("the money PayPal holds is recorded, not captured again").hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(orderStatus()).isEqualTo("CAPTURED");
+        assertThat(entries(booking)).containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+        assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
     }
 
     @Test
