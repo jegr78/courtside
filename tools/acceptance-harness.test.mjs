@@ -53,6 +53,26 @@ test("given a minimal configuration, when parsed, then defaults are filled and t
   assert.equal(config.notifyClubBookings, false, "club bookings are protected unless the operator says otherwise");
 });
 
+test("given a PayPal buyer with an external persona and its password in the environment, when parsed, then both are kept", () => {
+  // given
+  const raw = { ...valid(), personas: { ...valid().personas, external: "jane.external" }, paypal: { buyer: "buyer@example.org" } };
+  // when
+  const config = parseConfig(raw, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" });
+  // then
+  assert.equal(config.personas.external, "jane.external");
+  assert.deepEqual(config.paypal, { buyer: "buyer@example.org", password: "buyer-secret" });
+});
+
+test("given a PayPal buyer without its password, without an external persona or without an address, when parsed, then each refusal names the field", () => {
+  // given
+  const withExternal = { ...valid(), personas: { ...valid().personas, external: "jane.external" } };
+  // when / then
+  assert.equal(field({ ...withExternal, paypal: { buyer: "buyer@example.org" } }), "ACCEPTANCE_PAYPAL_BUYER_PASSWORD");
+  assert.equal(field({ ...valid(), paypal: { buyer: "buyer@example.org" } }, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }), "paypal");
+  assert.equal(field({ ...withExternal, paypal: { buyer: "not an address" } }, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }), "paypal.buyer");
+  assert.equal(field({ ...valid(), personas: { ...valid().personas, external: "jane.admin" } }), "personas.external");
+});
+
 test("given notifyClubBookings, when parsed, then true is kept and anything but a boolean is refused", () => {
   // when / then
   assert.equal(parseConfig({ ...valid(), notifyClubBookings: true }, env).notifyClubBookings, true);
@@ -156,7 +176,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { availabilityConflicts, governingHours, journeysOf, LaneError, laterOpeningOf, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
+import { availabilityConflicts, firstUsableWeek, governingHours, journeysOf, LaneError, laterOpeningOf, PAYPAL_JOURNEYS, shortestAdvanceWindow, PAYPAL_PROFILE, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -171,13 +191,51 @@ test("when the lanes are planned, then no two slots overlap and each lies inside
   assert.deepEqual(slots.filter((slot) => slot.start < "08:00" || slot.end > "23:00"), []);
 });
 
-test("when the lanes are planned, then weekday lanes use the first two courts and only the opening journey uses the weekend", () => {
+test("when the lanes are planned, then weekday lanes use the first two courts, the PayPal lanes the third, and only the opening journey uses the weekend", () => {
   // when
   const lanes = plan();
   // then
-  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date < lanes.saturday).map((s) => s.court))].sort(), [1, 3]);
+  const paypal = lanes.slots.filter((s) => PAYPAL_JOURNEYS.includes(s.journey));
+  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date < lanes.saturday && !paypal.includes(s)).map((s) => s.court))].sort(), [1, 3]);
+  assert.deepEqual(paypal.map((s) => [s.profile, s.journey, s.date, s.court]), [
+    [PAYPAL_PROFILE, "paypal-pay", lanes.days[0], 2], [PAYPAL_PROFILE, "paypal-credit", lanes.days[0], 2]]);
   assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date >= lanes.saturday).map((s) => s.journey))], ["saturday-opening"]);
   assert.deepEqual([...new Set(lanes.slots.filter((s) => s.journey === "saturday-opening").map((s) => s.court))].sort(), [1, 2, 3]);
+});
+
+test("given weeks with occupied lanes, when the window is chosen, then the first free week inside the advance window wins", () => {
+  // given
+  const weeks = [
+    { start: "2030-03-11", lastDay: "2030-03-27", occupied: ["desktop-chrome/rebook 2030-03-11 10:00 court 1: seed"] },
+    { start: "2030-03-18", lastDay: "2030-04-03", occupied: [] },
+    { start: "2030-03-25", lastDay: "2030-04-10", occupied: [] }
+  ];
+  // when / then
+  assert.equal(firstUsableWeek(weeks, "2030-04-05"), "2030-03-18");
+  assert.equal(firstUsableWeek(weeks, null), "2030-03-18", "a club without an advance window takes the first free week");
+});
+
+test("given free weeks beyond the advance window only, when the window is chosen, then the refusal names each week and why", () => {
+  // given
+  const weeks = [
+    { start: "2030-03-11", lastDay: "2030-03-27", occupied: ["ipad/youth 2030-03-13 09:00 court 3: seed"] },
+    { start: "2030-03-18", lastDay: "2030-04-03", occupied: [] }
+  ];
+  // when / then
+  assert.throws(() => firstUsableWeek(weeks, "2030-03-30"), (error) => error instanceof LaneError
+    && /2030-03-11: occupied ipad\/youth/.test(error.message) && /2030-03-18: its last journey day 2030-04-03 is after the last bookable day 2030-03-30/.test(error.message));
+});
+
+test("given rule sets with and without advance windows, when the shortest is read, then only active sets count", () => {
+  // given
+  const sets = [
+    { active: true, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 30 } }] },
+    { active: true, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 21 } }, { ruleType: "NO_COURT_BOOKING", params: {} }] },
+    { active: false, rules: [{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }] }
+  ];
+  // when / then
+  assert.equal(shortestAdvanceWindow(sets), 21);
+  assert.equal(shortestAdvanceWindow([{ active: true, rules: [] }]), null);
 });
 
 test("given every profile, when its journeys are resolved, then each has a slot and unknown pairs are refused", () => {
@@ -1117,7 +1175,7 @@ test("given the same WebKit page error from two instances, when collected, then 
   assert.equal(first[0].title, second[0].title, "the host is not part of the title");
 });
 
-import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
+import { parseArguments, secretsOf, waitForLoad } from "../acceptance/run.mjs";
 
 test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
   // when / then
@@ -1783,9 +1841,15 @@ test("given the runner, when its phases are read, then the matrix only masks and
   // given
   const source = readFileSync(new URL("../acceptance/run.mjs", import.meta.url), "utf8");
   // then
-  assert.match(source, /exit = playwright\(run, projects\);\n\s*redactRun\(run, config\.password\);/, "the matrix masks its artefacts and still lets the postflight clean up");
-  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*secureRun\(run, config\.password\);/, "the postflight fails the run on a leak");
-  assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
+  assert.match(source, /exit = playwright\(run, projects\);\n\s*for \(const secret of secretsOf\(config\)\) redactRun\(run, secret\);/, "the matrix masks its artefacts and still lets the postflight clean up");
+  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*for \(const secret of secretsOf\(config\)\) secureRun\(run, secret\);/, "the postflight fails the run on a leak");
+  assert.match(source, /phase === "report"\) \{\n\s*for \(const secret of secretsOf\(config\)\) secureRun\(run, secret\)/, "the report phase secures a run before it reads it");
+});
+
+test("given a configuration with a PayPal buyer, when its secrets are listed, then the shared and the buyer's password are both masked", () => {
+  // then
+  assert.deepEqual(secretsOf({ password: "shared-secret" }), ["shared-secret"]);
+  assert.deepEqual(secretsOf({ password: "shared-secret", paypal: { buyer: "buyer@example.org", password: "buyer-secret" } }), ["shared-secret", "buyer-secret"]);
 });
 
 const encodedForms = (secret) => {

@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { config, disposables, persona, runPath, type PersonaKey } from "../lib/context";
-import { resolveWindowStart } from "../config/calendar.mjs";
-import { governingHours, planLanes } from "../config/lanes.mjs";
+import { addDays, defaultWindowStart, localDate, resolveWindowStart, zonedInstant } from "../config/calendar.mjs";
+import { firstUsableWeek, governingHours, LAST_JOURNEY_DAY_AFTER_SUNDAY, planLanes, shortestAdvanceWindow } from "../config/lanes.mjs";
+import { occupying } from "../lib/core.mjs";
 import { openAs } from "../lib/session";
 import { apiAs, readRoster } from "../lib/api";
 import { PARTNER_MARKER } from "../lib/journey";
@@ -17,8 +18,11 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
   const activeCourts = (await (await api.get("/api/public/courts")).json() as { number: number }[]).map((court) => court.number);
   const courts = config.courts ?? activeCourts.slice(0, 3);
   expect(courts.filter((court: number) => !activeCourts.includes(court)), "PRECONDITION: every configured court is active").toEqual([]);
-  const start = resolveWindowStart(config.window.start, new Date(), timeZone);
-  const lanes = { timeZone, ...planLanes({ start, courts, hoursOf: (date: string) => governingHours(grid, date) }) };
+  const hoursOf = (date: string) => governingHours(grid, date);
+  const start = config.window.start !== undefined
+    ? resolveWindowStart(config.window.start, new Date(), timeZone)
+    : await firstFreeWeek(api, { timeZone, courts, hoursOf });
+  const lanes = { timeZone, ...planLanes({ start, courts, hoursOf }) };
   writeFileSync(runPath("lanes.json"), JSON.stringify(lanes, null, 2));
   const cards = await (await api.get("/api/admin/booking-cards")).json();
   const participantCards = await (await api.get("/api/admin/participant-cards")).json();
@@ -48,3 +52,31 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
   }, null, 2));
   writeFileSync(runPath("baseline.json"), JSON.stringify({ days }, null, 2));
 });
+
+type Lookup = { get: (path: string) => Promise<{ json: () => Promise<any> }> };
+
+// The club's own bookings move from week to week, so the window is the first week whose lanes are all free.
+async function firstFreeWeek(api: Lookup, { timeZone, courts, hoursOf }: { timeZone: string; courts: number[]; hoursOf: (date: string) => unknown }) {
+  const courtIds = new Map((await (await api.get("/api/public/courts")).json() as { id: string; number: number }[]).map((court) => [court.number, court.id]));
+  const ruleSets = await Promise.all((await (await api.get("/api/admin/rule-sets")).json() as { id: string; active: boolean }[])
+    .map(async (set) => ({ ...set, rules: await (await api.get(`/api/admin/rule-sets/${set.id}/rules`)).json() })));
+  const advance = shortestAdvanceWindow(ruleSets);
+  const latestBookable = advance === null ? null : addDays(localDate(new Date(), timeZone), advance);
+  const first = defaultWindowStart(new Date(), timeZone);
+  const days = new Map<string, unknown>();
+  const weeks = [];
+  for (let week = 0; week < 8; week++) {
+    const start = addDays(first, 7 * week);
+    const plan = planLanes({ start, courts, hoursOf } as never) as { sunday: string; slots: { profile: string; journey: string; date: string; court: number; start: string; end: string }[] };
+    const occupied: string[] = [];
+    for (const slot of plan.slots) {
+      if (!days.has(slot.date)) days.set(slot.date, await (await api.get(`/api/bookings?date=${slot.date}`)).json());
+      const ids = occupying(days.get(slot.date) as never, courtIds.get(slot.court)!, zonedInstant(slot.date, slot.start, timeZone), zonedInstant(slot.date, slot.end, timeZone)) as string[];
+      occupied.push(...ids.map((id) => `${slot.profile}/${slot.journey} ${slot.date} ${slot.start} court ${slot.court}: ${id}`));
+    }
+    weeks.push({ start, lastDay: addDays(plan.sunday, LAST_JOURNEY_DAY_AFTER_SUNDAY), occupied });
+  }
+  const chosen = firstUsableWeek(weeks, latestBookable);
+  writeFileSync(runPath("window-choice.json"), JSON.stringify({ chosen, latestBookable, weeks }, null, 2));
+  return chosen;
+}

@@ -3,14 +3,14 @@ import { test } from "@playwright/test";
 import { loadConfig } from "../config/schema.mjs";
 import { disposableFor } from "../config/disposables.mjs";
 
-export type PersonaKey = "admin" | "trainer" | "youth" | "sport" | "grounds" | "treasurer" | "memberA" | "memberB" | "memberC" | "disposable" | "restricted";
+export type PersonaKey = "admin" | "trainer" | "youth" | "sport" | "grounds" | "treasurer" | "memberA" | "memberB" | "memberC" | "disposable" | "restricted" | "external";
 export type Config = {
   baseUrl: string; expectedVersion: string; password: string;
-  personas: Record<Exclude<PersonaKey, "disposable" | "restricted">, string> & { disposable: string; restricted?: string };
+  personas: Record<Exclude<PersonaKey, "disposable" | "restricted" | "external">, string> & { disposable: string; restricted?: string; external?: string };
   disposables: string[]; timeZone?: string; window: { start?: string }; courts?: number[];
   mail?: { url: string }; logs: { app?: string; proxy?: string }; metrics?: { url: string };
   browsers: { firefox?: { wsEndpoint: string } }; loadLimit: number; resetCodesPerHour: number; notifyClubBookings: boolean; welcomeAccounts: boolean;
-  erasure?: { ssh: string; container: string };
+  erasure?: { ssh: string; container: string }; paypal?: { buyer: string; password: string };
 };
 export const config = loadConfig() as unknown as Config;
 export const PASSWORD: string = config.password;
