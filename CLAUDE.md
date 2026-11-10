@@ -157,8 +157,7 @@ fails on the missing `BuildProperties` bean.
   operations from `src/test/java/org/courtside/<module>/testfixture`. `AbstractIntegrationTest`
   imports every fixture, so all integration tests share one Spring context unless they set their
   own properties or beans; a new fixture is added there, not to a single test. A test that needs
-  another time names it with `@ClockAt` instead of a property, and a spy on a public bean is
-  declared on the base class and autowired by the test. Fixtures return
+  another time names it with `@ClockAt` instead of a property. Fixtures return
   identifiers or observations, not entities or repositories. Production code never depends on a
   test fixture.
 * **UI test selectors are semantic and language-neutral.** Locate elements by accessible role or a

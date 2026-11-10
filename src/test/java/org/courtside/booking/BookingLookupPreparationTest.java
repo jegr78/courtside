@@ -7,6 +7,7 @@ import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Instant;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.verify;
 
 class BookingLookupPreparationTest extends AbstractIntegrationTest {
 
-    @Autowired
+    @MockitoSpyBean
     private BookingRepository bookings;
 
     @Autowired

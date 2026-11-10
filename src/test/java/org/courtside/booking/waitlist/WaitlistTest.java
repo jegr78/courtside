@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -81,7 +82,7 @@ class WaitlistTest extends AbstractIntegrationTest {
     @Autowired
     private MemberTestFixture memberships;
 
-    @Autowired
+    @MockitoSpyBean
     private SecurityEventLog securityEvents;
 
     @Autowired

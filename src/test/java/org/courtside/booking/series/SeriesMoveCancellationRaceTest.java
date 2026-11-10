@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Timeout;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -53,7 +54,7 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     @Autowired
     private BookingService bookingService;
 
-    @Autowired
+    @MockitoSpyBean
     private BookingRepository bookings;
 
     @Autowired
@@ -62,7 +63,7 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
-    @Autowired
+    @MockitoSpyBean
     private FacilityService facility;
 
     private UUID court;

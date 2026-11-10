@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.SessionRepositoryFilter;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -39,8 +40,8 @@ class PermanentPasswordChangeRollbackTest extends AbstractIntegrationTest {
     @Autowired private UserAccountRepository accounts;
     @Autowired private PasswordEncoder encoder;
     @Autowired private SessionRepositoryFilter<?> storedSessions;
-    @Autowired private JdbcIndexedSessionRepository sessions;
-    @Autowired private SecurityEventLog securityEvents;
+    @MockitoSpyBean private JdbcIndexedSessionRepository sessions;
+    @MockitoSpyBean private SecurityEventLog securityEvents;
 
     private MockMvc mockMvc;
 

@@ -1,9 +1,9 @@
 package org.courtside.access.internal;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.shared.BookingAnnouncer;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -15,7 +15,7 @@ import static org.mockito.Mockito.doThrow;
 
 class AccessPassInsertIsolationTest extends AccessPassTestSupport {
 
-    @Autowired
+    @MockitoSpyBean
     private BookingAnnouncer announcer;
 
     @Test

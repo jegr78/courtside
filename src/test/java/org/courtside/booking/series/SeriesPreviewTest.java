@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -61,7 +62,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
     @Autowired
     private RulesTestFixture rules;
 
-    @Autowired
+    @MockitoSpyBean
     private CourtAllocationRepository allocations;
 
     @Autowired

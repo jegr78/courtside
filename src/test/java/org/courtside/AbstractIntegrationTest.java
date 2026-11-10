@@ -1,12 +1,5 @@
 package org.courtside;
 
-import org.courtside.booking.BookingRepository;
-import org.courtside.booking.internal.CourtAllocationRepository;
-import org.courtside.booking.internal.SeriesOccurrenceCancellation;
-import org.courtside.facility.FacilityService;
-import org.courtside.shared.BookingAnnouncer;
-import org.courtside.shared.SecurityEventLog;
-import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.courtside.access.testfixture.AccessTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
@@ -38,9 +31,6 @@ import java.util.Set;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@MockitoSpyBean(types = {BookingAnnouncer.class, BookingRepository.class, CourtAllocationRepository.class,
-        FacilityService.class, SeriesOccurrenceCancellation.class, SecurityEventLog.class,
-        JdbcIndexedSessionRepository.class})
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
         QuietMailConfiguration.class, SqlCountingConfiguration.class,
         SafePasswordLookupConfiguration.class,
