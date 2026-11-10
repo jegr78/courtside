@@ -73,6 +73,7 @@ test("given an external player and the club's PayPal sandbox, when the player pa
 
     // when
     const fromCredit = await step("external", "pay from credit", async () => {
+      await page.goto("/");
       await openSlot(page, creditSlot);
       await page.getByTestId("booking-card").selectOption(card!.id);
       await expect(page.getByTestId("booking-balance"), "product: the dialog shows the credit that pays").toBeVisible();
