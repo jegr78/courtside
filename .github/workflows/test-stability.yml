@@ -17,6 +17,8 @@ jobs:
       matrix:
         order: [reversealphabetical, random]
     steps:
+      - name: Record the job start
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -37,6 +39,9 @@ jobs:
           seed="$(date -u +%Y%m%d)"
           echo "Test order: ${TEST_ORDER}; random seed: ${seed}" | tee test-order.txt
           ./mvnw -B test -Dsurefire.runOrder="${TEST_ORDER}" -Dsurefire.runOrder.random.seed="${seed}"
+      - name: Record suite metrics
+        if: always() && hashFiles('target/surefire-reports/*.xml') != ''
+        run: node tools/surefire-metrics.mjs target/surefire-reports target/surefire-reports/suite-metrics.json
       - name: Upload first-attempt evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -45,8 +50,12 @@ jobs:
           path: |
             test-order.txt
             target/surefire-reports/*.xml
+            target/surefire-reports/suite-metrics.json
           if-no-files-found: error
           retention-days: 14
+      - name: Check timeout headroom
+        if: success()
+        run: node tools/ci-headroom.mjs
 
   browser-order:
     runs-on: ubuntu-latest
@@ -56,6 +65,8 @@ jobs:
       matrix:
         project_order: [configured, reversed]
     steps:
+      - name: Record the job start
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -125,11 +136,16 @@ jobs:
             quality/webkit-reliability.schema.json
           if-no-files-found: error
           retention-days: 90
+      - name: Check timeout headroom
+        if: success()
+        run: node tools/ci-headroom.mjs
 
   browser-compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - name: Record the job start
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -178,3 +194,6 @@ jobs:
             frontend/test-results/browser-diagnostics/*.json
           if-no-files-found: error
           retention-days: 14
+      - name: Check timeout headroom
+        if: success()
+        run: node tools/ci-headroom.mjs

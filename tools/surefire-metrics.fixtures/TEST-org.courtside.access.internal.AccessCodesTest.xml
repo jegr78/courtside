@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="org.courtside.access.internal.AccessCodesTest" time="6.129" tests="9" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="givenTwoDrawsRacingForTheSameCode_whenTheFirstCommits_thenTheSecondRedrawsAndBothHoldDifferentCodes" classname="org.courtside.access.internal.AccessCodesTest" time="0.428">
+<system-out>
+{"@timestamp":"2026-11-10T13:29:14.162485803Z","log":{"level":"INFO","logger":"org.flywaydb.core.internal.command.DbMigrate"},"process":{"pid":2595,"thread":{"name":"main"}},"service":{"name":"courtside","node":{}},"message":"Successfully applied 94 migrations to schema \"public\", now at version v94 (execution time 00:00.546s)","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-11-10T13:29:15.485313459Z","log":{"level":"INFO","logger":"org.courtside.access.internal.AccessCodesTest"},"process":{"pid":2595,"thread":{"name":"main"}},"service":{"name":"courtside","node":{}},"message":"Started AccessCodesTest in 2.654 seconds (process running for 261.916)","ecs":{"version":"8.11"}}
+</system-out>
+</testcase>
+</testsuite>
