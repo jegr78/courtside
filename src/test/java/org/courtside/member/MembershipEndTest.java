@@ -6,7 +6,6 @@ import org.courtside.member.internal.MembershipType;
 import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.LocalDate;
@@ -16,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-@Import(IdentityTestFixture.class)
 class MembershipEndTest extends AbstractIntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);

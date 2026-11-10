@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.courtside.shared.CancellationReason;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -60,8 +59,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
-        RulesTestFixture.class, ConfigTestFixture.class})
 class BookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

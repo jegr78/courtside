@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -41,7 +40,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 @Timeout(value = 90, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

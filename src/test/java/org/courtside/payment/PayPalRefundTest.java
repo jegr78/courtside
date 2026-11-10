@@ -21,7 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -65,11 +64,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // Two admission slots and a larger pool let two treasurers' returns meet at the order's row lock.
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=3s", "courtside.admission.classes[payment-provider-check].cost=5",
+        "courtside.payment.paypal.request-timeout=1s", "courtside.admission.classes[payment-provider-check].cost=5",
         "courtside.admission.classes[payment-provider-check].concurrency=2",
         "spring.datasource.hikari.maximum-pool-size=6"})
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
-        CreditTestFixture.class, PaymentTestFixture.class})
 class PayPalRefundTest extends AbstractIntegrationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -415,7 +412,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         UUID booking = paidAndCancelled();
         switch (answer) {
             case "delayed past the timeout" -> PAYPAL.replyAfter(REFUND, 201, FakePayPal.refund("COMPLETED"),
-                    Duration.ofSeconds(5));
+                    Duration.ofSeconds(2));
             case "2xx without id" -> PAYPAL.reply(REFUND, 201, "{\"status\":\"COMPLETED\"}");
             default -> PAYPAL.reply(REFUND, Integer.parseInt(answer), "{}");
         }

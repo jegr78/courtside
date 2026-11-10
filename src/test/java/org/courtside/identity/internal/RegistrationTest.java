@@ -12,7 +12,6 @@ import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import jakarta.mail.internet.MimeMessage;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
@@ -39,7 +38,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-@Import({ConfigTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
         "courtside.login-protection.registration.max-failures=3",
         "courtside.login-protection.address.max-failures=3"})

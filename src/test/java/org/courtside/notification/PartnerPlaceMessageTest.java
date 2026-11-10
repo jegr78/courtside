@@ -13,7 +13,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -27,8 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, BookingTestFixture.class,
-        MemberTestFixture.class})
 class PartnerPlaceMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

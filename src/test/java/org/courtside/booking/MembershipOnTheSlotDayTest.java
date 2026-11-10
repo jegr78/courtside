@@ -14,7 +14,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -27,8 +26,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import({ConfigTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
-        RulesTestFixture.class})
 class MembershipOnTheSlotDayTest extends AbstractIntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);

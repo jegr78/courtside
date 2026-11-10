@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,7 +42,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

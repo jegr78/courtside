@@ -61,8 +61,8 @@ test("given hosted browser jobs have an outer deadline, when a test hangs, then 
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
   assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
-  assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 40$/m);
-  assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 30$/m);
+  assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 90$/m);
+  assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 90$/m);
   assert.match(playwright, /const stalledTestBound = 5 \* 60_000;/);
   assert.match(playwright, /\n  timeout: stalledTestBound,/,
     "every project shares one test bound, so a hang fails with its trace instead of the job being cancelled without one");

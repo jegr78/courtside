@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.nio.charset.StandardCharsets;
@@ -27,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 @ExtendWith(OutputCaptureExtension.class)
-@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class AgeBandImportTest extends AbstractIntegrationTest {
 
     private static final Map<String, CanonicalField> COLUMNS = Map.of("Member number", CanonicalField.EXTERNAL_ID,

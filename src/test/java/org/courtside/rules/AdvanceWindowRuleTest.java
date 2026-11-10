@@ -7,7 +7,6 @@ import org.courtside.rules.internal.RuleAdminService;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -16,7 +15,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(ConfigTestFixture.class)
 class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

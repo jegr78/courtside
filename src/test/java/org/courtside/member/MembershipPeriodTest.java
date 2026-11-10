@@ -7,7 +7,6 @@ import org.courtside.member.internal.MembershipPeriodsOverlapException;
 import org.courtside.member.internal.MembershipType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -15,7 +14,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(IdentityTestFixture.class)
 class MembershipPeriodTest extends AbstractIntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);

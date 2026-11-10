@@ -625,6 +625,7 @@ async function bookCourtThree(page: Page, visualDate: string): Promise<string> {
   await selectVisualDate(page, visualDate);
   await page.locator('[data-testid="free-slot"][data-court-number="3"][data-slot="15:00"]').click();
   await expect(page.getByTestId("booking-dialog")).toBeVisible();
+  await expect(page.getByTestId("booking-card")).not.toHaveValue("");
   const cardId = await page.getByTestId("booking-card").inputValue();
   await page.getByTestId("member-search").fill("Mary");
   await page.getByTestId("member-match").click();

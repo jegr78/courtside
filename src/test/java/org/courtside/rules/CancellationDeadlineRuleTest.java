@@ -18,7 +18,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -31,7 +30,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class CancellationDeadlineRuleTest extends AbstractIntegrationTest {
 
     private static final UUID YOUTH_RULE_SET =

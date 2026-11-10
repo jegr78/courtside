@@ -21,7 +21,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
@@ -57,8 +56,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
-        CreditTestFixture.class, PaymentTestFixture.class, BookingTestFixture.class, RulesTestFixture.class})
 class PendingPaymentWriteTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");

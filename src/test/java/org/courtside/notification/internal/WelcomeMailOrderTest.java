@@ -7,7 +7,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.MessageKind;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.MailSendException;
@@ -31,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
-@Import(IdentityTestFixture.class)
 class WelcomeMailOrderTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");

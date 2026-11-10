@@ -1,5 +1,17 @@
 package org.courtside;
 
+import org.courtside.access.testfixture.AccessTestFixture;
+import org.courtside.audit.testfixture.AuditTestFixture;
+import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.card.testfixture.CardTestFixture;
+import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
+import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.notification.testfixture.NotificationTestFixture;
+import org.courtside.payment.testfixture.PaymentTestFixture;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +30,10 @@ import java.util.Set;
 @ActiveProfiles("test")
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
         QuietMailConfiguration.class, SqlCountingConfiguration.class,
-        SafePasswordLookupConfiguration.class})
+        SafePasswordLookupConfiguration.class,
+        AccessTestFixture.class, AuditTestFixture.class, BookingTestFixture.class, CardTestFixture.class,
+        ConfigTestFixture.class, CreditTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class,
+        MemberTestFixture.class, NotificationTestFixture.class, PaymentTestFixture.class, RulesTestFixture.class})
 public abstract class AbstractIntegrationTest {
 
     private static final String BASELINE_SCHEMA = "test_baseline";

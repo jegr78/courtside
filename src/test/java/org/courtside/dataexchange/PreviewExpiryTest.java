@@ -10,7 +10,6 @@ import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -23,7 +22,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(IdentityTestFixture.class)
 class PreviewExpiryTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

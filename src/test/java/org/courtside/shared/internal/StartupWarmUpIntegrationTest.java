@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "courtside.warm-up.enabled=true")
-@Import({StartupWarmUpIntegrationTest.ObservingSteps.class, FacilityTestFixture.class})
+@Import(StartupWarmUpIntegrationTest.ObservingSteps.class)
 class StartupWarmUpIntegrationTest extends AbstractIntegrationTest {
 
     private static final List<String> FAILED = new CopyOnWriteArrayList<>();

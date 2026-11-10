@@ -5,7 +5,6 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.postgresql.util.PSQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -20,7 +19,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(FacilityTestFixture.class)
 class BookingSeriesTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-@Import({MemberTestFixture.class, DomainEventDeliveryTest.RefusingConsumer.class})
+@Import(DomainEventDeliveryTest.RefusingConsumer.class)
 class DomainEventDeliveryTest extends AbstractIntegrationTest {
 
     @Autowired

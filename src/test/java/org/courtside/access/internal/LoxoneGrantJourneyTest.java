@@ -40,8 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "courtside.access-control.connector=simulated",
         "courtside.access-control.call-deadline=10s"})
-@Import({LoxoneGrantJourneyTest.Miniserver.class, SettablePassClock.Configuration.class, FacilityTestFixture.class,
-        IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class, MemberTestFixture.class})
+@Import({LoxoneGrantJourneyTest.Miniserver.class, SettablePassClock.Configuration.class})
 class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

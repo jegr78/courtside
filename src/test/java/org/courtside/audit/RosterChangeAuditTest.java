@@ -9,7 +9,6 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Map;
@@ -18,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({AuditTestFixture.class, MemberTestFixture.class, IdentityTestFixture.class})
 class RosterChangeAuditTest extends AbstractIntegrationTest {
 
     @Autowired

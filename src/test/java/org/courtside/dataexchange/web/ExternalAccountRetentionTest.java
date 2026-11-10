@@ -17,7 +17,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -42,8 +41,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({CreditTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
-        CardTestFixture.class, ConfigTestFixture.class})
 class ExternalAccountRetentionTest extends AbstractIntegrationTest {
 
     private static final Instant LONG_AGO = Instant.parse("2023-03-01T10:00:00Z");

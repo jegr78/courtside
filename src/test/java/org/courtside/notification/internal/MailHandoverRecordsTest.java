@@ -9,7 +9,6 @@ import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({IdentityTestFixture.class, NotificationTestFixture.class})
 class MailHandoverRecordsTest extends AbstractIntegrationTest {
 
     private static final Instant EARLIER = Instant.parse("2026-05-12T08:00:00Z");

@@ -8,7 +8,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -29,7 +28,6 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin.
-@Import(FacilityTestFixture.class)
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

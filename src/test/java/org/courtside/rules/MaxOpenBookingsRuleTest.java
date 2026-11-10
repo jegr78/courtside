@@ -17,7 +17,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -32,8 +31,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import({CardTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
-        MemberTestFixture.class})
 class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

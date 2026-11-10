@@ -5,13 +5,11 @@ import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({ConfigTestFixture.class, MemberTestFixture.class})
 class ShippedMembershipTypeNamingTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

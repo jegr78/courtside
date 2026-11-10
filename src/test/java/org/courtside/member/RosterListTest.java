@@ -12,7 +12,6 @@ import org.courtside.member.internal.MembershipTypeRepository;
 import org.courtside.shared.CursorPage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Clock;
@@ -29,7 +28,6 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(IdentityTestFixture.class)
 class RosterListTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

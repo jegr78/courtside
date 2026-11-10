@@ -163,13 +163,15 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
         // when
         inRow(grant, row -> answer(row, NOW, MAPPING, new GrantOutcome.Accepted("remote-user")));
         inRow(grant, row -> answer(row, NOW.plusSeconds(60), "north-group-v2", new GrantOutcome.Accepted("remote-user")));
+        List<String> afterAcceptances = eventTypes(booking);
         inRow(grant, row -> answer(row, NOW.plusSeconds(120), "north-group-v3",
                 new GrantOutcome.Refused(Scope.GRANT, "keypad full")));
 
         // then
-        assertThat(jdbc.sql("SELECT event_type FROM domain_event WHERE subject_id = ? ORDER BY occurred_at")
-                .params(booking).query(String.class).list())
-                .containsExactly("access.grant.installed", "access.grant.failing");
+        assertThat(afterAcceptances).as("two acceptances record one installation")
+                .containsExactly("access.grant.installed");
+        assertThat(eventTypes(booking)).as("the refusal adds one failure")
+                .containsExactlyInAnyOrder("access.grant.installed", "access.grant.failing");
         assertThat(jdbc.sql("SELECT payload::text FROM domain_event WHERE subject_id = ?").params(booking)
                 .query(String.class).list())
                 .allSatisfy(payload -> assertThat(payload).isEqualTo("{\"bookingId\": \"" + booking + "\"}"));
@@ -225,6 +227,11 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
 
     private <T> T inRow(UUID grant, Function<AccessGrant, T> work) {
         return new TransactionTemplate(transactions).execute(status -> work.apply(grants.findById(grant).orElseThrow()));
+    }
+
+    private List<String> eventTypes(UUID booking) {
+        return jdbc.sql("SELECT event_type FROM domain_event WHERE subject_id = ?").params(booking)
+                .query(String.class).list();
     }
 
     private List<String> currentCodes() {

@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
@@ -27,7 +26,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, RulesTestFixture.class})
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

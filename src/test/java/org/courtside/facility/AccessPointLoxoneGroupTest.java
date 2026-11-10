@@ -4,7 +4,6 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,7 +11,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(AuditTestFixture.class)
 class AccessPointLoxoneGroupTest extends AbstractIntegrationTest {
 
     private static final String GROUP = "0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0";

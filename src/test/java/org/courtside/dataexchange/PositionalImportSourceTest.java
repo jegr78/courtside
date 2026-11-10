@@ -8,7 +8,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -23,7 +22,6 @@ import static org.courtside.dataexchange.CanonicalField.EXTERNAL_ID;
 import static org.courtside.dataexchange.CanonicalField.FIRST_NAME;
 import static org.courtside.dataexchange.CanonicalField.LAST_NAME;
 
-@Import(IdentityTestFixture.class)
 class PositionalImportSourceTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

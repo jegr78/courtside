@@ -1,7 +1,6 @@
 package org.courtside.credit;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.credit.BookingPayments.PaymentMethod;
 import org.courtside.credit.internal.CreditLedger;
 import org.courtside.credit.testfixture.CreditTestFixture;
@@ -10,7 +9,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,7 +21,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({IdentityTestFixture.class, ConfigTestFixture.class, CreditTestFixture.class})
 class PayPalLedgerTest extends AbstractIntegrationTest {
 
     private static final Currency EURO = Currency.getInstance("EUR");

@@ -18,7 +18,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -41,7 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingGridCoordinationTest extends AbstractIntegrationTest {
 
     @Autowired
