@@ -343,9 +343,14 @@ An outsider closes its own account with `DELETE /api/account` after a re-authent
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
 with `identity.account.closureNotOpen` and an outsider holding a confirmed or pending booking of its
 own that has not ended, read through `shared.UpcomingBookings`, with
-`identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance,
-read through `shared.HeldCredit`, is refused with `identity.account.closureBlockedByCredit` and asks
-the treasurer for a payout first. Closing anonymises the account in place through
+`identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance
+is refused with `identity.account.closureBlockedByCredit` and asks the treasurer for a payout first.
+An outsider with a PayPal refund still `PENDING` or a PayPal order still `CREATED` is refused with
+`identity.account.closureBlockedByPayment`, because a refused refund puts the credit back and a late
+capture becomes credit. `shared.PaymentsInFlight` reads the balance and the unsettled payments in
+one statement, after the closure has locked the account row and any `credit_account` row it has, so
+a refund or capture holding the ledger lock commits first. A late capture reads the account row
+`FOR SHARE` and therefore waits for a closure underway and then finds the account anonymised. Closing anonymises the account in place through
 `AccountAnonymisation`: the person's name and email become placeholders, the username becomes
 `anonymised-` and the account id so the name is free again, the account is disabled and records
 `anonymised_at`, its password, second factors, challenges, reset code, queued messages, notification
@@ -542,6 +547,8 @@ PayPal reports as `FAILED` or `CANCELLED`. Before restoring it Courtside reads t
 a refund of the full amount PayPal lists there instead. A refusal marks the refund `FAILED` with
 PayPal's reason, appends a `PAYPAL_REFUND_REVERSED` of the amount and is audited as
 `payment.paypal.refundFailed`. `FAILED` is final for the order; the treasurer then pays out by hand.
+Neither a closure nor the retention run anonymises an account while a refund of it is `PENDING`, so
+the restored credit lands on an account the treasurer can still pay out.
 A capture PayPal reports as already fully refunded, for example after a refund in the PayPal
 account, is resolved by reading the order: a completed refund listed there is recorded as completed,
 otherwise the refund stays pending. Every other answer, including no answer, a timeout, a 5xx, a
@@ -1702,7 +1709,9 @@ account of theirs has credit ledger entries, which are never removed.
 `EXTERNAL_ACCOUNTS` anonymises, through `AccountAnonymisation` as a closure does, an account that is
 not anonymised yet, whose person holds no membership period, whose person's accounts all hold
 `EXTERNAL` and none `ADMIN`, and that was neither created nor signed in since the cut-off and has no
-own booking ending on or after it, an upcoming one included, and that holds no credit balance.
+own booking ending on or after it, an upcoming one included, and that holds no credit balance, no
+PayPal refund still `PENDING` and no PayPal order still `CREATED`. The run's re-check takes the
+`credit_account` locks of the person's accounts first, as a closure does.
 Person and account rows stay, so its bookings and ledger entries keep a reference that names nobody.
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the

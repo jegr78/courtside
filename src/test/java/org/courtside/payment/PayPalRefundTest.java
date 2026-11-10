@@ -5,6 +5,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.BookingPayments;
 import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Currency;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -53,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -101,6 +104,8 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     private TransactionTemplate transactions;
     @Autowired
     private PayPalRefunds payPalRefunds;
+    @Autowired
+    private BookingPayments bookingPayments;
     @Autowired
     private Clock clock;
 
@@ -664,6 +669,94 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenARefundTakingTheCredit_whenThePlayerClosesTheAccountMeanwhile_thenTheClosureWaitsAndIsRefused()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> refundUnderway = holdTransaction(() -> {
+            bookingPayments.takeForPayPalRefund(johnAccount, booking, ORDER, 1500, Currency.getInstance("EUR"));
+            jdbc.sql("""
+                            INSERT INTO paypal_refund (id, order_id, account_id, amount_minor, currency, status,
+                                                       requested_by, requested_at, updated_at)
+                            VALUES (gen_random_uuid(), :order, :account, 1500, 'EUR', 'PENDING', :by, now(), now())
+                            """)
+                    .param("order", ORDER).param("account", johnAccount).param("by", richardAccount).update();
+        }, release);
+
+        // when
+        CompletableFuture<MvcResult> closure = CompletableFuture.supplyAsync(this::closeJohnsAccount, THREADS);
+        awaitSessionsBlockedOnALock(1);
+        release.countDown();
+        refundUnderway.get(10, TimeUnit.SECONDS);
+
+        // then
+        JsonNode body = JSON.readTree(closure.get(20, TimeUnit.SECONDS).getResponse().getContentAsString());
+        assertThat(body.path("type").asString()).as("the closure reads the ledger after the refund took it")
+                .isEqualTo("urn:courtside:error:account-closure-blocked-by-payment");
+        assertThat(body.path("violations").path(0).path("code").asString())
+                .isEqualTo("identity.account.closureBlockedByPayment");
+        assertThat(anonymised(johnAccount)).isFalse();
+    }
+
+    @Test
+    void givenAClosureUnderwayOnAnAccountWithoutLedger_whenALateCaptureArrives_thenItWaitsAndBecomesNoCredit()
+            throws Exception {
+        // given
+        UUID booking = book(TOMORROW_AFTERNOON);
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> closing = holdTransaction(() -> {
+            jdbc.sql("SELECT id FROM user_account WHERE id = :id FOR UPDATE").param("id", johnAccount)
+                    .query(UUID.class).single();
+            jdbc.sql("UPDATE user_account SET anonymised_at = now(), enabled = false, password_hash = NULL WHERE id = :id")
+                    .param("id", johnAccount).update();
+        }, release);
+
+        // when
+        CompletableFuture<Boolean> credited = CompletableFuture.supplyAsync(() -> transactions.execute(status ->
+                bookingPayments.creditLateCapture(johnAccount, booking, "LATE-ORDER", 1500,
+                        Currency.getInstance("EUR"))), THREADS);
+        awaitSessionsBlockedOnALock(1);
+        release.countDown();
+        closing.get(10, TimeUnit.SECONDS);
+
+        // then
+        assertThat(credited.get(20, TimeUnit.SECONDS)).as("the capture reads the account after the closure")
+                .isFalse();
+        assertThat(jdbc.sql("SELECT count(*) FROM credit_entry WHERE account_id = :id").param("id", johnAccount)
+                .query(Long.class).single()).as("no credit lands on the anonymised account").isZero();
+    }
+
+    @Test
+    void givenAFailedRefundRestoringTheCredit_whenThePlayerClosesTheAccountMeanwhile_thenTheClosureWaitsAndIsRefused()
+            throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        UUID refund = refundId();
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> restoring = holdTransaction(() -> {
+            jdbc.sql("SELECT order_id FROM paypal_order WHERE order_id = :order FOR UPDATE").param("order", ORDER)
+                    .query(String.class).single();
+            jdbc.sql("UPDATE paypal_refund SET status = 'FAILED', failure_reason = 'Refused' WHERE id = :id")
+                    .param("id", refund).update();
+            bookingPayments.restoreAfterPayPalRefund(johnAccount, booking, ORDER, 1500, Currency.getInstance("EUR"));
+        }, release);
+
+        // when
+        CompletableFuture<MvcResult> closure = CompletableFuture.supplyAsync(this::closeJohnsAccount, THREADS);
+        awaitSessionsBlockedOnALock(1);
+        release.countDown();
+        restoring.get(10, TimeUnit.SECONDS);
+
+        // then
+        JsonNode body = JSON.readTree(closure.get(20, TimeUnit.SECONDS).getResponse().getContentAsString());
+        assertThat(body.path("type").asString()).as("the closure reads the credit the failed refund restored")
+                .isEqualTo("urn:courtside:error:account-closure-blocked-by-credit");
+        assertThat(anonymised(johnAccount)).as("the restored credit stays payable").isFalse();
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+    }
+
+    @Test
     void givenABookingRacingTheRefundForTheSameCredit_whenBothRun_thenTheBalanceNeverGoesBelowZero()
             throws Exception {
         // given
@@ -886,6 +979,36 @@ class PayPalRefundTest extends PayPalIntegrationTest {
         }), THREADS);
         assertThat(held.await(10, TimeUnit.SECONDS)).as("the row is held").isTrue();
         return holder;
+    }
+
+    private CompletableFuture<Void> holdTransaction(Runnable work, CountDownLatch release)
+            throws InterruptedException {
+        CountDownLatch held = new CountDownLatch(1);
+        CompletableFuture<Void> holder = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(status -> {
+            work.run();
+            held.countDown();
+            try {
+                release.await(20, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }), THREADS);
+        assertThat(held.await(10, TimeUnit.SECONDS)).as("the transaction holds its locks").isTrue();
+        return holder;
+    }
+
+    private MvcResult closeJohnsAccount() {
+        try {
+            return mockMvc.perform(delete("/api/account").with(csrf()).with(user(account("roe.john")))
+                    .sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli())).andReturn();
+        } catch (Exception failed) {
+            throw new IllegalStateException(failed);
+        }
+    }
+
+    private boolean anonymised(UUID accountId) {
+        return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :id")
+                .param("id", accountId).query(Boolean.class).single();
     }
 
     private void awaitSessionsBlockedOnALock(int sessions) throws InterruptedException {

@@ -502,7 +502,8 @@ Fehler in deinem Namen oder Benutzernamen korrigiert der Vorstand in der Persone
 Als externer Spieler kannst du dein Konto selbst schließen. Wähle in *Mein Konto* unter *Konto
 schließen* die Schaltfläche und bestätige. Liegt deine Anmeldung mehr als fünf Minuten zurück, fragt
 Courtside vorher erneut nach deinem Passwort. Hast du noch eine anstehende Buchung, storniere sie
-zuerst. Hast du noch Guthaben, lass es dir vorher vom Kassenwart auszahlen. Beim Schließen entfernt
+zuerst. Hast du noch Guthaben, lass es dir vorher vom Kassenwart auszahlen. Hat PayPal eine Zahlung
+oder Erstattung von dir noch nicht abgeschlossen, warte, bis das geschehen ist. Beim Schließen entfernt
 Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und dein Passwort und meldet dich
 ab. Vergangene Buchungen bleiben ohne deinen Namen beim Verein. Deinen
 Benutzernamen kann danach jemand neu registrieren. Als Mitglied beendet der Vorstand dein Konto.

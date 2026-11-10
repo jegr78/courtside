@@ -6332,8 +6332,9 @@ paths:
         Anonymises the signed-in account in place: the person's name and email become placeholders,
         the username is released, the account is disabled and its password, second factors and
         sessions are removed. Open only to an external account without a running membership and
-        without ADMIN, without an upcoming confirmed booking of its own, and with a re-authentication
-        no older than five minutes.
+        without ADMIN, without an upcoming confirmed booking of its own, without a credit balance,
+        without a PayPal order or refund PayPal has not settled, and with a re-authentication no older
+        than five minutes.
       security:
         - sessionCookie: []
           csrfToken: []

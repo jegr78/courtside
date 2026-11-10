@@ -261,7 +261,7 @@ public class CreditLedger implements BookingPayments {
     }
 
     private boolean anonymised(UUID accountId) {
-        return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :account")
+        return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :account FOR SHARE")
                 .param("account", accountId).query(Boolean.class).optional().orElse(true);
     }
 

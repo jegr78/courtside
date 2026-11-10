@@ -7,5 +7,8 @@ public interface HeldCredit {
 
     boolean heldBy(UUID accountId);
 
+    /** Holds the account's ledger against every write until the transaction ends. */
+    void lock(UUID accountId);
+
     boolean heldByAnyone();
 }

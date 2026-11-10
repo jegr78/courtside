@@ -112,6 +112,8 @@ const de = {
   "error.type.account-closure-blocked-by-booking": "Du hast noch eine anstehende Buchung. Storniere sie, bevor du dein Konto schließt.",
   "identity.account.closureBlockedByCredit": "Du hast noch Guthaben. Bitte den Kassenwart, es dir auszuzahlen, bevor du dein Konto schließt.",
   "error.type.account-closure-blocked-by-credit": "Du hast noch Guthaben. Bitte den Kassenwart, es dir auszuzahlen, bevor du dein Konto schließt.",
+  "identity.account.closureBlockedByPayment": "Eine PayPal-Zahlung oder -Erstattung von dir ist noch nicht abgeschlossen. Schließe dein Konto, sobald PayPal sie abgeschlossen hat, oder frag den Kassenwart.",
+  "error.type.account-closure-blocked-by-payment": "Eine PayPal-Zahlung oder -Erstattung von dir ist noch nicht abgeschlossen. Schließe dein Konto, sobald PayPal sie abgeschlossen hat, oder frag den Kassenwart.",
   "accountSecurity.closure.title": "Konto schließen",
   "accountSecurity.closure.hint": "Beim Schließen entfernt Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und dein Passwort. Vergangene Buchungen bleiben ohne deinen Namen beim Verein. Das lässt sich nicht rückgängig machen.",
   "accountSecurity.closure.start": "Konto schließen",

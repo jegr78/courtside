@@ -9,6 +9,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.RosterService;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +81,9 @@ class AccountClosureTest extends AbstractIntegrationTest {
 
     @Autowired
     private CreditTestFixture credit;
+
+    @Autowired
+    private PaymentTestFixture payment;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -250,6 +254,40 @@ class AccountClosureTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-credit"))
                 .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByCredit"));
         assertThat(identity.isAccountEnabled(johnAccount)).as("a refused closure changes nothing").isTrue();
+    }
+
+    @Test
+    void givenAPayPalRefundAwaitingPayPal_whenThePlayerClosesTheirAccount_thenTheClosureWaitsForTheRefund()
+            throws Exception {
+        // given
+        payment.pendingRefund(johnAccount, bookings.insertBookingThatHasStarted(court, winterDoubles,
+                new TimeSlot(Instant.parse("2026-05-01T16:00:00Z"), Instant.parse("2026-05-01T17:00:00Z")),
+                johnAccount));
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-payment"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByPayment"));
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a refund that fails restores credit to this account")
+                .isTrue();
+    }
+
+    @Test
+    void givenAPayPalOrderStillOpen_whenThePlayerClosesTheirAccount_thenTheClosureWaitsForTheOrder()
+            throws Exception {
+        // given
+        payment.orderWithCaptureAttempted(johnAccount, bookings.insertBookingThatHasStarted(court, winterDoubles,
+                new TimeSlot(Instant.parse("2026-05-01T16:00:00Z"), Instant.parse("2026-05-01T17:00:00Z")),
+                johnAccount));
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-payment"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByPayment"));
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a capture still to come pays this account")
+                .isTrue();
     }
 
     @Test

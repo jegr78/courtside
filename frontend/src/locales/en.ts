@@ -114,6 +114,8 @@ const en: Record<keyof typeof de, string> = {
   "error.type.account-closure-blocked-by-booking": "You still have an upcoming booking. Cancel it before closing your account.",
   "identity.account.closureBlockedByCredit": "You still hold credit. Ask the treasurer to pay it out before closing your account.",
   "error.type.account-closure-blocked-by-credit": "You still hold credit. Ask the treasurer to pay it out before closing your account.",
+  "identity.account.closureBlockedByPayment": "A PayPal payment or refund of yours is not settled yet. Close your account once PayPal has settled it, or ask the treasurer.",
+  "error.type.account-closure-blocked-by-payment": "A PayPal payment or refund of yours is not settled yet. Close your account once PayPal has settled it, or ask the treasurer.",
   "accountSecurity.closure.title": "Close account",
   "accountSecurity.closure.hint": "Closing removes your name, email address, username and password. Past bookings stay with the club without your name. You cannot undo this.",
   "accountSecurity.closure.start": "Close account",

@@ -482,7 +482,8 @@ The board can correct errors in your name or username from the people administra
 As an external player you can close your account yourself. In *My account*, choose the button under
 *Close account* and confirm. If you signed in more than five minutes ago, Courtside asks for your
 password again first. If you still have an upcoming booking, cancel it first. If you still hold
-credit, ask the treasurer to pay it out first. Closing removes your
+credit, ask the treasurer to pay it out first. While PayPal has not yet settled a payment or a
+refund of yours, wait until it has. Closing removes your
 name, email address, username and password and signs you out. Past bookings stay with the club
 without your name. Somebody else may register your username afterwards. As a member, the board ends
 your account.
