@@ -802,7 +802,7 @@
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed",
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenAnUnknownClosure_whenAskingWhatChangingItWouldAffect_thenItIsNotFound",
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned",
-        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
+        "src/test/java/org/courtside/operations/internal/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAnEndBeforeTheStart_whenReadingUtilisation_thenThePeriodOrderIsRefused",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenMembersWhoPlayedLeftOrOnlyCancelled_whenReadingLastMonth_thenOnlyRunningPlayersAreActive",
         "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenBookingsOfNamedMembers_whenReporting_thenNoPersonAccountOrBookingIsNamed",

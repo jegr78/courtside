@@ -21,6 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -108,5 +109,20 @@ class DemoDataSeederTest {
                 });
         assertThat(accounts.findByUsername("jane.doe")).get()
                 .satisfies(account -> assertThat(account.getRoles()).containsExactly(Role.MEMBER));
+    }
+
+    @Test
+    void givenASeededSlotThatHasAlreadyStarted_whenTheDemoIsRead_thenItIsKeptAsAHistoricalBooking() {
+        // when
+        List<OffsetDateTime> starts = jdbc.sql("SELECT starts_at FROM court_allocation ORDER BY starts_at")
+                .query(OffsetDateTime.class).list();
+
+        // then
+        assertThat(starts).hasSize(2);
+        assertThat(starts.getFirst().toInstant())
+                .as("this week's slot started before seeding, which the rule engine refuses, so only the"
+                        + " historical path can have stored it")
+                .isBefore(clock.instant());
+        assertThat(starts.getLast().toInstant()).as("next week's slot is booked as usual").isAfter(clock.instant());
     }
 }

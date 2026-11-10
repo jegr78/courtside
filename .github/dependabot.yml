@@ -14,6 +14,8 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
 
   - package-ecosystem: npm
     directory: "/frontend"
@@ -32,11 +34,20 @@ updates:
     directory: "/site"
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
 
   - package-ecosystem: npm
     directory: "/lighthouse"
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      lighthouse-runner:
+        applies-to: version-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: "/"

@@ -6,7 +6,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.GuardianGrant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.util.Set;
@@ -14,7 +13,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class MemberTestFixtureTest extends AbstractIntegrationTest {
 
     @Autowired

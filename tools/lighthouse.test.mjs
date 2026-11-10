@@ -126,13 +126,14 @@ test("given page results and the container's exit, when the outcome is read, the
 
 const performanceSource = { environment: "PERFORMANCE", commit: "f1faef0f" };
 
-function orchestration({ source = performanceSource, results, timedOut = false, calls = [] }) {
+function orchestration({ source = performanceSource, results, timedOut = false, calls = [], options = [] }) {
   const root = mkdtempSync(join(tmpdir(), "lighthouse-orchestration-"));
   mkdirSync(join(root, "build"));
   writeFileSync(join(root, "build", "perf-environment.json"), JSON.stringify({ password: "placeholder-password" }));
   const summary = join(root, "step-summary.md");
-  const execute = (command, args) => {
+  const execute = (command, args, settings) => {
     calls.push(args);
+    options.push(settings);
     if (args.includes("cp")) writeFileSync(args.at(-1), "certificate");
     if (args[0] === "run" && timedOut) return { status: null, signal: "SIGTERM", error: Object.assign(new Error("spawnSync docker ETIMEDOUT"), { code: "ETIMEDOUT" }) };
     if (args[0] === "run" && results) writeFileSync(join(root, "build", "lighthouse", "results.json"), JSON.stringify(results));
@@ -194,9 +195,26 @@ test("given a run that exceeds its limit, when the run ends, then the container 
   const { root, run } = orchestration({ timedOut: true, calls });
   // when / then
   try {
-    await assert.rejects(run, /the Lighthouse container exceeded 55 minutes/);
+    await assert.rejects(run, /the Lighthouse container exceeded 20 minutes/);
     const removal = calls.find((args) => args[0] === "rm");
     assert.deepEqual(removal?.slice(0, 2), ["rm", "-f"], "the hung container leaves the load network");
     assert.match(removal[2], /^courtside-lighthouse-[a-f0-9]{16}$/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given the measured runs of about twelve minutes, when the budgets are read, then the container limit ends before the job budget", async () => {
+  // given
+  const workflow = readFileSync(new URL("../.github/workflows/lighthouse.yml", import.meta.url), "utf8");
+  const calls = [];
+  const options = [];
+  const { root, run } = orchestration({ results: [{ path: "/", formFactor: "mobile", report: report() }], calls, options });
+  // when
+  try {
+    await run();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  // then
+  const containerMinutes = options[calls.findIndex((args) => args[0] === "run")].timeout / 60000;
+  const jobMinutes = Number(workflow.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
+  assert.equal(jobMinutes, 25, "the job budget is about twice the measured run");
+  assert.equal(containerMinutes, 20, "the container limit leaves the job time to upload the reports");
 });

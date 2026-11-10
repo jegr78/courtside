@@ -5994,11 +5994,11 @@
       ],
       "positiveTests": [
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered",
-        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAnAdministratorAndPrivateCriteria_whenSearching_thenTheMatchingPageIsReturned"
+        "src/test/java/org/courtside/operations/internal/OperationalLogAdminControllerTest.java#givenAnAdministratorAndPrivateCriteria_whenSearching_thenTheMatchingPageIsReturned"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed",
-        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
+        "src/test/java/org/courtside/operations/internal/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
       ]
     },

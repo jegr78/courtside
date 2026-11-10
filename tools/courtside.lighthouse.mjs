@@ -10,7 +10,7 @@ import {
 } from "./courtside.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const RUN_LIMIT_MILLISECONDS = 55 * 60 * 1000;
+const RUN_LIMIT_MILLISECONDS = 20 * 60 * 1000;
 
 export function lighthouseContainerPlan({ root, output, stateFile, administratorFile, certificatePin, name,
   user = containerUserArguments() }) {
