@@ -247,7 +247,7 @@ of it, or if a trace cannot be read.
 - `--phase report --run <dir>` renders the report again, for example after the review.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
-hour. Without `window.start` it also writes `window-choice.json`, the week it took and why each
+hour. Without `window.start` it also writes `window-choice.json`, the week and court order it took and why each
 earlier week was refused. Preflight then proves every lane slot free before a journey starts.
 
 The harness cancels only bookings, removes only opening weeks, holidays and court closures and
