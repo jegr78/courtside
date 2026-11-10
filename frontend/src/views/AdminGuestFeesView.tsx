@@ -47,10 +47,10 @@ export function AdminGuestFeesView() {
   }
 
   async function download() {
-    if (running) return;
+    if (running || !report) return;
     setRunning(true);
     try {
-      const offered = await api.exportGuestFees({ ...fields, separator });
+      const offered = await api.exportGuestFees({ from: report.from, to: report.to, separator });
       downloadBlob(offered.fileName, offered.content);
       clear();
     } catch (failure) {
