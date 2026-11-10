@@ -182,6 +182,26 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenOnlyAStartDate_whenTheReportIsRead_thenTheHalfPeriodIsRefusedByName() throws Exception {
+        // when / then
+        mockMvc.perform(post(REPORT).param("from", "2025-03-01").with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guest-fee-period-incomplete"))
+                .andExpect(jsonPath("$.violations[0].code").value("treasury.guestFees.periodIncomplete"));
+        assertThat(readsRecorded()).as("a half period reads nothing").isZero();
+    }
+
+    @Test
+    void givenOnlyAnEndDate_whenTheFileIsDownloaded_thenTheHalfPeriodIsRefusedByName() throws Exception {
+        // when / then
+        mockMvc.perform(post(EXPORT).param("to", "2025-06-30").with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guest-fee-period-incomplete"))
+                .andExpect(jsonPath("$.violations[0].code").value("treasury.guestFees.periodIncomplete"));
+        assertThat(readsRecorded()).as("a half period reads nothing").isZero();
+    }
+
+    @Test
     void givenAnEncodingThatCannotWrite_whenTheReportIsDownloaded_thenItIsRefusedAndNothingIsRecorded() throws Exception {
         // when / then
         mockMvc.perform(post(EXPORT).param("encoding", "UTF-99").with(csrf()).with(user(as("major.mary"))))

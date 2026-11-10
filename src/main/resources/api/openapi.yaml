@@ -8630,10 +8630,9 @@ paths:
         ended, and when its fee is above zero. The fee belongs to the account the booking was made
         for. Guest places whose booking no longer names a member are only counted.
 
-        `from` and `to` are inclusive dates in the club time zone. A missing `from` is the first
-        and a missing `to` the last day of the current calendar year. The period may span at most
-        366 days. Reading the report is recorded,
-        without its content, which is why it is a `POST`.
+        `from` and `to` are inclusive dates in the club time zone. Without both the period is the
+        current calendar year, and only one of them is answered `400`. The period may span at most
+        366 days. Reading the report is recorded, without its content, which is why it is a `POST`.
       security:
         - sessionCookie: []
           csrfToken: []
