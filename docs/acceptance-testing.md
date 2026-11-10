@@ -157,19 +157,45 @@ court is never touched. The postflight fails when any of these rows is left, and
 cleanup section names the counts. Without `erasure` the run writes the statement to
 `erase-persona-residue.sql`.
 
+## The PayPal sandbox walk
+
+With `paypal` and `personas.external` configured, desktop-chrome walks an external player through
+the club's PayPal sandbox on two lanes of the third court: the player pays a booking at PayPal,
+cancels it, pays the next booking from the credit that left, cancels that one, and the treasurer
+returns the PayPal payment through PayPal. After each step the journey reads the player's ledger
+and balance; the run ends with the balance it began with. The ledger records that balance, and
+the postflight pays out or credits any difference an interrupted run left. Each run adds its
+ledger lines to the player's history.
+
+The instance needs:
+
+- PayPal set to `SANDBOX`, switched on, and credentials that pass **Verbindung prüfen**. The
+  preflight refuses `LIVE`, so the walk never moves real money.
+- An active card whose roles include `EXTERNAL`, which records no players and carries a price for
+  external players, and **Externe Buchungen zulassen** in the club profile.
+- An external account that may book: no rule set for people without a membership type may carry
+  `NO_COURT_BOOKING`, and the account holds no credit.
+- At least three courts in `courts`.
+
+PayPal's checkout pages are not Courtside's. The journey finds their steps by PayPal's own ids and
+the pay button's name; a failure on them is a harness finding with the step and a trace, and their
+console output stays out of the captures.
+
 ## Configuration
 
 `ACCEPTANCE_CONFIG` names a JSON file outside the repository. `ACCEPTANCE_PASSWORD` carries the
-shared password of the test accounts; it never appears in the file. `acceptance/config.example.json`
+shared password of the test accounts; it never appears in the file. With `paypal` configured,
+`ACCEPTANCE_PAYPAL_BUYER_PASSWORD` carries the sandbox buyer's password the same way. `acceptance/config.example.json`
 shows the shape with placeholder accounts.
 
 | Field | Meaning | Required |
 | --- | --- | --- |
 | `baseUrl` | Instance under test | yes |
 | `expectedVersion` | Version the preflight must read from the instance | yes |
-| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours | yes, `restricted` no |
+| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours; `external` names an external account that shares the password | yes, `restricted` and `external` no |
 | `timeZone` | Club time zone; default the zone the instance reports | no |
-| `window.start` | Monday of the booking window; default the first Monday after the run starts | no |
+| `window.start` | Monday of the booking window; default the first of the next eight weeks whose lanes are free and whose last journey day, ten days after its Sunday, lies inside the shortest active advance window | no |
+| `paypal.buyer` | E-mail of the PayPal sandbox account that pays; needs `personas.external` | no |
 | `courts` | Court numbers the journeys use; default the first three active courts | no |
 | `mail.url` | Mailpit API | no |
 | `logs.app`, `logs.proxy` | Log files the operator writes alongside the run | no |
@@ -220,12 +246,13 @@ of it, or if a trace cannot be read.
 - `--phase report --run <dir>` renders the report again, for example after the review.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
-hour. Preflight then proves every lane slot free before a journey starts.
+hour. Without `window.start` it also writes `window-choice.json`, the week it took and why each
+earlier week was refused. Preflight then proves every lane slot free before a journey starts.
 
 The harness cancels only bookings, removes only opening weeks, holidays and court closures and
 resets only message wordings and retention periods it recorded in its ledger. A booking or week of
 the club in its way stops the preflight or the journey that needs it and is never touched; choose
-another `window.start` or other `courts`. Each opening week a journey schedules is followed the next
+another `window.start`, leave it out so discovery picks a free week, or choose other `courts`. Each opening week a journey schedules is followed the next
 day by a copy of the hours in force, so the change governs one day. The availability and
 closure-notice journeys remove their holidays, court closures and bookings themselves; the
 postflight removes any the ledger still holds, a booking beyond the window included, and fails when

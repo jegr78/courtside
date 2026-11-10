@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { loadavg } from "node:os";
 import { writeFileSync } from "node:fs";
-import { apiAs, readRoster } from "../lib/api";
+import { adminPost, apiAs, readRoster } from "../lib/api";
+import { creditOf, externalCard } from "../lib/paypal";
 import { canSignIn } from "../lib/disposable";
 import { allSlots, instantOf, lanePlan } from "../lib/lanes";
 import { availabilityConflicts, governingHours, weekendConflicts } from "../config/lanes.mjs";
@@ -111,6 +112,20 @@ test("when the environment is checked before a run, then every precondition hold
       resetQuotas[`disposable ${index + 1}`] = resetQuota({ sentAt, now: Date.now(), perHour: config.resetCodesPerHour, needed: profilesOf(username, disposables).length + 1 });
     }
     checks.resetQuotas = resetQuotas;
+    if (config.paypal) {
+      const treasurer = await apiAs("treasurer");
+      const settings = await (await treasurer.get("/api/treasury/paypal")).json() as { environment: string; enabled: boolean };
+      const connection = await adminPost(treasurer, "/api/treasury/paypal/check", {});
+      const external = await apiAs("external");
+      checks.paypal = {
+        environment: settings.environment,
+        enabled: settings.enabled,
+        connection: connection.ok() ? (await connection.json() as { outcome: string }).outcome : `answered ${connection.status()}`,
+        externalCard: externalCard(await (await admin.get("/api/admin/booking-cards")).json()) !== undefined,
+        externalViolations: ((await (await external.get("/api/booking-eligibility")).json()).violations as { code: string }[]).map((violation) => violation.code),
+        externalBalance: (await creditOf(external)).balanceMinor
+      };
+    }
   } finally {
     writeFileSync(runPath("preflight.json"), JSON.stringify(checks, null, 2));
     await admin.dispose();
@@ -144,6 +159,15 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.activeMembershipType, "PRECONDITION: the club has an active membership type the acceptance import source can default to").toBe(true);
   expect.soft((checks.retentionPeriods as { status: number }).status, "PRECONDITION: the admin reads the retention periods, which the retention journey sets and puts back").toBe(200);
   expect.soft(checks.foreignWordings, "PRECONDITION: every message uses the shipped wording, so a run reads mail it can recognise and resets only what it wrote").toEqual([]);
+  if (config.paypal) {
+    const paypal = checks.paypal as Record<string, unknown>;
+    expect.soft(paypal.environment, "PRECONDITION: PayPal is set to the sandbox, so the walk never moves real money").toBe("SANDBOX");
+    expect.soft(paypal.enabled, "PRECONDITION: PayPal is switched on").toBe(true);
+    expect.soft(paypal.connection, "PRECONDITION: PayPal accepts the stored sandbox credentials").toBe("OK");
+    expect.soft(paypal.externalCard, "PRECONDITION: an active card open to EXTERNAL records no players and carries a price for external players").toBe(true);
+    expect.soft(paypal.externalViolations, "PRECONDITION: the external player may book, so no rule set for people without a membership type carries NO_COURT_BOOKING").toEqual([]);
+    expect.soft(paypal.externalBalance, "PRECONDITION: the external player holds no credit, so the first booking is paid at PayPal").toBe(0);
+  }
   if (config.personas.restricted) {
     expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();
     expect.soft(checks.restrictedLanesInside, "PRECONDITION: the earliest lane hour lies outside the restricted member's booking hours").toEqual([]);

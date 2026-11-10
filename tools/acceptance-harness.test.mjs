@@ -129,7 +129,7 @@ test("given the example configuration, when parsed, then it is valid", () => {
   // given
   const example = JSON.parse(readFileSync(new URL("../acceptance/config.example.json", import.meta.url), "utf8"));
   // when / then
-  assert.doesNotThrow(() => parseConfig(example, env));
+  assert.doesNotThrow(() => parseConfig(example, { ...env, ACCEPTANCE_PAYPAL_BUYER_PASSWORD: "buyer-secret" }));
 });
 
 import { addDays, defaultWindowStart, localDate, resolveWindowStart, windowDays, weekdayOf, zonedInstant } from "../acceptance/config/calendar.mjs";
@@ -2103,4 +2103,13 @@ test("given the captures whose state sits below the top of the page, when the jo
     assert.match(journeys, new RegExp(`capture\\(\\w+, "${label}", \\{[^}]*subject: `), `the ${label} capture names its subject`);
   }
   assert.match(journeys, /fill\("Richard Roe"\);\s*\}, \{ filledSubject: /, "the guest booking's filled dialog names the guest as its subject");
+});
+
+import { creditRestoration } from "../acceptance/lib/core.mjs";
+
+test("given the external player's balance before and after a run, when it is restored, then the difference is paid out or credited and an equal balance needs nothing", () => {
+  // then
+  assert.deepEqual(creditRestoration(0, 1500, "run-a"), { kind: "PAYOUT", amountMinor: 1500, note: "acceptance run run-a: restores the balance it found" });
+  assert.deepEqual(creditRestoration(1500, 750, "run-a"), { kind: "CREDIT", amountMinor: 750, note: "acceptance run run-a: restores the balance it found" });
+  assert.equal(creditRestoration(750, 750, "run-a"), null);
 });

@@ -438,3 +438,12 @@ export const relationshipsBetween = (relationships, one, other) => relationships
 
 export const confirmationsOf = (items, startsAt) => items
   .filter((item) => item.kind === "BOOKING_CONFIRMED" && item.booking && Date.parse(item.booking.startsAt) === startsAt.getTime());
+
+// A run that broke between a payment and the treasurer's return leaves the external player's balance above where it began.
+export function creditRestoration(before, balanceMinor, run) {
+  if (balanceMinor === before) return null;
+  const note = `acceptance run ${run}: restores the balance it found`;
+  return balanceMinor > before
+    ? { kind: "PAYOUT", amountMinor: balanceMinor - before, note }
+    : { kind: "CREDIT", amountMinor: before - balanceMinor, note };
+}

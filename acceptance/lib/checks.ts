@@ -74,6 +74,19 @@ export async function inCapturePhase<T>(page: Page, phase: string, operation: ()
   try { return await operation(); } finally { if (record) record.phase = previous; }
 }
 
+// Another site's console and failed requests belong to that site: they stay in browser-events.jsonl but no capture counts them.
+export async function offSite<T>(page: Page, operation: () => Promise<T>): Promise<T> {
+  const record = watched.get(page);
+  const before = record ? { console: record.console.length, events: record.consoleEvents.length, http: record.httpErrors.length } : undefined;
+  try { return await inCapturePhase(page, "off-site", operation); } finally {
+    if (record && before) {
+      record.console.splice(before.console);
+      record.consoleEvents.splice(before.events);
+      record.httpErrors.splice(before.http);
+    }
+  }
+}
+
 export const LOADING_NOTICE = 'p[role="status"]:not([data-testid]), p[aria-live]:not([data-testid])';
 
 const QUIET_MS = 1_000;
