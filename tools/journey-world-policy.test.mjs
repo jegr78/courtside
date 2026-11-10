@@ -60,7 +60,7 @@ test("given several browser projects, when Playwright runs them, then one global
 test("given hosted browser jobs have an outer deadline, when a test hangs, then it fails on its own bound naming its step while slow steps stay unbounded", () => {
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
-  assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
+  assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 40$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 90$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 90$/m);
   assert.match(playwright, /const stalledTestBound = 5 \* 60_000;/);

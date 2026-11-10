@@ -273,6 +273,12 @@
     { "path": "tools/workflow-history-depth.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/workflow-lint.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/workflow-lint.test.mjs", "profiles": ["tooling"], "test": true },
-    { "path": "tools/workflow-prerequisites.test.mjs", "profiles": ["tooling"], "test": true }
+    { "path": "tools/workflow-prerequisites.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/ci-headroom.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/ci-headroom.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/surefire-metrics.fixtures/TEST-org.courtside.access.GrantInstructionTest.xml", "profiles": ["tooling"], "test": false },
+    { "path": "tools/surefire-metrics.fixtures/TEST-org.courtside.access.internal.AccessCodesTest.xml", "profiles": ["tooling"], "test": false },
+    { "path": "tools/surefire-metrics.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/surefire-metrics.test.mjs", "profiles": ["tooling"], "test": true }
   ]
 }

@@ -128,7 +128,8 @@ fails on the missing `BuildProperties` bean.
   with a focused test before a fix; neither a blind rerun nor a larger timeout is a remedy for a
   test that fails or hangs. A job's `timeout-minutes` is a guard against a hung run, not a cap on
   how long a growing suite may take: set it about twice the job's usual duration and raise it when
-  the suite outgrows it.
+  the suite outgrows it. A scheduled run that uses more than two thirds of it fails its
+  `Check timeout headroom` step, so the nightly tracker reports the growth before a cancellation.
 * **A change to the scanner normalizers is unverified until the assessment has run.**
   `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
   assert wordings somebody has already observed — so it is structurally unable to show that the
@@ -159,7 +160,8 @@ fails on the missing `BuildProperties` bean.
   own properties or beans; a new fixture is added there, not to a single test. A test that needs
   another time names it with `@ClockAt` instead of a property. Fixtures return
   identifiers or observations, not entities or repositories. Production code never depends on a
-  test fixture.
+  test fixture. `SpringContextConfigurationBoundTest` caps the distinct context configurations, so a
+  test that adds one folds another away or raises the bound in review.
 * **UI test selectors are semantic and language-neutral.** Locate elements by accessible role or a
   stable ID/test ID. Never use rendered labels, translated text, placeholders, displayed values,
   titles or alt text as selectors. Text assertions remain valid only after the element has already
