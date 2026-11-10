@@ -37,6 +37,13 @@ updates:
     directory: "/lighthouse"
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      lighthouse-runner:
+        applies-to: version-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: "/"

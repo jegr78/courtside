@@ -12,13 +12,19 @@ export function validateDependabot(candidate) {
   assert.ok(Array.isArray(candidate.updates));
   const locations = candidate.updates.map((update) => {
     assert.deepEqual(Object.keys(update).sort(), Object.keys(update).filter((key) =>
-      ["directory", "groups", "ignore", "open-pull-requests-limit", "package-ecosystem", "schedule"].includes(key)).sort());
+      ["commit-message", "directory", "groups", "ignore", "open-pull-requests-limit", "package-ecosystem", "schedule"]
+        .includes(key)).sort());
     assert.equal(typeof update["package-ecosystem"], "string");
     assert.equal(typeof update.directory, "string");
     assert.deepEqual(update.schedule, { interval: "weekly" });
     if (update["open-pull-requests-limit"] !== undefined) {
       assert.ok(Number.isInteger(update["open-pull-requests-limit"]));
       assert.ok(update["open-pull-requests-limit"] >= 1 && update["open-pull-requests-limit"] <= 100);
+    }
+    if (update["commit-message"] !== undefined) {
+      assert.deepEqual(Object.keys(update["commit-message"]), ["prefix"]);
+      assert.ok(["ci", "chore"].includes(update["commit-message"].prefix),
+        "a prefix override names a type the club changelog hides");
     }
     if (update.groups !== undefined) {
       assert.equal(typeof update.groups, "object");
@@ -57,6 +63,11 @@ export function validateDependabot(candidate) {
     "frontend-minor-and-patch": { "applies-to": "version-updates", patterns: ["*"], "update-types": ["minor", "patch"] }
   }, "Frontend dependency updates need one compatible version-only catch-all group; security fixes remain ungrouped");
   assert.equal(frontend.ignore, undefined, "Frontend dependency updates must not silently ignore available fixes");
+  const lighthouse = candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/lighthouse");
+  assert.deepEqual(lighthouse["commit-message"], { prefix: "ci" },
+    "Lighthouse runner updates change no product code and stay out of the club changelog");
+  assert.deepEqual(lighthouse.groups, { "lighthouse-runner": { "applies-to": "version-updates", patterns: ["*"] } },
+    "Lighthouse runner version updates arrive as one pull request");
 }
 
 export function validatePullRequestTitleWorkflow(candidate) {
@@ -142,9 +153,15 @@ test("given Dependabot nested fields are malformed, when validating, then each f
   const invalidUpdateType = structuredClone(source);
   invalidUpdateType.updates.at(-1).ignore = [{ "dependency-name": "example", "update-types": ["all"] }];
   cases.push(invalidUpdateType);
+  const unknownCommitMessageField = structuredClone(source);
+  unknownCommitMessageField.updates[0]["commit-message"] = { prefix: "ci", include: "scope" };
+  cases.push(unknownCommitMessageField);
+  const visiblePrefix = structuredClone(source);
+  visiblePrefix.updates[0]["commit-message"] = { prefix: "fix" };
 
   // when / then
   for (const candidate of cases) assert.throws(() => validateDependabot(candidate));
+  assert.throws(() => validateDependabot(visiblePrefix), /changelog hides/);
 });
 
 test("given the PR title workflow, when validating it, then its event permissions and pinned action are closed", () => {
