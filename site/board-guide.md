@@ -179,7 +179,7 @@ und speicherst alle geänderten Plätze gemeinsam.
 
 Deaktiviere einen Platz, den der Verein nicht mehr nutzt. Der Platz verschwindet aus dem
 Platzplan, bleibt aber in vergangenen Buchungen und Auswertungen erhalten. Courtside benachrichtigt
-Mitglieder mit betroffenen zukünftigen Buchungen.
+Mitglieder mit betroffenen zukünftigen Buchungen. Diese Buchungen bleiben bestehen. Eine Buchung, die ein externer Spieler bezahlt hat, storniert Courtside stattdessen und bucht den Betrag auf sein Guthaben zurück.
 
 ![Die Platzliste mit Nummer, Name, Status und dem Formular für einen neuen Platz.](screenshots/de/courts.png)
 
@@ -384,7 +384,7 @@ Für eine vorübergehende Schließung ist *Geschlossen* das falsche Werkzeug. Da
 Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
 sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
 die Mitglieder mit betroffenen Buchungen. Diese Buchungen bleiben bestehen und im Platzplan
-sichtbar.
+sichtbar. Eine Buchung, die ein externer Spieler bezahlt hat, storniert Courtside stattdessen und bucht den Betrag auf sein Guthaben zurück.
 
 ![Winterzeiten ab dem 2. November, geplant neben der geltenden Woche und zum Bearbeiten geöffnet.](screenshots/de/opening-hours.png)
 
@@ -405,7 +405,8 @@ Ein Eintrag beginnt frühestens heute. Bis zu seinem ersten Tag kannst du alles 
 entfernen. Hat er begonnen, bleiben erster Tag und Zeiten fest, umbenennen oder früher beenden geht
 weiterhin. Beendete Einträge bleiben unverändert, damit vergangene Tage ihre Zeiten behalten.
 
-Buchungen, die schon auf einem gesperrten Tag liegen, bleiben bestehen. Neue Buchungen und
+Buchungen, die schon auf einem gesperrten Tag liegen, bleiben bestehen, außer einer Buchung, die ein
+externer Spieler bezahlt hat: Courtside storniert sie und bucht den Betrag auf sein Guthaben zurück. Neue Buchungen und
 Verschiebungen dorthin lehnt Courtside ab. Im Platzplan steht ein Feiertag mit seinem Namen, ein
 gesperrter Platz zeigt *Gesperrt*.
 
@@ -444,7 +445,7 @@ Eine neutrale Anzeige schützt die
 Bezeichnung nicht vor technischem Zugriff, da die öffentliche Schnittstelle sie weiterhin liefert.
 Verwende deshalb keine vertraulichen Bezeichnungen.
 
-Deaktiviere nicht mehr benötigte Karten. Bestehende Buchungen bleiben erhalten.
+Deaktiviere nicht mehr benötigte Karten. Bestehende Buchungen bleiben erhalten. Eine Buchung, die ein externer Spieler bezahlt hat, storniert Courtside stattdessen und bucht den Betrag auf sein Guthaben zurück.
 
 ![Eine Buchungskarte mit Bezeichnung, Farbe, Rollen, Spielerzahlen und weiteren Optionen.](screenshots/de/booking-card.png)
 

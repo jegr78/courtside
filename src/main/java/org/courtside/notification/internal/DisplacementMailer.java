@@ -34,28 +34,35 @@ class DisplacementMailer implements MessageComposer {
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingDisplaced displaced) {
+        Map<String, String> parameters = new HashMap<>(Map.of(
+                QueuedMessage.BOOKING, displaced.bookingId().toString(),
+                QueuedMessage.CLOSURE, displaced.closure().name()));
+        MessageKind kind = displaced.cancelled() ? MessageKind.BOOKING_DISPLACED_CANCELLED
+                : MessageKind.BOOKING_DISPLACED;
         bookings.describe(displaced.bookingId()).ifPresent(booking -> audience.of(booking).forEach(account ->
-                outbox.queue(account.getId(), MessageKind.BOOKING_DISPLACED, Map.of(
-                        QueuedMessage.BOOKING, displaced.bookingId().toString(),
-                        QueuedMessage.CLOSURE, displaced.closure().name()))));
+                outbox.queue(account.getId(), kind, parameters)));
     }
 
     @Override
     public Set<MessageKind> kinds() {
-        return Set.of(MessageKind.BOOKING_DISPLACED);
+        return Set.of(MessageKind.BOOKING_DISPLACED, MessageKind.BOOKING_DISPLACED_CANCELLED);
     }
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
         BookingDisplaced.Closure closure = closureOf(message.closure());
-        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
+        boolean cancelled = message.kind() == MessageKind.BOOKING_DISPLACED_CANCELLED;
+        BookingAnnouncement booking = cancelled ? AnnouncedBooking.existing(bookings, message.booking())
+                : AnnouncedBooking.current(bookings, message.booking());
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
-        String key = MessageKind.BOOKING_DISPLACED.templateKey();
+        String displaced = MessageKind.BOOKING_DISPLACED.templateKey();
+        String key = message.kind().templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
         values.put(InstanceLinks.PLACEHOLDER, links.of(message));
-        values.put("closure", templates.render(key + "." + closureKey(closure), locale, values));
+        values.put("closure", templates.render(displaced + "." + closureKey(closure), locale, values));
+        values.put("refund", wording.refund(booking, account, locale));
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values)));

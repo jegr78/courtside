@@ -45,17 +45,19 @@ class ClosureAnnouncements {
     private final ClubTimeZone timeZone;
     private final BookingRepository bookings;
     private final PendingPayments pendingPayments;
+    private final DisplacedPayments displacedPayments;
     private final TransactionTemplate separately;
 
     ClosureAnnouncements(ImpactService impact, ApplicationEventPublisher events, Clock clock, ClubTimeZone timeZone,
                          BookingRepository bookings, PendingPayments pendingPayments,
-                         PlatformTransactionManager transactions) {
+                         DisplacedPayments displacedPayments, PlatformTransactionManager transactions) {
         this.impact = impact;
         this.events = events;
         this.clock = clock;
         this.timeZone = timeZone;
         this.bookings = bookings;
         this.pendingPayments = pendingPayments;
+        this.displacedPayments = displacedPayments;
         this.separately = new TransactionTemplate(transactions);
         this.separately.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -129,8 +131,10 @@ class ClosureAnnouncements {
     }
 
     private void announce(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure) {
+        List<UUID> confirmed = new ArrayList<>();
         List<UUID> held = new ArrayList<>();
-        displace(affected, closure, held);
+        sort(affected, confirmed, held);
+        confirmed.forEach(bookingId -> displace(bookingId, closure));
         held.forEach(bookingId -> releaseOrDisplace(bookingId, closure));
     }
 
@@ -144,14 +148,16 @@ class ClosureAnnouncements {
     private <P> void announce(Function<Instant, P> window, BiFunction<P, UUID, ImpactService.ImpactPage> page,
                               BookingDisplaced.Closure closure) {
         P fixed = window.apply(clock.instant());
+        List<UUID> confirmed = new ArrayList<>();
         List<UUID> held = new ArrayList<>();
         UUID cursor = null;
         do {
             ImpactService.ImpactPage impacted = page.apply(fixed, cursor);
-            displace(impacted.bookings(), closure, held);
+            sort(impacted.bookings(), confirmed, held);
             cursor = impacted.nextCursor();
         } while (cursor != null);
-        // Released only after the walk, because the cursor names a booking the next page must still find.
+        // Cancelled only after the walk, because the cursor names a booking the next page must still find.
+        confirmed.forEach(bookingId -> displace(bookingId, closure));
         held.forEach(bookingId -> releaseOrDisplace(bookingId, closure));
     }
 
@@ -161,7 +167,7 @@ class ClosureAnnouncements {
             if (Boolean.TRUE.equals(separately.execute(status -> !pendingPayments.release(bookingId)
                     && bookings.findById(bookingId).filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
                     .isPresent()))) {
-                events.publishEvent(new BookingDisplaced(bookingId, closure));
+                displace(bookingId, closure);
             }
         } catch (RuntimeException failed) {
             log.warn("A closure could not release pending booking {}; its payment deadline ends the hold", bookingId,
@@ -170,19 +176,32 @@ class ClosureAnnouncements {
     }
 
     // A booking still awaiting its payment was never confirmed, so the closure ends its hold instead.
-    private void displace(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure,
-                          List<UUID> held) {
+    private void sort(List<ImpactService.AffectedBooking> affected, List<UUID> confirmed, List<UUID> held) {
         if (affected.isEmpty()) {
             return;
         }
         Set<UUID> pending = new HashSet<>(bookings.findPendingAmong(
                 affected.stream().map(ImpactService.AffectedBooking::bookingId).toList()));
-        affected.forEach(booking -> {
-            if (pending.contains(booking.bookingId())) {
-                held.add(booking.bookingId());
-            } else {
-                events.publishEvent(new BookingDisplaced(booking.bookingId(), closure));
+        affected.forEach(booking -> (pending.contains(booking.bookingId()) ? held : confirmed)
+                .add(booking.bookingId()));
+    }
+
+    // A booking the booker paid for is cancelled and its charge returned; one nobody paid for stays.
+    private void displace(UUID bookingId, BookingDisplaced.Closure closure) {
+        try {
+            if (Boolean.TRUE.equals(separately.execute(status -> {
+                boolean cancelled = displacedPayments.cancelCharged(bookingId);
+                if (cancelled) {
+                    events.publishEvent(new BookingDisplaced(bookingId, closure, true));
+                }
+                return cancelled;
+            }))) {
+                return;
             }
-        });
+        } catch (RuntimeException failed) {
+            log.warn("A closure could not cancel paid booking {}; it stays and the club refunds it by cancelling",
+                    bookingId, failed);
+        }
+        events.publishEvent(new BookingDisplaced(bookingId, closure));
     }
 }

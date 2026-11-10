@@ -225,7 +225,9 @@ pending" with the minutes left. There, **Continue to PayPal** takes you back to 
 the hold has ended, Courtside keeps the money as credit for you, or the club gets in touch with you. If you
 cancel before your club's cancellation deadline, the full amount goes back to your credit. After the
 deadline you can no longer cancel. If the club cancels your booking before it starts, you always get
-the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
+the amount back. The same holds when the club closes the court, the day or the hours your paid booking
+falls into: Courtside then cancels the booking, puts the amount back on your credit and tells you by
+email, also after the deadline. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
 
 If you would rather have the money of a cancelled PayPal booking back in your PayPal account, ask the
@@ -410,7 +412,8 @@ retired booking type or shorter opening hours.
 
 Courtside tells you the reason under *Messages*, and by email if you chose email. This does
 not cancel the booking automatically. The club
-decides how to handle it.
+decides how to handle it. The exception is a booking you paid for as an external player: Courtside
+cancels it and puts the amount back on your credit.
 
 ## Messages
 

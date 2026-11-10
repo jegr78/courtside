@@ -233,7 +233,9 @@ die Reservierung abgelaufen ist, behält Courtside das Geld als Guthaben für di
 meldet sich bei dir. Stornierst
 du vor der Stornofrist deines Vereins, kommt der volle Betrag zurück auf dein Guthaben. Nach der
 Frist kannst du nicht mehr stornieren. Storniert der Verein deine Buchung vor ihrem Beginn, bekommst
-du den Betrag immer zurück. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
+du den Betrag immer zurück. Das gilt auch, wenn der Verein den Platz, den Tag oder die Zeiten sperrt, in
+die deine bezahlte Buchung fällt: Courtside storniert die Buchung dann, bucht den Betrag auf dein
+Guthaben zurück und schreibt dir eine E-Mail, auch nach der Frist. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
 Verein.
 
 Möchtest du das Geld einer stornierten PayPal-Buchung lieber auf dein PayPal-Konto zurück, frag den
@@ -428,6 +430,8 @@ stillgelegte Buchungsart oder verkürzte Öffnungszeiten.
 
 Courtside nennt dir den Grund unter *Nachrichten* und per E-Mail, wenn du E-Mail gewählt
 hast. Die Buchung wird dadurch nicht automatisch storniert. Der Verein entscheidet, wie er mit ihr umgeht.
+Eine Ausnahme ist eine Buchung, die du als externer Spieler bezahlt hast: Courtside storniert sie und
+bucht den Betrag auf dein Guthaben zurück.
 
 ## Nachrichten
 
