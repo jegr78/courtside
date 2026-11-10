@@ -1592,6 +1592,7 @@ const de = {
   "import.source.ageBands.valueRepeated": "Der Kategoriewert {{value}} ist zweimal aufgeteilt.",
   "import.source.ageBands.tooMany": "Eine Quelle darf höchstens {{maxEntries}} Altersbänder haben.",
   "import.source.ageBands.fallbackMissing": "Der Kategoriewert {{value}} braucht eine eigene Mitgliedsart für Zeilen ohne Geburtsdatum.",
+  "import.source.ageBands.birthDateNotMapped": "Eine Aufteilung nach Alter braucht eine Spalte, die dem Geburtsdatum zugeordnet ist.",
   "import.source.ageBands.startsAtZero": "Die Altersbänder von {{value}} müssen bei 0 beginnen.",
   "import.source.ageBands.boundOutOfRange": "Ein Altersband von {{value}} beginnt nach {{maxAge}} Jahren.",
   "import.source.ageBands.boundRepeated": "Zwei Altersbänder von {{value}} beginnen beim selben Alter.",

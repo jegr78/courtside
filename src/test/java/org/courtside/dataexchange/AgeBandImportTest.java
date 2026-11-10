@@ -200,6 +200,61 @@ class AgeBandImportTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoBirthDateColumn_whenACategoryIsSplit_thenTheSplitIsRefusedByItsField() {
+        // when / then
+        assertThatThrownBy(() -> sources.create("club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(withoutBirthDate()), Map.of("active", unsorted), List.of(),
+                Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(18, adult))), unsorted,
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.source.ageBands.birthDateNotMapped")
+                .extracting("params").asInstanceOf(InstanceOfAssertFactories.MAP)
+                .containsEntry("field", "ageBands");
+    }
+
+    @Test
+    void givenASplitSource_whenItsBirthDateColumnIsRemoved_thenTheChangeIsRefused() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+
+        // when / then
+        assertThatThrownBy(() -> sources.change(source, "club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(withoutBirthDate()), Map.of("active", unsorted, "honorary", honorary),
+                List.of(), Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(18, adult))), unsorted,
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), 10, false))
+                .hasFieldOrPropertyWithValue("code", "import.source.ageBands.birthDateNotMapped");
+        assertThat(sources.configurationOf(source).columns())
+                .as("the stored source keeps its birth date column").containsValue(CanonicalField.BIRTH_DATE);
+    }
+
+    @Test
+    void givenAStoredSplitWithoutABirthDateColumn_whenAFileIsPreviewed_thenThePreviewIsRefused() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+        jdbc.sql("DELETE FROM import_column_mapping WHERE source_id = :source AND canonical_field = 'BIRTH_DATE'")
+                .param("source", source).update();
+
+        // when / then
+        assertThatThrownBy(() -> preview(source, EXPORT))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.source.ageBands.birthDateNotMapped");
+    }
+
+    @Test
+    void givenABirthDateAtAPosition_whenACategoryIsSplit_thenTheSplitIsStored() {
+        // when
+        SourceConfiguration described = sources.create("club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.positions(Map.of(1, CanonicalField.EXTERNAL_ID, 2, CanonicalField.FIRST_NAME,
+                        3, CanonicalField.LAST_NAME, 4, CanonicalField.MEMBERSHIP_TYPE, 5, CanonicalField.BIRTH_DATE), 5),
+                Map.of("active", unsorted), List.of(),
+                Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(18, adult))), unsorted,
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), 10);
+
+        // then
+        assertThat(described.ageBands().get("active")).extracting(AgeBand::fromAge).containsExactly(0, 18);
+    }
+
+    @Test
     void givenTheBirthDate_whenASourceWouldOwnIt_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("club-registry", "Club registry", ",", "UTF-8",
@@ -218,6 +273,11 @@ class AgeBandImportTest extends AbstractIntegrationTest {
                 Map.of("active", unsorted, "honorary", honorary), List.of(),
                 Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(18, adult))), unsorted,
                 owned, 10).sourceId();
+    }
+
+    private static Map<String, CanonicalField> withoutBirthDate() {
+        return COLUMNS.entrySet().stream().filter(column -> column.getValue() != CanonicalField.BIRTH_DATE)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private UUID typeOf(UUID personId) {

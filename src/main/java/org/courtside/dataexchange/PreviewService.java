@@ -58,6 +58,8 @@ public class PreviewService {
                                  SnapshotUpload upload, UUID accountId) {
         byte[] content = requiredUpload(upload).content();
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
+        ImportSourceService.requireBirthDateForAgeBands(configuration.ageBands(), configuration.columns().values(),
+                configuration.positions().values());
         SnapshotMode requested = requiredMode(mode);
         CsvSnapshot snapshot = parsed(content, configuration,
                 SupportedEncodings.resolve(encodingInForce(encoding, configuration)),
