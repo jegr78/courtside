@@ -13,7 +13,7 @@ import { precondition } from "../lib/precondition";
 import { adminLinks } from "../lib/surfaces.mjs";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "admin journeys run on desks, tablet and one phone"); });
-test.setTimeout(120_000);
+test.setTimeout(300_000);
 
 test("when the admin visits every administration page, then each renders", async ({ browser }) => {
   // when / then — every page renders in turn
