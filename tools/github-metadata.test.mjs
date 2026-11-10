@@ -6,6 +6,8 @@ import { test } from "node:test";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const { parse } = require("yaml");
 
+const OUTSIDE_THE_PRODUCT = ["github-actions:/", "npm:/lighthouse", "npm:/site"];
+
 export function validateDependabot(candidate) {
   assert.deepEqual(Object.keys(candidate).sort(), ["updates", "version"]);
   assert.equal(candidate.version, 2);
@@ -23,8 +25,7 @@ export function validateDependabot(candidate) {
     }
     if (update["commit-message"] !== undefined) {
       assert.deepEqual(Object.keys(update["commit-message"]), ["prefix"]);
-      assert.ok(["ci", "chore"].includes(update["commit-message"].prefix),
-        "a prefix override names a type the club changelog hides");
+      assert.equal(update["commit-message"].prefix, "ci", "a prefix override is ci, which the club changelog hides");
     }
     if (update.groups !== undefined) {
       assert.equal(typeof update.groups, "object");
@@ -55,7 +56,14 @@ export function validateDependabot(candidate) {
           ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"].includes(type)));
       }
     }
-    return `${update["package-ecosystem"]}:${update.directory}`;
+    const location = `${update["package-ecosystem"]}:${update.directory}`;
+    if (OUTSIDE_THE_PRODUCT.includes(location)) {
+      assert.deepEqual(update["commit-message"], { prefix: "ci" },
+        `${location} changes nothing a club runs and stays out of the club changelog`);
+    } else {
+      assert.equal(update["commit-message"], undefined, `${location} ships to clubs and keeps a changelog entry`);
+    }
+    return location;
   });
   assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend", "npm:/lighthouse", "npm:/site"]);
   const frontend = candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/frontend");
@@ -64,8 +72,6 @@ export function validateDependabot(candidate) {
   }, "Frontend dependency updates need one compatible version-only catch-all group; security fixes remain ungrouped");
   assert.equal(frontend.ignore, undefined, "Frontend dependency updates must not silently ignore available fixes");
   const lighthouse = candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/lighthouse");
-  assert.deepEqual(lighthouse["commit-message"], { prefix: "ci" },
-    "Lighthouse runner updates change no product code and stay out of the club changelog");
   assert.deepEqual(lighthouse.groups, { "lighthouse-runner": { "applies-to": "version-updates", patterns: ["*"] } },
     "Lighthouse runner version updates arrive as one pull request");
 }
@@ -154,14 +160,23 @@ test("given Dependabot nested fields are malformed, when validating, then each f
   invalidUpdateType.updates.at(-1).ignore = [{ "dependency-name": "example", "update-types": ["all"] }];
   cases.push(invalidUpdateType);
   const unknownCommitMessageField = structuredClone(source);
-  unknownCommitMessageField.updates[0]["commit-message"] = { prefix: "ci", include: "scope" };
+  unknownCommitMessageField.updates[1]["commit-message"] = { prefix: "ci", include: "scope" };
   cases.push(unknownCommitMessageField);
   const visiblePrefix = structuredClone(source);
-  visiblePrefix.updates[0]["commit-message"] = { prefix: "fix" };
+  visiblePrefix.updates[1]["commit-message"] = { prefix: "fix" };
 
   // when / then
   for (const candidate of cases) assert.throws(() => validateDependabot(candidate));
   assert.throws(() => validateDependabot(visiblePrefix), /changelog hides/);
+  const chorePrefix = structuredClone(source);
+  chorePrefix.updates[1]["commit-message"] = { prefix: "chore" };
+  assert.throws(() => validateDependabot(chorePrefix), /a prefix override is ci/);
+  const hiddenProduct = structuredClone(source);
+  hiddenProduct.updates[0]["commit-message"] = { prefix: "ci" };
+  assert.throws(() => validateDependabot(hiddenProduct), /maven:\/ ships to clubs/);
+  const listedTooling = structuredClone(source);
+  delete listedTooling.updates.find((update) => update.directory === "/site")["commit-message"];
+  assert.throws(() => validateDependabot(listedTooling), /npm:\/site changes nothing a club runs/);
 });
 
 test("given the PR title workflow, when validating it, then its event permissions and pinned action are closed", () => {
