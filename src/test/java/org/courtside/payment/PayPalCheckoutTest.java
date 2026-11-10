@@ -2,7 +2,6 @@ package org.courtside.payment;
 
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.PendingPayments;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.credit.testfixture.CreditTestFixture;
@@ -77,8 +76,6 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     private UserDetailsService userDetails;
     @Autowired
     private BookingService bookingService;
-    @Autowired
-    private PendingPayments pendingPayments;
     @Autowired
     private PayPalCheckout checkout;
     @Autowired

@@ -640,6 +640,23 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnUnansweredRefund_whenPayPalSaysTheFirstRequestIsStillInProgress_thenItIsNoOutage() throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, "15.00", FakePayPal.capture("COMPLETED", "15.00")));
+        PAYPAL.replaceReply(REFUND, 409, "{\"name\":\"RESOURCE_CONFLICT\",\"message\":\"in progress\"}");
+
+        // when
+        PayPalRefunds.Resolution resolution = payPalRefunds.resolve(refundId());
+
+        // then
+        assertThat(resolution.refund().status()).isEqualTo(PayPalRefunds.RefundStatus.PENDING);
+        assertThat(resolution.payPalUnreachable()).as("PayPal answered, so the run's outage stop does not count it")
+                .isFalse();
+        assertThat(credit.balance(johnAccount)).isZero();
+    }
+
+    @Test
     void givenACapturePartlyRefundedAtPayPal_whenTheRestIsReturned_thenTheCreditedRestGoesBack() throws Exception {
         // given
         UUID booking = bookWithOrder();

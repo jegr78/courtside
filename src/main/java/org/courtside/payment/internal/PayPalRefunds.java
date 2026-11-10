@@ -173,6 +173,9 @@ public class PayPalRefunds {
             log.warn("PayPal refund {} of order {} was not answered by the refund itself and stays pending: {}",
                     refund.id(), refund.orderId(), unclear.reason());
             return answered(view(refund));
+        } catch (PayPalRequestInProgressException inProgress) {
+            log.info("PayPal is still processing refund {} of order {}", refund.id(), refund.orderId());
+            return answered(view(refunds.find(refund.id()).orElse(refund)));
         } catch (PayPalUnavailableException unknown) {
             log.warn("PayPal refund {} of order {} has no known outcome yet: {}", refund.id(), refund.orderId(),
                     unknown.getMessage());

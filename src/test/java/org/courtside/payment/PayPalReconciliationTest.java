@@ -2,6 +2,7 @@ package org.courtside.payment;
 
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.credit.BookingPayments;
@@ -292,6 +293,74 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
                 .as("an outage costs a run at most three PayPal calls").isEqualTo(3);
         assertThat(jdbc.sql("SELECT count(*) FROM paypal_order WHERE status = 'CREATED'").query(Integer.class).single())
                 .isEqualTo(5);
+    }
+
+    @Test
+    void givenACaptureWithoutAnAnswer_whenTwoMoreOrdersGoUnanswered_thenTheRunStopsBeforeTheNext() throws Exception {
+        // given
+        captureThenThreeUnreadableOrders(503, UNAVAILABLE);
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERB"))).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERC"))).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERD"))).as("a capture PayPal did not answer counts towards the outage")
+                .isEmpty();
+    }
+
+    @Test
+    void givenACaptureStillInProgressAtPayPal_whenTwoMoreOrdersGoUnanswered_thenTheRunGoesOn() throws Exception {
+        // given
+        captureThenThreeUnreadableOrders(409, "{\"name\":\"RESOURCE_CONFLICT\",\"message\":\"in progress\"}");
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERD"))).as("PayPal answered the capture, so it is no outage").hasSize(1);
+    }
+
+    @Test
+    void givenASlowPayPal_whenTheSchedulerTicksTwice_thenOneRunLeavesTheSchedulerThreadAtOnce() throws Exception {
+        // given
+        storeAttemptedOrder("ORDERA", "EUR");
+        PAYPAL.reply(readOf("ORDERA"), 503, UNAVAILABLE);
+        CountDownLatch held = PAYPAL.holdFirst(readOf("ORDERA"));
+        Instant unchecked = orderUpdatedAt("ORDERA");
+
+        // when
+        reconciliation.poll();
+        Instant whenTheTickReturned = orderUpdatedAt("ORDERA");
+        reconciliation.poll();
+
+        // then
+        assertThat(whenTheTickReturned).as("the tick returned before the run read PayPal").isEqualTo(unchecked);
+        awaitRequest(readOf("ORDERA"));
+        held.countDown();
+        awaitChecked("ORDERA");
+        assertThat(PAYPAL.seen(readOf("ORDERA"))).as("a tick during a busy run starts no second run").hasSize(1);
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void givenARunThatFails_whenTheSchedulerTicks_thenTheFailureIsLogged(CapturedOutput output) throws Exception {
+        // given
+        doThrow(new IllegalStateException("the pending bookings cannot be read"))
+                .when(AopTestUtils.<PendingPayments>getUltimateTargetObject(pendingPayments)).expiredAt(any());
+
+        // when
+        reconciliation.poll();
+
+        // then
+        for (int attempt = 0; attempt < 500 && !output.getOut().contains("PayPal reconciliation run failed"); attempt++) {
+            Thread.sleep(10);
+        }
+        assertThat(output.getOut()).as("a failed run reaches the log with its cause")
+                .contains("PayPal reconciliation run failed").contains("the pending bookings cannot be read");
     }
 
     @Test
@@ -1031,6 +1100,29 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     private void expire(UUID booking, Duration ago) {
         jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
                 .param("at", Timestamp.from(clock.instant().minus(ago))).param("id", booking).update();
+    }
+
+    private void captureThenThreeUnreadableOrders(int captureStatus, String captureBody) throws Exception {
+        UUID booking = bookWithOrder();
+        age(Duration.ofHours(2));
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, captureStatus, captureBody);
+        for (String orderId : List.of("ORDERB", "ORDERC", "ORDERD")) {
+            storeAttemptedOrder(orderId, "EUR");
+            PAYPAL.reply(readOf(orderId), 503, UNAVAILABLE);
+        }
+    }
+
+    private void awaitChecked(String orderId) throws InterruptedException {
+        for (int attempt = 0; attempt < 500 && !clock.instant().equals(orderUpdatedAt(orderId)); attempt++) {
+            Thread.sleep(10);
+        }
+        assertThat(orderUpdatedAt(orderId)).as("the run finished on its own thread").isEqualTo(clock.instant());
+    }
+
+    private Instant orderUpdatedAt(String orderId) {
+        return jdbc.sql("SELECT updated_at FROM paypal_order WHERE order_id = :order").param("order", orderId)
+                .query(Timestamp.class).single().toInstant();
     }
 
     private void storeAttemptedOrder(String orderId, String currency) {

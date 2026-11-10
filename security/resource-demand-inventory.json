@@ -666,16 +666,17 @@
       "id": "payment-provider-reconciliation",
       "kind": "demanding",
       "entryPoints": [
-        "PayPalReconciliation#run"
+        "PayPalReconciliation#poll"
       ],
       "growthDrivers": "Each run reads at PayPal every open order older than five minutes or past its hold, up to 50, plus one read per voided order whose capture was attempted in the last 72 hours, up to 50 and at most once per five minutes each. An approved order adds one capture and, after a refusal, one more read. Held bookings without an order are released without calling PayPal.",
       "inputOrDataBound": "Two pages of 50 orders bound the PayPal calls of one run; the held bookings past their deadline are bounded by the accounts holding one pending booking each. Each PayPal answer is read up to 64 KiB.",
-      "concurrencyOrRateBound": "Spring's single scheduling thread, shared with the other scheduled jobs, runs one pass at a time, 60 seconds after the previous one ended. A run stops after three reads in a row that PayPal does not answer, so an outage costs a run at most three PayPal requests; the remaining orders wait for the next run, the longest unchecked first.",
+      "concurrencyOrRateBound": "The scheduler tick every 60 seconds hands the run to the job's own single thread and returns; a tick that finds a run still busy is dropped, so one pass runs at a time and the other scheduled jobs never wait for PayPal. A run stops after three requests in a row that PayPal does not answer, reads and captures alike, so an outage costs a run at most three unanswered PayPal requests, each a read, a capture or a refund request; the remaining orders wait for the next run, the longest unchecked first.",
       "executionModel": "Every PayPal call runs outside any transaction; each decision then takes the order row lock, the grid lock and the booking row in a short transaction of its own, the same path the return uses.",
-      "failureBehavior": "A PayPal read that fails or a status that leaves the outcome open keeps the order and its court for the next run, past the deadline for at most 24 hours (courtside.payment.paypal.unresolved-release-after); then the booking is released, and an order with a capture attempt stays open and is read on later runs. A failure on one order is logged with its id and the run goes on with the next. Three unanswered reads in a row end the run with one log line.",
-      "consumerTimeoutBehavior": "There is no HTTP consumer. Each PayPal request has its own 10-second deadline, so an outage holds the scheduling thread for at most three deadlines per run; a run against an answering PayPal is bounded by its two pages, and the next run starts only after it ended.",
+      "failureBehavior": "A PayPal read that fails or a status that leaves the outcome open keeps the order and its court for the next run, past the deadline for at most 24 hours (courtside.payment.paypal.unresolved-release-after); then the booking is released, and an order with a capture attempt stays open and is read on later runs. A failure on one order is logged with its id and the run goes on with the next. Three unanswered requests in a row end the run with one log line.",
+      "consumerTimeoutBehavior": "There is no HTTP consumer. Each PayPal request has its own 10-second deadline, so an outage holds the job's own thread for at most three deadlines per run; a run against an answering PayPal is bounded by its two pages, and no second run starts before it ended.",
       "productionPaths": [
         "src/main/java/org/courtside/payment/internal/PayPalReconciliation.java",
+        "src/main/java/org/courtside/payment/internal/PaymentConfiguration.java",
         "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
         "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
         "src/main/java/org/courtside/payment/internal/PayPalClient.java",
@@ -685,7 +686,9 @@
         "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld",
         "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAVoidedOrderWithoutACaptureAttempt_whenTheJobRuns_thenPayPalIsNotAsked",
         "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAYoungApprovedOrder_whenTheJobRuns_thenTheReturnIsGivenItsTime",
-        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenPayPalDown_whenTheJobMeetsThreeUnreachableOrders_thenTheRunStopsAndTheRestWait"
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenPayPalDown_whenTheJobMeetsThreeUnreachableOrders_thenTheRunStopsAndTheRestWait",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenACaptureWithoutAnAnswer_whenTwoMoreOrdersGoUnanswered_thenTheRunStopsBeforeTheNext",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenASlowPayPal_whenTheSchedulerTicksTwice_thenOneRunLeavesTheSchedulerThreadAtOnce"
       ]
     },
     {

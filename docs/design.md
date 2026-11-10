@@ -513,7 +513,8 @@ HTTP 409, `DUPLICATE_REQUEST_ID` or `PREVIOUS_REQUEST_IN_PROGRESS` counts as unk
 decline. Every order endpoint answers only the signed-in booker; another account's order is not
 found.
 
-`PayPalReconciliation` runs every 60 seconds. Each run reads at PayPal up to 50 open orders older
+`PayPalReconciliation` runs every 60 seconds on a thread of its own, so a slow PayPal never holds up
+the other scheduled jobs such as the mail outbox. Each run reads at PayPal up to 50 open orders older
 than five minutes, longest unchecked first, and in addition every open order whose booking is past
 its deadline. A capture found is recorded through the same locked
 transition as the return. An `APPROVED` order is captured while its booking is still pending, also
@@ -529,7 +530,7 @@ order as merely approved again, or its booking has started, the job voids it loc
 PayPal. A capture that completes after the booking's start never confirms it and becomes credit as
 well. For 72 hours the job also rereads voided orders whose capture was attempted, at most once per five minutes each, and records a
 capture PayPal completed after all as a late capture. A run stops after three consecutive orders
-PayPal does not answer. A hold therefore ends at its deadline plus at most one run while PayPal
+PayPal does not answer, a capture PayPal does not answer included. A hold therefore ends at its deadline plus at most one run while PayPal
 answers clearly, and in every case at the earlier of 24 hours past its deadline and the
 booking's start.
 

@@ -100,7 +100,7 @@ public class PayPalClient {
         }
         if (answer.status() == 409 || answer.status() / 100 == 4
                 && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
-            throw new PayPalUnavailableException("PayPal is still processing an earlier capture of this order");
+            throw new PayPalRequestInProgressException("PayPal is still processing an earlier capture of this order");
         }
         return capture(success(answer)).orElseThrow(() -> new PayPalRefusedException("PayPal order has no capture"));
     }
@@ -112,7 +112,7 @@ public class PayPalClient {
         }
         if (answer.status() == 409 || answer.status() / 100 == 4
                 && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
-            throw new PayPalUnavailableException("PayPal is still processing an earlier refund of this capture");
+            throw new PayPalRequestInProgressException("PayPal is still processing an earlier refund of this capture");
         }
         if (answer.status() / 100 == 4 && answer.status() != 401 && answer.status() != 403
                 && answer.status() != 429) {

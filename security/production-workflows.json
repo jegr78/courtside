@@ -1011,7 +1011,7 @@
         "cancelPayPalOrder"
       ],
       "backgroundEntryPoints": [
-        "PayPalReconciliation#run"
+        "PayPalReconciliation#poll"
       ],
       "stateTransitions": [
         "The booker of a pending booking creates one PayPal order carrying the booking id and the amount stored with the booking, and one audit entry.",

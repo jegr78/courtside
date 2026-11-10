@@ -1,6 +1,7 @@
 package org.courtside.payment;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.PendingPayments;
 import org.courtside.credit.BookingPayments;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -19,6 +20,9 @@ abstract class PayPalIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean
     protected BookingPayments bookingPayments;
+
+    @MockitoSpyBean
+    protected PendingPayments pendingPayments;
 
     @DynamicPropertySource
     static void endpoints(DynamicPropertyRegistry registry) {

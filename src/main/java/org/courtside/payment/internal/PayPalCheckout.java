@@ -158,9 +158,9 @@ public class PayPalCheckout {
         }
         Settlement decided = decide(stored, pending, order);
         if (decided.outcome() != Outcome.PROCESSING || !overdue(pending, unresolvedAfter)) {
-            return Reconciled.answered(decided);
+            return Reconciled.of(decided);
         }
-        return Reconciled.answered(releaseKeepingOrder(stored));
+        return new Reconciled(releaseKeepingOrder(stored).outcome(), decided.payPalUnreachable());
     }
 
     private Settlement decide(StoredOrder stored, Optional<PendingBooking> pending, PayPalClient.Order order) {
@@ -308,10 +308,13 @@ public class PayPalCheckout {
         }
         try {
             return settle(stored, client.captureOrder(credentials, stored.orderId()), true, null);
+        } catch (PayPalRequestInProgressException inProgress) {
+            log.info("PayPal is still capturing order {} of booking {}", stored.orderId(), stored.bookingId());
+            return processing(stored);
         } catch (PayPalUnavailableException unknown) {
             log.warn("The capture of PayPal order {} of booking {} has no known outcome yet", stored.orderId(),
                     stored.bookingId());
-            return processing(stored);
+            return unanswered(stored);
         } catch (PayPalRefusedException refused) {
             log.warn("PayPal refused to capture order {} of booking {}: {}", stored.orderId(), stored.bookingId(),
                     refused.reason());
@@ -320,9 +323,13 @@ public class PayPalCheckout {
             PayPalClient.Order order = client.getOrder(credentials, stored.orderId());
             if (order.capture().isPresent()) return settle(stored, order.capture().get(), true, order.refunds());
             return UNCAPTURED.contains(order.status()) ? reject(stored, Rejection.CAPTURE_REFUSED) : processing(stored);
-        } catch (PayPalUnavailableException | PayPalRefusedException failed) {
+        } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of booking {} could not be read after its capture: {}", stored.orderId(),
-                    stored.bookingId(), failed.getMessage());
+                    stored.bookingId(), down.getMessage());
+            return unanswered(stored);
+        } catch (PayPalRefusedException refused) {
+            log.warn("PayPal order {} of booking {} could not be read after its capture: {}", stored.orderId(),
+                    stored.bookingId(), refused.getMessage());
             return processing(stored);
         }
     }
@@ -466,6 +473,10 @@ public class PayPalCheckout {
         return new Settlement(order.bookingId(), Outcome.PROCESSING);
     }
 
+    private static Settlement unanswered(StoredOrder order) {
+        return new Settlement(order.bookingId(), Outcome.PROCESSING, true);
+    }
+
     private StoredOrder owned(String orderId) {
         UUID account = signedIn();
         return orders.find(orderId).filter(order -> order.accountId().equals(account))
@@ -500,7 +511,12 @@ public class PayPalCheckout {
     public record CreatedOrder(String orderId, URI approveUrl) {
     }
 
-    public record Settlement(UUID bookingId, Outcome outcome) {
+    /** The outcome of an order and whether it stayed open because PayPal did not answer. */
+    public record Settlement(UUID bookingId, Outcome outcome, boolean payPalUnreachable) {
+
+        Settlement(UUID bookingId, Outcome outcome) {
+            this(bookingId, outcome, false);
+        }
     }
 
     /** The outcome of one reconciled order and whether PayPal failed to answer its read. */
@@ -508,6 +524,10 @@ public class PayPalCheckout {
 
         static Reconciled answered(Settlement settlement) {
             return new Reconciled(settlement.outcome(), false);
+        }
+
+        static Reconciled of(Settlement settlement) {
+            return new Reconciled(settlement.outcome(), settlement.payPalUnreachable());
         }
     }
 }
