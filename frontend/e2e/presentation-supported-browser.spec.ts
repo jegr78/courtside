@@ -3,11 +3,23 @@ import { expect, expectWholeValue, test } from "./fixtures";
 
 test.use({ serviceWorkers: "block", viewport: { width: 1280, height: 900 } });
 
+// This spec measures presentation, so it signs in through the request the form sends rather than a click on the form.
 async function signIn(page: Page) {
   await page.goto("/login");
-  await page.getByTestId("username").fill("configuration-admin");
-  await page.getByTestId("password").fill("temporary-password");
-  await page.getByTestId("login-submit").click();
+  const status = await page.evaluate(async () => {
+    const name = location.protocol === "https:" ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
+    const token = () => document.cookie.split("; ").find((entry) => entry.startsWith(`${name}=`))?.substring(name.length + 1);
+    if (token() === undefined) await fetch("/api/session", { credentials: "same-origin" });
+    const response = await fetch("/api/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-XSRF-TOKEN": decodeURIComponent(token() ?? "") },
+      body: new URLSearchParams({ username: "configuration-admin", password: "temporary-password" })
+    });
+    return response.status;
+  });
+  expect(status, "the administrator's sign-in is accepted").toBe(200);
+  await page.goto("/");
   await expect(page.getByTestId("administration-link")).toBeVisible({ timeout: 10_000 });
 }
 
