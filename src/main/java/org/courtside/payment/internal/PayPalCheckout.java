@@ -289,7 +289,6 @@ public class PayPalCheckout {
     }
 
     private Settlement captureWhileHeld(StoredOrder stored, PayPalClient.Credentials active) {
-        if (stored.captureAttemptedAt() != null) return capture(stored, active);
         Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
         if (pending.isEmpty()) return voided(stored, VoidReason.BOOKING_RELEASED);
         if (pending.get().startsAt().isBefore(clock.instant())) return voided(stored, VoidReason.HOLD_EXPIRED);

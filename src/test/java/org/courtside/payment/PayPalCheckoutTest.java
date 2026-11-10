@@ -404,6 +404,65 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnAttemptedCaptureAndAReleasedBooking_whenThePayerReturnsAgain_thenItIsVoidedWithoutACapture()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        assertThat(pendingPayments.release(booking)).isTrue();
+        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, "15.00", null));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("only the timed-out capture reached PayPal; a released court is never"
+                + " charged").hasSize(1);
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("BOOKING_RELEASED"));
+    }
+
+    @Test
+    void givenAnAttemptedCaptureAndAStartedBooking_whenThePayerReturnsAgain_thenItIsVoidedWithoutACapture()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        jdbc.sql("UPDATE court_allocation SET starts_at = :start WHERE booking_id = :id")
+                .param("start", Timestamp.from(clock.instant().minus(Duration.ofMinutes(1)))).param("id", booking)
+                .update();
+        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, "15.00", null));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a session that has begun is never charged").hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
+    }
+
+    @Test
+    void givenAnAttemptedCaptureOfAHeldBooking_whenThePayerReturnsAgain_thenTheCaptureIsRepeated() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).extracting(request -> request.header("PayPal-Request-Id"))
+                .as("the repeat carries the order id, so PayPal captures once").containsOnly(ORDER);
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+    }
+
+    @Test
     void givenABookingThatHasStarted_whenThePayerReturnsWithAnApprovedOrder_thenItIsVoidedWithoutACapture()
             throws Exception {
         // given
