@@ -35,7 +35,7 @@ class ClockOverridePolicyTest {
     // The demo seeder is an ApplicationRunner and reads the clock while the context starts.
     private static final List<String> FILES_ALLOWED_TO_NAME_THE_PROPERTY = List.of(
             "java/org/courtside/FixedClockConfiguration.java",
-            "java/org/courtside/demo/DemoDataSeederTest.java");
+            "java/org/courtside/DemoDataSeederTest.java");
 
     @Test
     void whenReadingEveryTestSource_thenOnlyAStartupClockSetsTheClockProperty() throws IOException {
