@@ -783,7 +783,8 @@ Passwortbestätigung, fragt Courtside dein Passwort ab.
 Zurückzahlen kannst du nur eine Zahlung, deren Buchung storniert und erstattet wurde, oder eine späte
 PayPal-Zahlung, die zu Guthaben wurde. Teilbeträge gibt es nicht. Hat der Spieler das Guthaben schon
 wieder ausgegeben, zeigt der Verlauf statt der Schaltfläche den Grund. Dasselbe gilt, wenn PayPal
-ausgeschaltet ist oder die Zahlung aus der anderen Umgebung stammt. Jede Zahlung lässt sich nur
+ausgeschaltet ist oder die Zahlung aus der anderen Umgebung oder von einem anderen PayPal-Konto
+stammt. Jede Zahlung lässt sich nur
 einmal zurückzahlen.
 
 Neben der Erstattung steht, wie es ausging. *Über PayPal zurückgezahlt* heißt, das Geld ist

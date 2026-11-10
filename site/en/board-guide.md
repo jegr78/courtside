@@ -747,7 +747,7 @@ password.
 You can only return a payment whose booking was cancelled and refunded, or a late PayPal payment that
 became credit. There are no partial amounts. When the player has already spent the credit, the ledger
 shows the reason instead of the button. The same applies when PayPal is switched off or the payment
-comes from the other environment. Each payment can be returned once.
+comes from the other environment or from another PayPal account. Each payment can be returned once.
 
 Next to the refund the ledger shows how it ended. *Returned through PayPal* means the money is on its
 way and the player gets a message. When PayPal refuses, the reason appears next to it and Courtside

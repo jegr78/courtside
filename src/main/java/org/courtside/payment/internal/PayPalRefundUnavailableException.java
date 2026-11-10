@@ -10,7 +10,7 @@ class PayPalRefundUnavailableException extends CodedDomainFailure {
 
     static final ProblemType PROBLEM_TYPE = new ProblemType(
             "paypal-refund-unavailable", HttpStatus.SERVICE_UNAVAILABLE,
-            "PayPal refund unavailable", "PayPal is switched off or set to another environment");
+            "PayPal refund unavailable", "PayPal is switched off or set to another environment or PayPal account");
 
     PayPalRefundUnavailableException() {
         super(PayPalRefunds.UNAVAILABLE, Map.of());

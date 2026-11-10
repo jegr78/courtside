@@ -9071,7 +9071,8 @@ paths:
         returned before, in any status, with `payment.paypal.refund.alreadyRefunded`; a balance that no
         longer covers the amount with `payment.paypal.refund.creditSpent`. Each of these answers
         `urn:courtside:error:paypal-refund-refused`. PayPal switched off, or an order of the other
-        environment, answers `urn:courtside:error:paypal-refund-unavailable` and takes nothing.
+        environment or of another PayPal client id, answers `urn:courtside:error:paypal-refund-unavailable`
+        and takes nothing.
 
         `COMPLETED` means PayPal returned the money. `FAILED` means PayPal refused the refund, the
         credit is restored and `failureReason` carries PayPal's reason; a failed refund is final.

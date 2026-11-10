@@ -85,7 +85,8 @@ public class PayPalCheckout {
             return new PayPalCheckoutUnavailableException();
         });
         StoredOrder fresh = new StoredOrder(order.id(), bookingId, account, active.environment(),
-                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl, null, null);
+                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl, null, null,
+                active.fingerprint());
         return transactions.execute(status -> {
             if (orders.insert(fresh)) {
                 events.publishEvent(new PaymentEvent.PayPalOrderCreated(bookingId, fresh.orderId(),

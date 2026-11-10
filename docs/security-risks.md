@@ -431,8 +431,8 @@ part of the product, or when the club's PayPal reports show captures completing 
 
 ## A PayPal order the former credentials alone can read may never become credit
 
-An order keeps the environment it was created in, but Courtside does not keep the client id and
-secret that created it. When a treasurer changes the environment or the client id or removes the
+An order keeps the environment it was created in and a fingerprint of the client id, but Courtside
+does not keep the client id and secret that created it. When a treasurer changes the environment or the client id or removes the
 credentials while an order with a capture attempt cannot be read at PayPal, the order stays open and
 the reconciliation can no longer read it with the credentials now stored. Its booking is released 24
 hours after its deadline, so no court stays held. If PayPal had taken the money, that payment appears
@@ -447,7 +447,14 @@ Returning a PayPal payment takes the credit back before Courtside asks PayPal, a
 when PayPal clearly refuses the refund. When PayPal does not answer, answers something Courtside
 cannot read, or never settles the refund, the refund stays pending and the player's balance stays
 lower by the amount, although PayPal may not have sent the money. The reconciliation keeps asking,
-and the treasurer page shows the refund as unclear. Causing it needs no access beyond a treasurer
+and the treasurer page shows the refund as unclear. A treasurer who moves PayPal to another client id
+while a refund is pending ends the asking too: the new account cannot see the payment, so the
+refund stays pending until somebody acts. A new refund of a payment another PayPal account took is
+refused before any credit is taken, for orders created since Courtside keeps the client id
+fingerprint. An older order carries the fingerprint of the client id stored at the upgrade when it was
+created after that client id's secret, and none otherwise; a club that moves to another account
+while such an order has none can still see its refund take the credit and stay pending as described
+above. Causing it needs no access beyond a treasurer
 starting a refund during a PayPal outage, and the player loses at most the one payment's amount
 until somebody acts. The treasurer checks the club's PayPal account and, if the money did not go
 back, corrects the balance with a `CREDIT` entry and a note. The account stays open for that

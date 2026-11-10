@@ -69,10 +69,10 @@ public class PayPalRefunds {
                 "PayPal refund " + refundId + " does not exist"));
         if (refund.status() != RefundStatus.PENDING) return answered(view(refund));
         StoredOrder order = lockless(refund.orderId());
-        Optional<PayPalClient.Credentials> readable = credentials.stored(order.environment());
+        Optional<PayPalClient.Credentials> readable = credentials.stored(order);
         if (readable.isEmpty()) {
-            log.warn("PayPal refund {} of order {} cannot be resolved: no stored {} credentials", refund.id(),
-                    refund.orderId(), order.environment());
+            log.warn("PayPal refund {} of order {} cannot be resolved: no stored credentials of the {} account that"
+                    + " created the order", refund.id(), refund.orderId(), order.environment());
             return answered(view(refund));
         }
         if (refund.refundId() == null) return askAgain(refund, order, readable.get());
@@ -107,7 +107,7 @@ public class PayPalRefunds {
         }
         Optional<PayPalCredit> credit = creditOf(order);
         if (credit.isEmpty()) return blocked(order, neverCredited(order) ? NOT_CREDITED : NOT_REFUNDABLE);
-        if (active.filter(credentials -> credentials.environment() == order.environment()).isEmpty()) {
+        if (active.filter(credentials -> PayPalCredentials.created(order, credentials)).isEmpty()) {
             return blocked(order, UNAVAILABLE);
         }
         long balance = balances.computeIfAbsent(order.currency(),
@@ -128,8 +128,9 @@ public class PayPalRefunds {
         PayPalCredit credit = creditOf(order).orElseThrow(() -> neverCredited(order)
                 ? PayPalRefundException.notCredited() : PayPalRefundException.notRefundable());
         if (refunds.ofOrder(orderId).isPresent()) throw PayPalRefundException.alreadyRefunded();
-        PayPalClient.Credentials active = credentials.active(order.environment()).orElseThrow(() -> {
-            log.info("PayPal order {} is not refunded: no active {} credentials", orderId, order.environment());
+        PayPalClient.Credentials active = credentials.active(order).orElseThrow(() -> {
+            log.info("PayPal order {} is not refunded: no active credentials of the {} account that created it",
+                    orderId, order.environment());
             return new PayPalRefundUnavailableException();
         });
         captureOf(order);

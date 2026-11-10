@@ -463,7 +463,7 @@ booking an entry paid leaves the entry.
 | Table | Holds | References |
 |---|---|---|
 | `paypal_settings` | The club's PayPal client id, encrypted secret and since when it is stored, sandbox or live, whether PayPal payment is on, and when and by which account the row last changed | None |
-| `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id, when Courtside last asked PayPal to capture it or released its booking while PayPal still showed it unresolved, the address PayPal sends the payer to for approval, and when it was created and last changed or checked | None |
+| `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id, the SHA-256 fingerprint of the client id that created it, when Courtside last asked PayPal to capture it or released its booking while PayPal still showed it unresolved, the address PayPal sends the payer to for approval, and when it was created and last changed or checked | None |
 | `paypal_refund` | One refund of a captured order through PayPal: the order, the paying account, amount in the minor unit, currency, status (`PENDING`, `COMPLETED`, `FAILED`), PayPal's refund id, PayPal's reason for a failure, which account asked for it and when, and when it last changed | `paypal_order` |
 
 `paypal_settings_single_row` keeps at most one row, and removing the credentials deletes it.
@@ -477,6 +477,10 @@ account that last saved the settings leaves them.
 `paypal_order.booking_id` and `account_id` have no foreign key, like `credit_entry.booking_id`, so an
 order outlives the booking or account it paid for. `booking_id` is unique.
 `paypal_order_capture_id` requires a capture id exactly on `CAPTURED` and `LATE_CAPTURED` orders.
+`paypal_order_client_fingerprint` allows 64 lower-case hex digits; the fingerprint is empty only on an
+order from before it was kept that the upgrade could not tie to the stored client id: one of another
+environment, or one created before the stored secret, since a new client id always comes with a new
+secret.
 
 `paypal_refund_one_per_order` allows an order one refund in any status. `paypal_refund_status` allows
 `PENDING`, `COMPLETED` and `FAILED`, `paypal_refund_completed_has_id` requires PayPal's refund id on a

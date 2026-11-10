@@ -2577,6 +2577,10 @@
         "level": "operational",
         "lifecycle": "payment-provider"
       },
+      "client_fingerprint": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
       "created_at": {
         "level": "operational",
         "lifecycle": "payment-provider"

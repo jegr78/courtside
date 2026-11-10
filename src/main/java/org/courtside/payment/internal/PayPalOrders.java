@@ -22,14 +22,14 @@ class PayPalOrders {
 
     private static final String COLUMNS = """
             SELECT order_id, booking_id, account_id, environment, amount_minor, currency, status, approve_url,
-                   capture_attempted_at, capture_id
+                   capture_attempted_at, capture_id, client_fingerprint
             FROM paypal_order
             """;
     private static final RowMapper<StoredOrder> ROW = (rs, n) -> new StoredOrder(rs.getString(1),
             rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), PayPalEnvironment.valueOf(rs.getString(4)),
             rs.getInt(5), Currency.getInstance(rs.getString(6)), Status.valueOf(rs.getString(7)),
             URI.create(rs.getString(8)), rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
-            rs.getString(10));
+            rs.getString(10), rs.getString(11));
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -39,15 +39,16 @@ class PayPalOrders {
         Timestamp now = Timestamp.from(clock.instant());
         return jdbc.sql("""
                         INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
-                                                  status, approve_url, created_at, updated_at)
+                                                  status, approve_url, client_fingerprint, created_at, updated_at)
                         VALUES (:order, :booking, :account, :environment, :amount, :currency, :status, :approve,
-                                :now, :now)
+                                :fingerprint, :now, :now)
                         ON CONFLICT DO NOTHING
                         """)
                 .param("order", order.orderId()).param("booking", order.bookingId())
                 .param("account", order.accountId()).param("environment", order.environment().name())
                 .param("amount", order.amountMinor()).param("currency", order.currency().getCurrencyCode())
                 .param("status", order.status().name()).param("approve", order.approveUrl().toString())
+                .param("fingerprint", order.clientFingerprint())
                 .param("now", now).update() == 1;
     }
 
@@ -130,6 +131,6 @@ class PayPalOrders {
 
     record StoredOrder(String orderId, UUID bookingId, UUID accountId, PayPalEnvironment environment, int amountMinor,
                        Currency currency, Status status, URI approveUrl, @Nullable Instant captureAttemptedAt,
-                       @Nullable String captureId) {
+                       @Nullable String captureId, @Nullable String clientFingerprint) {
     }
 }

@@ -34,6 +34,22 @@ class PayPalCredentials {
         return stored().filter(credentials -> credentials.environment() == environment);
     }
 
+    /** The active credentials, when they are of the PayPal account that created the order. */
+    Optional<PayPalClient.Credentials> active(PayPalOrders.StoredOrder order) {
+        return active().filter(credentials -> created(order, credentials));
+    }
+
+    /** The stored credentials, when they are of the PayPal account that created the order. */
+    Optional<PayPalClient.Credentials> stored(PayPalOrders.StoredOrder order) {
+        return stored().filter(credentials -> created(order, credentials));
+    }
+
+    /** Whether the credentials are of the order's environment and, when the order names it, of its account. */
+    static boolean created(PayPalOrders.StoredOrder order, PayPalClient.Credentials credentials) {
+        return credentials.environment() == order.environment()
+                && (order.clientFingerprint() == null || order.clientFingerprint().equals(credentials.fingerprint()));
+    }
+
     private Optional<PayPalClient.Credentials> credentials(boolean enabledOnly) {
         return jdbc.sql("""
                         SELECT environment, client_id, secret_ciphertext FROM paypal_settings

@@ -473,8 +473,8 @@ the reconciliation job, and confirms a booking only after it holds the captured 
    currency stored with the booking, and return and cancel addresses built from the instance's
    public address. The request carries the booking id and nothing else, so the client never names
    an amount.
-   The order is stored in `paypal_order` with the environment it was created in and audited as
-   `payment.paypal.order.created`; calling again for the same booking answers the stored order.
+   The order is stored in `paypal_order` with the environment it was created in and the SHA-256
+   fingerprint of the client id that created it, and audited as `payment.paypal.order.created`; calling again for the same booking answers the stored order.
    Without a public address the request is refused with `payment.paypal.publicUrlMissing`.
 3. The browser goes to PayPal's approve link and comes back to the shell routes
    `/payment/paypal/return` or `/payment/paypal/cancel` with the order id. A payer whose session
@@ -541,7 +541,8 @@ open orders of the former credentials after the change commits. An order without
 cannot have moved money, so it is voided and its booking released without asking PayPal. One with
 an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
-environment it was created in, and sandbox credentials work on every instance.
+environment and the client id fingerprint it was created with, and sandbox credentials work on every
+instance.
 
 #### Returning a PayPal payment
 
@@ -551,7 +552,10 @@ account's PayPal payments and says for each whether it can be returned, and why 
 A payment can be returned when its order is `CAPTURED` and its booking was cancelled with a
 `BOOKING_REFUND`, or `LATE_CAPTURED` and credited with a `PAYPAL_LATE_CAPTURE`; when the order has
 no refund in any status; when the payer's balance still covers the amount of the order's credit
-entry; and when PayPal is on with the environment the order was created in. Otherwise
+entry; and when PayPal is on with the environment and the client id the order was created with,
+because another PayPal account cannot see the payment. An order from before Courtside kept the
+fingerprint is matched by its environment alone, unless the upgrade tied it to the client id then
+stored, which it does for an order of that environment created after the stored secret. Otherwise
 `POST /api/treasury/paypal/refunds` refuses it with `payment.paypal.refund.notRefundable`,
 `payment.paypal.refund.notCredited` for a late capture Courtside kept no credit for,
 `payment.paypal.refund.alreadyRefunded`, `payment.paypal.refund.creditSpent` with amount, balance
@@ -587,7 +591,9 @@ refund `PENDING` with its credit taken.
 `PayPalReconciliation` also resolves `PENDING` refunds older than five minutes, up to 50 per run and
 longest unchecked first: one without a PayPal refund id is requested again with the same request id
 after reading the order, one with an id is read at PayPal, and the answer is recorded as in step 3.
-These calls count towards the run's stop after three unanswered reads. A refund that stays unclear
+These calls count towards the run's stop after three unanswered reads. A pending refund whose order
+another PayPal account created than the one now stored is not asked again and stays pending. A
+refund that stays unclear
 keeps its credit taken, and the treasurer page shows it as unclear with the advice to check the
 PayPal account.
 

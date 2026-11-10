@@ -618,16 +618,17 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"switched off", "another environment"})
-    void givenPayPalOffOrAnotherEnvironment_whenReturning_thenItIsUnavailableAndNothingIsTaken(String cause)
+    @ValueSource(strings = {"switched off", "another environment", "another PayPal account"})
+    void givenPayPalOffOrAnotherEnvironmentOrAccount_whenReturning_thenItIsUnavailableAndNothingIsTaken(String cause)
             throws Exception {
         // given
         UUID booking = paidAndCancelled();
-        if (cause.equals("switched off")) {
-            jdbc.sql("UPDATE paypal_settings SET enabled = false").update();
-        } else {
-            payment.switchPayPalEnvironment("LIVE");
+        switch (cause) {
+            case "switched off" -> jdbc.sql("UPDATE paypal_settings SET enabled = false").update();
+            case "another environment" -> payment.switchPayPalEnvironment("LIVE");
+            default -> jdbc.sql("UPDATE paypal_settings SET client_id = 'client-other'").update();
         }
+        option().andExpect(jsonPath("$.items[0].blockedBy").value("payment.paypal.refund.unavailable"));
 
         // when
         unavailable(refund("miles.richard", ORDER, true), UNAVAILABLE, "payment.paypal.refund.unavailable");
@@ -692,6 +693,62 @@ class PayPalRefundTest extends PayPalIntegrationTest {
         // then
         assertThat(PAYPAL.seen(REFUND)).isEmpty();
         assertThat(refunds()).isZero();
+    }
+
+    @Test
+    void givenAPendingRefund_whenTheClubMovesToAnotherPayPalAccount_thenItIsNotAskedAgainWithTheNewAccount()
+            throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        jdbc.sql("UPDATE paypal_settings SET client_id = 'client-other'").update();
+
+        // when
+        PayPalRefunds.Resolution resolution = payPalRefunds.resolve(refundId());
+
+        // then
+        assertThat(resolution.refund().status()).isEqualTo(PayPalRefunds.RefundStatus.PENDING);
+        assertThat(resolution.payPalUnreachable()).as("PayPal was not asked, so it is no outage").isFalse();
+        assertThat(PAYPAL.seen(REFUND)).as("another account cannot see the payment").hasSize(1);
+        assertThat(PAYPAL.seen(READ)).as("nor read its order").hasSize(1);
+        assertThat(credit.balance(johnAccount)).as("the first request may have gone out").isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+    }
+
+    @Test
+    void givenAnOrderFromBeforeTheFingerprint_whenTheClientIdChanged_thenItIsStillReturnedByItsEnvironment()
+            throws Exception {
+        // given
+        paidAndCancelled();
+        jdbc.sql("UPDATE paypal_order SET client_fingerprint = NULL").update();
+        jdbc.sql("UPDATE paypal_settings SET client_id = 'client-other'").update();
+        PAYPAL.reply(REFUND, 201, FakePayPal.refund("COMPLETED"));
+        option().andExpect(jsonPath("$.items[0].refundable").value(true));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertThat(PAYPAL.seen(REFUND)).as("an order without a fingerprint keeps the environment-only check")
+                .hasSize(1);
+    }
+
+    @Test
+    void givenAnOrder_whenItIsStored_thenItNamesItsPayPalAccountAsTheUpgradeComputesIt() throws Exception {
+        // given
+        paid();
+
+        // when
+        Map<String, Object> stored = jdbc.sql("""
+                        SELECT o.client_fingerprint AS stored,
+                               encode(sha256(convert_to(s.client_id, 'UTF8')), 'hex') AS computed
+                        FROM paypal_order o, paypal_settings s
+                        """).query().singleRow();
+
+        // then
+        assertThat(stored.get("stored")).as("the order keeps a fingerprint, never the client id itself")
+                .isNotNull().isEqualTo(stored.get("computed"));
     }
 
     @Test

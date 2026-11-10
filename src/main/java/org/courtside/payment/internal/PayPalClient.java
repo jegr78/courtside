@@ -467,6 +467,16 @@ public class PayPalClient {
             return "Credentials[" + environment + "]";
         }
 
+        /** The SHA-256 of the client id in lower-case hex, naming the PayPal account without storing its id. */
+        String fingerprint() {
+            try {
+                byte[] digest = MessageDigest.getInstance("SHA-256").digest(clientId.getBytes(StandardCharsets.UTF_8));
+                return HexFormat.of().formatHex(digest);
+            } catch (NoSuchAlgorithmException missing) {
+                throw new IllegalStateException("SHA-256 is unavailable", missing);
+            }
+        }
+
         private String cacheKey() {
             try {
                 byte[] digest = MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8));
