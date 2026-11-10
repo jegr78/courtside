@@ -15,8 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.mail.internet.MimeMessage;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
@@ -61,9 +59,6 @@ class RegistrationTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
     @Autowired
     private Clock clock;
-    @MockitoSpyBean
-    private JavaMailSender sender;
-
     private MockMvc mockMvc;
 
     @BeforeEach

@@ -17,9 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
@@ -47,9 +45,6 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
     private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
             Instant.parse("2026-05-13T17:00:00Z"));
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private FacilityTestFixture facility;

@@ -9,10 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -36,9 +34,6 @@ class CredentialMailOrderTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     private static final Pattern CREDENTIAL = Pattern.compile("[A-Za-z0-9_-]{32}");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;

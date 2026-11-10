@@ -19,9 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.sql.Timestamp;
 import java.time.DayOfWeek;
@@ -44,9 +42,6 @@ class QueuedAccessCodeMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String CODE = "135790";
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;

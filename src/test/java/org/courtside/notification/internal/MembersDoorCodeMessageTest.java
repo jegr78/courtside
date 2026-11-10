@@ -15,9 +15,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -38,9 +36,6 @@ class MembersDoorCodeMessageTest extends AbstractIntegrationTest {
     private static final String OLD_CODE = "135790";
     private static final String NEW_CODE = "975310";
     private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;

@@ -10,10 +10,8 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -40,9 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DependantControllerTest extends AbstractIntegrationTest {
 
     private static final String CREDENTIALS_REQUESTED = "roster.account.credentialsRequested";
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private WebApplicationContext context;

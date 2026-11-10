@@ -16,8 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
@@ -33,9 +31,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class CredentialHandoverFailureTest extends AbstractIntegrationTest {
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private MailOutbox outbox;

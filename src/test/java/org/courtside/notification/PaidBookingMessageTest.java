@@ -22,9 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
@@ -52,9 +50,6 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
 
     private static final TimeSlot SIX_TO_SEVEN =
             new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"), Instant.parse("2026-05-13T17:00:00Z"));
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @Autowired
     private BookingService bookings;

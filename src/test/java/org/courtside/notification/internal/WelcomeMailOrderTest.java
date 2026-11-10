@@ -10,9 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -33,9 +31,6 @@ import static org.mockito.Mockito.doAnswer;
 class WelcomeMailOrderTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;

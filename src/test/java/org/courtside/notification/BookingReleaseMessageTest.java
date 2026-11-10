@@ -12,8 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -29,9 +27,6 @@ class BookingReleaseMessageTest extends AbstractIntegrationTest {
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
-
-    @MockitoSpyBean
-    private JavaMailSender sender;
 
     private SentMail mail;
 
