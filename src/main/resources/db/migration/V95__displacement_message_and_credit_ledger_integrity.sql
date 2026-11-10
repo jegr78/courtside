@@ -23,3 +23,6 @@ ALTER TABLE notification
                  'BOOKING_PARTNER_FOUND', 'BOOKING_PLACE_TAKEN', 'ACCESS_CODE_CHANGED', 'MEMBERS_DOOR_CODE_CHANGED',
                  'ACCESS_CODE_READY',
                  'REGISTRATION_VERIFICATION', 'REGISTRATION_NAME_TAKEN', 'PAYPAL_REFUNDED'));
+
+DELETE FROM credit_account a
+WHERE NOT EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = a.account_id);

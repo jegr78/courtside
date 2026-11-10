@@ -135,6 +135,21 @@ class PendingPaymentWriteTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoCreditAndPayPalOn_whenAnOutsiderBooksAndGivesThePaymentUp_thenNoLedgerIsLeftBehind() {
+        // given
+        payment.storePayPal(true);
+        UUID booking = book(0);
+
+        // when
+        bookingService.cancel(booking, johnAccount, Set.of(Role.EXTERNAL));
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM credit_account WHERE account_id = :account")
+                .param("account", johnAccount).query(Long.class).single())
+                .as("an account without a ledger entry holds no ledger that retention would report").isZero();
+    }
+
+    @Test
     void givenABookingStartingNow_whenItAwaitsPayPal_thenTheHoldEndsAtItsStart() {
         // given
         payment.storePayPal(true);

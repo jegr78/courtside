@@ -101,8 +101,10 @@ public class CreditLedger implements BookingPayments {
         if (accountId == null || bookingId == null || currency == null || amountMinor < 1) {
             throw new IllegalStateException("A booking debit needs an account, a booking and a positive amount");
         }
-        lock(accountId);
         String code = currency.getCurrencyCode();
+        if (!lockExisting(accountId)) {
+            return new BookingDebit(false, 0, code);
+        }
         long balance = balance(accountId, code);
         if (balance < amountMinor) {
             return new BookingDebit(false, balance, code);
@@ -356,12 +358,23 @@ public class CreditLedger implements BookingPayments {
     }
 
     private void lock(UUID accountId) {
-        // Shares the club configuration lock, so a currency change waits for this entry and then sees it.
-        jdbc.sql("SELECT 1 FROM club_config FOR SHARE").query(Integer.class).list();
+        shareClubConfiguration();
         jdbc.sql("INSERT INTO credit_account (account_id) VALUES (:account) ON CONFLICT DO NOTHING")
                 .param("account", accountId).update();
         jdbc.sql("SELECT account_id FROM credit_account WHERE account_id = :account FOR UPDATE")
                 .param("account", accountId).query(UUID.class).single();
+    }
+
+    // Without a ledger the balance is zero, so a write that could only be refused creates none.
+    private boolean lockExisting(UUID accountId) {
+        shareClubConfiguration();
+        return !jdbc.sql("SELECT account_id FROM credit_account WHERE account_id = :account FOR UPDATE")
+                .param("account", accountId).query(UUID.class).list().isEmpty();
+    }
+
+    private void shareClubConfiguration() {
+        // Shares the club configuration lock, so a currency change waits for this entry and then sees it.
+        jdbc.sql("SELECT 1 FROM club_config FOR SHARE").query(Integer.class).list();
     }
 
     private long balance(UUID accountId, String currency) {
