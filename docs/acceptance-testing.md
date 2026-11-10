@@ -201,7 +201,7 @@ shows the shape with placeholder accounts.
 | `mail.url` | Mailpit API | no |
 | `logs.app`, `logs.proxy` | Log files the operator writes alongside the run | no |
 | `metrics.url` | Prometheus query endpoint for request latency around failures | no |
-| `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox | no |
+| `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox, which on macOS starts with a home of its own in the temp directory | no |
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
