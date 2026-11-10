@@ -45,7 +45,7 @@ public final class ExportCsv {
     private static CSVFormat format(List<String> header, char separator) {
         return CSVFormat.DEFAULT.builder()
                 .setDelimiter(separator)
-                .setHeader(header.toArray(String[]::new))
+                .setHeader(header.stream().map(ExportCsv::cell).toArray(String[]::new))
                 .setRecordSeparator("\r\n")
                 .get();
     }

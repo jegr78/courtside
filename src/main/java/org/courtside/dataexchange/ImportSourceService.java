@@ -93,7 +93,7 @@ public class ImportSourceService {
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
         Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields);
+        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields, storedLayout);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
@@ -117,7 +117,7 @@ public class ImportSourceService {
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
         Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields);
+        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields, storedLayout);
         ImportSource source = require(sourceId);
         SourceConfiguration before = toConfiguration(source);
         requireConfirmedModeChange(before.columnMode(), storedLayout.mode(), columnModeChangeConfirmed);
@@ -271,11 +271,13 @@ public class ImportSourceService {
     // would decide only when a person is created and then never again.
     private Map<String, List<AgeBand>> usableAgeBands(Map<String, List<AgeBand>> ageBands,
                                                       Map<String, UUID> membershipTypes,
-                                                      Set<CanonicalField> ownedFields) {
+                                                      Set<CanonicalField> ownedFields,
+                                                      ColumnLayout layout) {
         Map<String, List<AgeBand>> given = ageBands == null ? Map.of() : ageBands;
         if (given.isEmpty()) {
             return Map.of();
         }
+        requireBirthDateForAgeBands(given, layout.headers().values(), layout.positions().values());
         if (!requiredOwnedFields(ownedFields).contains(CanonicalField.MEMBERSHIP_TYPE)) {
             throw new ImportSourceInvalidException("import.source.ageBands.membershipTypeNotOwned",
                     Map.of("field", "ageBands"));
@@ -314,6 +316,16 @@ public class ImportSourceService {
             usable.put(value, ordered);
         });
         return usable;
+    }
+
+    static void requireBirthDateForAgeBands(Map<String, List<AgeBand>> ageBands,
+                                            Collection<CanonicalField> headers,
+                                            Collection<CanonicalField> positions) {
+        if (!ageBands.isEmpty() && !headers.contains(CanonicalField.BIRTH_DATE)
+                && !positions.contains(CanonicalField.BIRTH_DATE)) {
+            throw new ImportSourceInvalidException("import.source.ageBands.birthDateNotMapped",
+                    Map.of("field", "ageBands"));
+        }
     }
 
     private void requireKnownMembershipTypes(Map<String, UUID> membershipTypes) {

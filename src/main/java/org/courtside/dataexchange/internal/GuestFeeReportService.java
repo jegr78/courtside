@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.booking.BookingLedger;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.dataexchange.DataExchangeEvent;
+import org.courtside.dataexchange.GuestFeePeriodIncompleteException;
 import org.courtside.dataexchange.SupportedEncodings;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -82,6 +83,9 @@ public class GuestFeeReportService {
     }
 
     private Report read(LocalDate requestedFrom, LocalDate requestedTo, DataExchangeEvent.GuestFeesRead.Form form) {
+        if ((requestedFrom == null) != (requestedTo == null)) {
+            throw new GuestFeePeriodIncompleteException();
+        }
         Year year = Year.now(clock.withZone(clubTimeZone.zoneId()));
         LocalDate from = requestedFrom == null ? year.atDay(1) : requestedFrom;
         LocalDate to = requestedTo == null ? year.atMonth(12).atEndOfMonth() : requestedTo;

@@ -2474,8 +2474,8 @@ components:
             and names a type per band. The age is the one a person reaches in the current calendar
             year, read from the `BIRTH_DATE` column. The value's own `membershipTypes` entry is the
             fallback for a row without a readable birth date, so a split value must also be mapped
-            there. A split requires the source to own `MEMBERSHIP_TYPE`. A source holds at most 200
-            age bands in all.
+            there. A split requires the source to own `MEMBERSHIP_TYPE` and to map a `BIRTH_DATE`
+            column. A source holds at most 200 age bands in all.
           additionalProperties:
             type: array
             minItems: 1
@@ -8630,10 +8630,9 @@ paths:
         ended, and when its fee is above zero. The fee belongs to the account the booking was made
         for. Guest places whose booking no longer names a member are only counted.
 
-        `from` and `to` are inclusive dates in the club time zone. A missing `from` is the first
-        and a missing `to` the last day of the current calendar year. The period may span at most
-        366 days. Reading the report is recorded,
-        without its content, which is why it is a `POST`.
+        `from` and `to` are inclusive dates in the club time zone. Without both the period is the
+        current calendar year, and only one of them is answered `400`. The period may span at most
+        366 days. Reading the report is recorded, without its content, which is why it is a `POST`.
       security:
         - sessionCookie: []
           csrfToken: []

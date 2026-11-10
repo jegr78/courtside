@@ -11,8 +11,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
@@ -26,6 +28,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 
 @Slf4j
@@ -125,6 +128,7 @@ class SpaConfiguration {
     static final class ApplicationShell extends ResourceHttpRequestHandler {
 
         private final ApplicationShellText clubText;
+        private final AtomicBoolean lookupFailing = new AtomicBoolean();
 
         ApplicationShell(ApplicationShellText clubText) {
             this.clubText = clubText;
@@ -136,12 +140,25 @@ class SpaConfiguration {
                 Resource document = location.createRelative(SHELL_DOCUMENT);
                 if (document.isReadable()) {
                     String shell = document.getContentAsString(StandardCharsets.UTF_8);
-                    ApplicationShellText.Text text = clubText.current();
-                    return new ShellDocument(withClubText(shell, text.language(), text.description())
-                            .getBytes(StandardCharsets.UTF_8));
+                    return new ShellDocument(withCurrentClubText(shell).getBytes(StandardCharsets.UTF_8));
                 }
             }
             return null;
+        }
+
+        // A club text the database cannot deliver only costs the shell its club name and language.
+        private String withCurrentClubText(String shell) {
+            ApplicationShellText.Text text;
+            try {
+                text = clubText.current();
+            } catch (DataAccessException | TransactionException e) {
+                if (lookupFailing.compareAndSet(false, true)) {
+                    log.warn("The application shell is served without the club's text", e);
+                }
+                return shell;
+            }
+            lookupFailing.set(false);
+            return withClubText(shell, text.language(), text.description());
         }
 
         static String withClubText(String shell, String language, String description) {

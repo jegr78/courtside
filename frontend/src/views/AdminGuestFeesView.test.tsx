@@ -58,6 +58,24 @@ it("given a chosen period, when the treasurer downloads the file, then it covers
   expect(exported).toHaveBeenCalledWith({ from: "2026-01-01", to: "2026-12-31", separator: "," });
 });
 
+it("given a period typed but not read, when the treasurer downloads the file, then it covers the period on screen", async () => {
+  // given
+  vi.spyOn(api, "guestFees").mockResolvedValue(report);
+  const exported = vi.spyOn(api, "exportGuestFees").mockResolvedValue({ fileName: "guest-fees.csv", content: new Blob(["x"]) });
+  vi.spyOn(downloads, "downloadBlob").mockImplementation(() => undefined);
+  render(<AdminGuestFeesView />);
+  await screen.findByTestId("guest-fees-row");
+  const from = screen.getByTestId("guest-fees-from");
+  await userEvent.clear(from);
+  await userEvent.type(from, "2025-03-01");
+
+  // when
+  await userEvent.click(screen.getByTestId("guest-fees-download"));
+
+  // then
+  await waitFor(() => expect(exported).toHaveBeenCalledWith({ from: "2026-01-01", to: "2026-12-31", separator: ";" }));
+});
+
 it("given a period the server refuses, when it is read, then the refusal is shown", async () => {
   // given
   vi.spyOn(api, "guestFees").mockResolvedValueOnce(report).mockRejectedValueOnce(

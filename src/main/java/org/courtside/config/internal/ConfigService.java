@@ -66,6 +66,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         return ClubConfigurationSnapshot.from(currentEntity());
     }
 
+    ClubShellText shellText() {
+        return configurations.findShellTextById(ClubConfiguration.SINGLETON_ID)
+                .orElseThrow(() -> new IllegalStateException("The club configuration row is missing"));
+    }
+
     public ClubLogo logo() {
         return uploadedLogo().orElseThrow(ClubLogoNotFoundException::new);
     }
