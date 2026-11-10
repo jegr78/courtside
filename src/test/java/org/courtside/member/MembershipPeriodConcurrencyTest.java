@@ -6,7 +6,6 @@ import org.courtside.member.internal.MembershipPeriodsOverlapException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -24,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import(IdentityTestFixture.class)
 class MembershipPeriodConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

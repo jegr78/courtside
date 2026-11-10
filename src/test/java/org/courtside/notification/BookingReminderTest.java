@@ -16,7 +16,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -39,8 +38,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
-        BookingTestFixture.class, MemberTestFixture.class})
 class BookingReminderTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

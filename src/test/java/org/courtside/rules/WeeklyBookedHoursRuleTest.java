@@ -5,7 +5,6 @@ import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
-import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -18,7 +17,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -34,8 +32,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import({ConfigTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class,
-        MemberTestFixture.class})
 class WeeklyBookedHoursRuleTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

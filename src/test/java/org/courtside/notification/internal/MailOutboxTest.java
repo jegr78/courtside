@@ -16,7 +16,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.MailSendException;
@@ -49,7 +48,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@Import(IdentityTestFixture.class)
 @ExtendWith(OutputCaptureExtension.class)
 class MailOutboxTest extends AbstractIntegrationTest {
 

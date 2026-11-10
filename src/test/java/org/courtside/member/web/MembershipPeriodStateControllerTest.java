@@ -5,7 +5,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
@@ -24,7 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(IdentityTestFixture.class)
 @TestPropertySource(properties = "courtside.test.clock=2026-05-11T22:30:00Z")
 class MembershipPeriodStateControllerTest extends AbstractIntegrationTest {
 

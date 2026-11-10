@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,8 +37,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
-        NotificationTestFixture.class})
 class StatisticsControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,7 +29,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
-@Import(IdentityTestFixture.class)
 class OutsiderServiceGuardTest extends AbstractIntegrationTest {
 
     private static final Set<Role> EXTERNAL = Set.of(Role.EXTERNAL);

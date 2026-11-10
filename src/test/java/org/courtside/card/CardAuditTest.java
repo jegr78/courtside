@@ -5,7 +5,6 @@ import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.identity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Map;
@@ -13,7 +12,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(AuditTestFixture.class)
 class CardAuditTest extends AbstractIntegrationTest {
 
     @Autowired

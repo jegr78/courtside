@@ -8,7 +8,6 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Set;
@@ -16,7 +15,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({MemberTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class})
 class CardServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

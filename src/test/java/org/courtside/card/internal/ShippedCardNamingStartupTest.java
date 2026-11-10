@@ -6,7 +6,6 @@ import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.shared.ShippedNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -18,7 +17,6 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 
-@Import(ConfigTestFixture.class)
 class ShippedCardNamingStartupTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING =

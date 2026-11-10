@@ -4,14 +4,12 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(ConfigTestFixture.class)
 class ShippedCardNamingTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING =

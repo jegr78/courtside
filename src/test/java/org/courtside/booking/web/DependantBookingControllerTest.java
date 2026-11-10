@@ -16,7 +16,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -42,8 +41,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, RulesTestFixture.class,
-        AuditTestFixture.class})
 class DependantBookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

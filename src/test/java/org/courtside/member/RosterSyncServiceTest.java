@@ -17,7 +17,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -32,7 +31,6 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.courtside.member.MemberFixtures.memberSince;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_MEMBERSHIP =

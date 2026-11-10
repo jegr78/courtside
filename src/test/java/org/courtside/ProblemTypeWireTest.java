@@ -10,7 +10,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -39,7 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     private static final Pattern ALLOWED_TYPE = Pattern.compile("^urn:courtside:error:[a-z0-9-]+$");

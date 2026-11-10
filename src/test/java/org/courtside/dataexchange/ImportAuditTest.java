@@ -5,7 +5,6 @@ import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +13,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({AuditTestFixture.class, IdentityTestFixture.class})
 class ImportAuditTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");

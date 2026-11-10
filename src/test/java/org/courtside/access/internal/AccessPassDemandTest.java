@@ -10,7 +10,6 @@ import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -21,7 +20,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(RulesTestFixture.class)
 class AccessPassDemandTest extends AccessPassTestSupport {
 
     private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");

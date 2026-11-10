@@ -11,7 +11,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -22,7 +21,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(FacilityTestFixture.class)
 class WarmUpTargetTest extends AbstractIntegrationTest {
 
     private static final int DAYS_AHEAD = 7;

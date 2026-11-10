@@ -5,11 +5,9 @@ import org.courtside.dataexchange.internal.ImportPreviewRepository;
 import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
-import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -19,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class ImportRecordSurvivalTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID =

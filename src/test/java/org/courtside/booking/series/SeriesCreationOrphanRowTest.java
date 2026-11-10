@@ -8,7 +8,6 @@ import org.courtside.identity.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -26,7 +25,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
 class SeriesCreationOrphanRowTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

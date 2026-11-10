@@ -10,7 +10,6 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
@@ -38,7 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class, AuditTestFixture.class})
 class DependantControllerTest extends AbstractIntegrationTest {
 
     private static final String CREDENTIALS_REQUESTED = "roster.account.credentialsRequested";

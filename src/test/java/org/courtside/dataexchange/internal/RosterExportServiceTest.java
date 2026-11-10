@@ -7,11 +7,9 @@ import org.courtside.dataexchange.ExternalReferenceService;
 import org.courtside.dataexchange.ImportSourceService;
 import org.courtside.dataexchange.SnapshotEncodingUnsupportedException;
 import org.courtside.dataexchange.ImportSourceNotFoundException;
-import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -24,7 +22,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class RosterExportServiceTest extends AbstractIntegrationTest {
 
     private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");

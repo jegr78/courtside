@@ -11,7 +11,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
@@ -24,8 +23,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class,
-        BookingTestFixture.class})
 class BookingExportServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

@@ -8,7 +8,6 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,7 +35,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, ConfigTestFixture.class, AccessTestFixture.class})
 class AccessPointAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired

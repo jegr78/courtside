@@ -17,7 +17,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,7 +30,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({IdentityTestFixture.class, FacilityTestFixture.class})
 class SecurityAssessmentReminderIsolationTest extends AbstractIntegrationTest {
 
     @Autowired

@@ -16,7 +16,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
@@ -41,7 +40,6 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, MemberTestFixture.class})
 class InstanceLinkMessageTest extends AbstractIntegrationTest {
 
     private static final String INSTANCE = "https://courts.example.org";

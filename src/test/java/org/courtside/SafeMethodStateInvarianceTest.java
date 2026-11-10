@@ -22,7 +22,6 @@ import org.springframework.boot.actuate.endpoint.web.PathMappedEndpoints;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroups;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.yaml.snakeyaml.Yaml;
@@ -63,8 +62,6 @@ import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({IdentityTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
-        MemberTestFixture.class})
 class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final Set<Role> EVERY_MEMBER_ROLE = java.util.EnumSet.complementOf(java.util.EnumSet.of(Role.EXTERNAL));

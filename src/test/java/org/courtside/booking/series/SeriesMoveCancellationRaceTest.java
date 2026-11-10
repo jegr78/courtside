@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -43,7 +42,6 @@ import static org.mockito.Mockito.inOrder;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
-@Import(FacilityTestFixture.class)
 class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

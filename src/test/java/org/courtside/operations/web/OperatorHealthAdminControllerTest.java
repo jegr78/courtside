@@ -10,7 +10,6 @@ import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -38,7 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, NotificationTestFixture.class})
 class OperatorHealthAdminControllerTest extends AbstractIntegrationTest {
 
     private static final Path EVIDENCE = evidenceDirectory().resolve("last-backup.json");

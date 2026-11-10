@@ -7,7 +7,6 @@ import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -20,7 +19,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(AuditTestFixture.class)
 class FacilityAuditTest extends AbstractIntegrationTest {
 
     @Autowired

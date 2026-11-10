@@ -12,7 +12,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
@@ -27,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
 class SeriesMovePreviewTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

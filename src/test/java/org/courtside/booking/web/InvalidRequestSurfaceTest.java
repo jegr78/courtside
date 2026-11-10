@@ -9,7 +9,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -30,7 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

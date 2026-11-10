@@ -8,14 +8,12 @@ import org.courtside.config.ResetTokenLifetime;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import(RulesTestFixture.class)
 class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
 
     @Autowired

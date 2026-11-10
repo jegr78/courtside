@@ -7,7 +7,6 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.ShippedNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -18,7 +17,6 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 
-@Import({ConfigTestFixture.class, MemberTestFixture.class})
 class ShippedMembershipTypeNamingStartupTest extends AbstractIntegrationTest {
 
     private static final UUID YOUTH = UUID.fromString("cccccccc-0000-0000-0000-000000000002");

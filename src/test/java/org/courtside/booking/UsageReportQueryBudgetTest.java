@@ -8,7 +8,6 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -19,7 +18,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(FacilityTestFixture.class)
 class UsageReportQueryBudgetTest extends AbstractIntegrationTest {
 
     private static final LocalDate FROM = LocalDate.of(2026, 2, 1);

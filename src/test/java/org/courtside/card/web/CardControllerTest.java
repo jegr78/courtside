@@ -10,7 +10,6 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,7 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "jane.doe", roles = "MEMBER")
-@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class CardControllerTest extends AbstractIntegrationTest {
 
     @Autowired

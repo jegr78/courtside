@@ -58,9 +58,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
-        RulesTestFixture.class, AuditTestFixture.class, BookingChangeEventsTest.OccupancyConsumer.class,
-        MemberTestFixture.class})
+@Import(BookingChangeEventsTest.OccupancyConsumer.class)
 class BookingChangeEventsTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =

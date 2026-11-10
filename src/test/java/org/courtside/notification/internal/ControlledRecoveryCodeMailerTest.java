@@ -11,7 +11,6 @@ import org.courtside.shared.IssuedResetCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -27,7 +26,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@Import(IdentityTestFixture.class)
 class ControlledRecoveryCodeMailerTest extends AbstractIntegrationTest {
     private final ControlledRecoveryCodeIssuer codes = mock(ControlledRecoveryCodeIssuer.class);
     @Autowired private UserAccountRepository accounts;

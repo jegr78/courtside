@@ -20,7 +20,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -47,8 +46,6 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.access-control.connector=simulated")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, BookingTestFixture.class,
-        AccessTestFixture.class, MemberTestFixture.class})
 class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

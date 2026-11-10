@@ -4,7 +4,6 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.net.URI;
 import java.time.Clock;
@@ -15,7 +14,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(FacilityTestFixture.class)
 class LoxoneGroupMappingTest extends AbstractIntegrationTest {
 
     private static final String GROUP = "0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0";

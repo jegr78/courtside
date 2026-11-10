@@ -24,7 +24,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -44,8 +43,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class,
-        MemberTestFixture.class, RulesTestFixture.class})
 class WaitlistTest extends AbstractIntegrationTest {
 
     static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");

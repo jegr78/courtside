@@ -11,7 +11,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.JsonNode;
@@ -28,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "server.servlet.context-path=/club")
-@Import(IdentityTestFixture.class)
 class UnsupportedMethodTest extends AbstractIntegrationTest {
 
     private static final String USERNAME = "doe.jane";

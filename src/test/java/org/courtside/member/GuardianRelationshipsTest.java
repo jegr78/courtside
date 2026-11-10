@@ -7,7 +7,6 @@ import org.courtside.member.internal.GuardianRelationship;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -17,7 +16,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(IdentityTestFixture.class)
 class GuardianRelationshipsTest extends AbstractIntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);

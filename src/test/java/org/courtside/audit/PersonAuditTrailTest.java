@@ -7,7 +7,6 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Set;
@@ -18,7 +17,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 
-@Import({MemberTestFixture.class, IdentityTestFixture.class})
 class PersonAuditTrailTest extends AbstractIntegrationTest {
 
     @Autowired

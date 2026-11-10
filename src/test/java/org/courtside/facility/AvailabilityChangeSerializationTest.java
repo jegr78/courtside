@@ -5,7 +5,6 @@ import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.core.EventSerializer;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
@@ -18,7 +17,6 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @RecordApplicationEvents
-@Import(FacilityTestFixture.class)
 class AvailabilityChangeSerializationTest extends AbstractIntegrationTest {
 
     private static final String BOARD_NOTE = "Roof leak, contractor booked";

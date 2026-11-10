@@ -5,12 +5,10 @@ import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.InstanceAddress;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(PaymentTestFixture.class)
 class PayPalAvailabilityTest extends AbstractIntegrationTest {
 
     private static final InstanceAddress PUBLISHED = new InstanceAddress("https://courts.example.org");

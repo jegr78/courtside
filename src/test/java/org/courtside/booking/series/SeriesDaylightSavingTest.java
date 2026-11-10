@@ -8,7 +8,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -28,7 +27,6 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-03-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
 class SeriesDaylightSavingTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

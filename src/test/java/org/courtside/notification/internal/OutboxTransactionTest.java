@@ -8,7 +8,6 @@ import org.courtside.shared.UsernameReminderRequested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -32,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 
-@Import(IdentityTestFixture.class)
 class OutboxTransactionTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean

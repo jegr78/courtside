@@ -13,7 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -34,7 +33,6 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(OutputCaptureExtension.class)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class MembersDoorCodeMessageTest extends AbstractIntegrationTest {
 
     private static final String OLD_CODE = "135790";
