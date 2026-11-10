@@ -10,6 +10,7 @@ import { ownedFields, useClubConfigForm } from "../configuration/clubConfigForm"
 import { FacilityPage } from "./FacilityPage";
 import { OccupancyKeySection } from "./OccupancyKeySection";
 import { useSaving } from "./useSaving";
+import type { Translate } from "../../i18n";
 
 const MAX_NAME = 60;
 const NEW = "access-point:new";
@@ -17,7 +18,7 @@ const SETTINGS = "access-settings";
 
 type RemoteGroup = AccessControlGroups["groups"][number];
 
-function courtLabel(court: AdminCourt, t: (key: string, options?: Record<string, unknown>) => string) {
+function courtLabel(court: AdminCourt, t: Translate) {
   return court.name ? `${t("court.number", { number: court.number })} · ${court.name}` : t("court.number", { number: court.number });
 }
 
