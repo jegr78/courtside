@@ -916,6 +916,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         port: 3000, host: "0.0.0.0", wsPath,
         args: browserName === "chromium"
           ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : [],
+        // Over plain HTTP Firefox opens a warning popup under a focused password field, which swallows a click on the button below it.
+        ...(browserName === "firefox"
+          ? { firefoxUserPrefs: { "security.insecure_field_warning.contextual.enabled": false } } : {}),
         ...language.launchOptions
       };
       const startupDiagnostics = async (containerId: string, failureClass: BrowserStartupFailureClass) => {
