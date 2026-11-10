@@ -85,18 +85,26 @@ public class PayPalClient {
         context.put("user_action", "PAY_NOW");
         context.put("shipping_preference", "NO_SHIPPING");
         Answer answer = api(credentials, "POST", "/v2/checkout/orders", JSON.writeValueAsString(body),
-                bookingId.toString());
+                bookingId.toString(), PayPalDeadline.NONE);
         return order(success(answer));
     }
 
     Order getOrder(Credentials credentials, String orderId) {
-        return order(success(api(credentials, "GET", orderPath(orderId), null, null)));
+        return getOrder(credentials, orderId, PayPalDeadline.NONE);
+    }
+
+    Order getOrder(Credentials credentials, String orderId, PayPalDeadline deadline) {
+        return order(success(api(credentials, "GET", orderPath(orderId), null, null, deadline)));
     }
 
     Capture captureOrder(Credentials credentials, String orderId) {
-        Answer answer = api(credentials, "POST", orderPath(orderId) + "/capture", "{}", orderId);
+        return captureOrder(credentials, orderId, PayPalDeadline.NONE);
+    }
+
+    Capture captureOrder(Credentials credentials, String orderId, PayPalDeadline deadline) {
+        Answer answer = api(credentials, "POST", orderPath(orderId) + "/capture", "{}", orderId, deadline);
         if (answer.status() == 422 && hasIssue(answer.body(), ALREADY_CAPTURED)) {
-            return captureOf(getOrder(credentials, orderId));
+            return captureOf(getOrder(credentials, orderId, deadline));
         }
         if (answer.status() == 409 || answer.status() / 100 == 4
                 && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
@@ -106,7 +114,8 @@ public class PayPalClient {
     }
 
     Refund refundCapture(Credentials credentials, String captureId, UUID requestId) {
-        Answer answer = api(credentials, "POST", capturePath(captureId) + "/refund", "{}", requestId.toString());
+        Answer answer = api(credentials, "POST", capturePath(captureId) + "/refund", "{}", requestId.toString(),
+                PayPalDeadline.NONE);
         if (answer.status() == 422 && hasIssue(answer.body(), FULLY_REFUNDED)) {
             throw new PayPalCaptureFullyRefundedException();
         }
@@ -122,28 +131,36 @@ public class PayPalClient {
     }
 
     Refund getRefund(Credentials credentials, String refundId) {
-        return refund(unclearUnlessReadable(api(credentials, "GET", refundPath(refundId), null, null)));
+        return refund(unclearUnlessReadable(api(credentials, "GET", refundPath(refundId), null, null,
+                PayPalDeadline.NONE)));
     }
 
     Answer requestToken(PayPalEnvironment environment, String clientId, String secret) {
+        return requestToken(environment, clientId, secret, PayPalDeadline.NONE);
+    }
+
+    private Answer requestToken(PayPalEnvironment environment, String clientId, String secret,
+                                PayPalDeadline deadline) {
+        Duration timeout = deadline.timeout(properties.requestTimeout());
         String basic = Base64.getEncoder().encodeToString((clientId + ":" + secret).getBytes(StandardCharsets.UTF_8));
         HttpRequest request = HttpRequest.newBuilder(endpoint(environment, "/v1/oauth2/token"))
-                .timeout(properties.requestTimeout())
+                .timeout(timeout)
                 .header("Authorization", "Basic " + basic)
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString("grant_type=client_credentials"))
                 .build();
-        return send(environment, request, MAX_TOKEN_BYTES);
+        return send(environment, request, MAX_TOKEN_BYTES, timeout);
     }
 
-    private String token(Credentials credentials) {
+    private String token(Credentials credentials, PayPalDeadline deadline) {
         String key = credentials.cacheKey();
         Instant now = clock.instant();
         CachedToken cached = tokens.get(key);
         if (cached != null && now.isBefore(cached.validUntil())) return cached.value();
         tokens.values().removeIf(token -> !now.isBefore(token.validUntil()));
-        Answer answer = requestToken(credentials.environment(), credentials.clientId(), credentials.secret());
+        Answer answer = requestToken(credentials.environment(), credentials.clientId(), credentials.secret(),
+                deadline);
         JsonNode body = success(answer);
         JsonNode value = body.get("access_token");
         JsonNode lifetime = body.get("expires_in");
@@ -158,19 +175,21 @@ public class PayPalClient {
     }
 
     private Answer api(Credentials credentials, String method, String path, @Nullable String body,
-                       @Nullable String requestId) {
-        Answer answer = attempt(credentials, method, path, body, requestId);
+                       @Nullable String requestId, PayPalDeadline deadline) {
+        Answer answer = attempt(credentials, method, path, body, requestId, deadline);
         if (answer.status() != 401) return answer;
         tokens.remove(credentials.cacheKey());
         log.info("PayPal {} refused the cached token; retrying once with a new one", credentials.environment());
-        return attempt(credentials, method, path, body, requestId);
+        return attempt(credentials, method, path, body, requestId, deadline);
     }
 
     private Answer attempt(Credentials credentials, String method, String path, @Nullable String body,
-                           @Nullable String requestId) {
+                           @Nullable String requestId, PayPalDeadline deadline) {
+        String bearer = token(credentials, deadline);
+        Duration timeout = deadline.timeout(properties.requestTimeout());
         HttpRequest.Builder request = HttpRequest.newBuilder(endpoint(credentials.environment(), path))
-                .timeout(properties.requestTimeout())
-                .header("Authorization", "Bearer " + token(credentials))
+                .timeout(timeout)
+                .header("Authorization", "Bearer " + bearer)
                 .header("Accept", "application/json");
         if (requestId != null) request.header("PayPal-Request-Id", requestId);
         if (body == null) {
@@ -179,14 +198,14 @@ public class PayPalClient {
             request.header("Content-Type", "application/json").header("Prefer", "return=representation")
                     .method(method, HttpRequest.BodyPublishers.ofString(body));
         }
-        return send(credentials.environment(), request.build(), MAX_API_BYTES);
+        return send(credentials.environment(), request.build(), MAX_API_BYTES, timeout);
     }
 
-    private Answer send(PayPalEnvironment environment, HttpRequest request, int limit) {
+    private Answer send(PayPalEnvironment environment, HttpRequest request, int limit, Duration timeout) {
         CompletableFuture<HttpResponse<byte[]>> exchange = client.sendAsync(request,
                 HttpResponse.BodyHandlers.limiting(HttpResponse.BodyHandlers.ofByteArray(), limit));
         try {
-            HttpResponse<byte[]> response = exchange.get(properties.requestTimeout().toNanos(), TimeUnit.NANOSECONDS);
+            HttpResponse<byte[]> response = exchange.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
             return new Answer(response.statusCode(), response.body());
         } catch (InterruptedException interrupted) {
             exchange.cancel(true);

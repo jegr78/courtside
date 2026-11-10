@@ -57,6 +57,7 @@ courtside:
       sandbox-endpoint: https://api-m.sandbox.paypal.com
       live-endpoint: https://api-m.paypal.com
       request-timeout: 10s
+      return-deadline: 30s
       reconcile-interval: 60s
       reconcile-after: 5m
       unresolved-release-after: 24h

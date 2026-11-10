@@ -830,6 +830,39 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenLessTimeLeftThanOneRequest_whenTheReturnWouldCapture_thenNoCaptureStarts() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.replyAfter(READ, 401, "{}", Duration.ofMillis(600));
+        PAYPAL.replyAfter(READ, 200, order("APPROVED", booking, "15.00", null), Duration.ofMillis(600));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a capture is never started that the deadline could cut off").isEmpty();
+        assertThat(jdbc.sql("SELECT capture_attempted_at IS NULL FROM paypal_order").query(Boolean.class).single())
+                .as("no attempt is stamped, so the job may still void the order unread").isTrue();
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
+    void givenASlowPayPal_whenTheReturnWouldOutlastItsDeadline_thenItAnswersProcessingInTime() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.replyAfter(READ, 200, order("APPROVED", booking, "15.00", null), Duration.ofMillis(900));
+        PAYPAL.replyAfter(CAPTURE, 422, DECLINED, Duration.ofMillis(900));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(orderStatus()).as("the job settles what the return left open").isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
     void givenAnOrderOfTheOtherEnvironment_whenCapturing_thenItIsNotCapturedWithTheCurrentCredentials()
             throws Exception {
         // given

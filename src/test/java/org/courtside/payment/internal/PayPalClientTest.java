@@ -643,6 +643,54 @@ class PayPalClientTest {
         assertThat(printed).doesNotContain("hunter2-secret");
     }
 
+    @Test
+    void givenAUsedUpDeadline_whenReadingAnOrder_thenNothingIsSent() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1", PayPalDeadline.after(Duration.ZERO)))
+                .isInstanceOf(PayPalUnavailableException.class);
+        assertThat(seen).as("a request the deadline leaves no time for is never sent").isEmpty();
+    }
+
+    @Test
+    void givenASlowTokenEndpoint_whenTheDeadlineIsShorter_thenTheTokenRequestIsCutAndTheOrderIsNotRead()
+            throws IOException {
+        // given
+        replyAfter("POST /v1/oauth2/token", 200, TOKEN, Duration.ofSeconds(3));
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "APPROVED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[]"));
+        PayPalClient client = client(Duration.ofSeconds(5));
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1", PayPalDeadline.after(Duration.ofMillis(300))))
+                .isInstanceOf(PayPalUnavailableException.class);
+        assertThat(seen).extracting(Seen::route).as("the token request ran into the deadline")
+                .containsExactly("POST /v1/oauth2/token");
+    }
+
+    @Test
+    void givenACachedTokenRefused_whenTheRetryWouldOutlastTheDeadline_thenTheCallIsCut() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        PayPalClient client = client(Duration.ofSeconds(5));
+        reply("GET /v2/checkout/orders/ORD0", 200, order("ORD0", "APPROVED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[]"));
+        client.getOrder(credentials(), "ORD0");
+        replies.put("POST /v1/oauth2/token", new ArrayDeque<>());
+        replyAfter("POST /v1/oauth2/token", 200, TOKEN, Duration.ofSeconds(3));
+        replyAfter("GET /v2/checkout/orders/ORD1", 401, "{}", Duration.ofMillis(100));
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "APPROVED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[]"));
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1", PayPalDeadline.after(Duration.ofMillis(800))))
+                .as("without the deadline the new token comes after three seconds and the read succeeds")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
     private PayPalClient.Credentials credentials() {
         return new PayPalClient.Credentials(PayPalEnvironment.SANDBOX, "client", "secret");
     }
@@ -680,7 +728,7 @@ class PayPalClientTest {
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         URI endpoint = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-        return new PayPalClient(new PayPalProperties(endpoint, endpoint, timeout), clock, production);
+        return new PayPalClient(new PayPalProperties(endpoint, endpoint, timeout, Duration.ofSeconds(30)), clock, production);
     }
 
     private void reply(String route, int status, String body) {

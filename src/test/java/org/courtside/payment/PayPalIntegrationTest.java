@@ -11,7 +11,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 // Two admission slots and a larger pool let two treasurers' returns meet at the order's row lock.
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=1s", "courtside.admission.classes[payment-provider-check].cost=5",
+        "courtside.payment.paypal.request-timeout=1s", "courtside.payment.paypal.return-deadline=2s",
+        "courtside.admission.classes[payment-provider-check].cost=5",
         "courtside.admission.classes[payment-provider-check].concurrency=2",
         "spring.datasource.hikari.maximum-pool-size=6"})
 abstract class PayPalIntegrationTest extends AbstractIntegrationTest {

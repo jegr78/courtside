@@ -506,11 +506,13 @@ lists as completed as credit. While PayPal lists such a refund as still pending,
 not known yet, so the order is marked without credit for the treasurer. The audit's `reason` tells
 the cases apart: `HOLD_ENDED`, `CAPTURE_DIFFERS`, `PARTLY_REFUNDED` or `REFUND_PENDING`.
 `REJECTED` means no money moved and the court is free: PayPal declined, PayPal shows the capture fully
-refunded, the order did not match or the payer turned back. `PROCESSING` means the outcome is not known yet, because PayPal did not
-answer, the capture timed out, a capture is still pending at PayPal or the credentials are no longer
-active; the order stays open and the court stays held for the reconciliation. A PayPal refusal with
-HTTP 409, `DUPLICATE_REQUEST_ID` or `PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a
-decline. Every order endpoint answers only the signed-in booker; another account's order is not
+refunded, the order did not match or the payer turned back. `PROCESSING` means the outcome is not
+known yet, because PayPal did not answer, the capture timed out, the request used up the 30 seconds
+it may spend on all its PayPal calls together or has less than one request timeout of it left
+before a capture, a capture is still pending at PayPal or the
+credentials are no longer active; the order stays open and the court stays held for the
+reconciliation. A PayPal refusal with HTTP 409, `DUPLICATE_REQUEST_ID` or
+`PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a decline. Every order endpoint answers only the signed-in booker; another account's order is not
 found.
 
 `PayPalReconciliation` runs every 60 seconds on a thread of its own, so a slow PayPal never holds up

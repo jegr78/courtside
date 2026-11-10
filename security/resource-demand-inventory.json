@@ -648,16 +648,18 @@
       "concurrencyOrRateBound": "Only the signed-in booker of a held booking reaches PayPal, an account holds at most one pending booking, and each call spends 2 tokens of the caller's request budget.",
       "executionModel": "Every PayPal call runs synchronously in the request thread outside any transaction. A create inserts the order in one short transaction after PayPal answered. A capture reads the order and verifies booking id, amount, currency and status before it captures, then stamps its attempt on the open order in a short transaction of its own; the order row, the grid lock and the booking row are locked only in the short transaction that settles, rejects or voids the order after PayPal answered.",
       "failureBehavior": "A refused or unreachable create answers urn:courtside:error:paypal-unavailable and stores nothing. A capture or cancel whose read or capture fails or whose outcome is unknown answers PROCESSING and leaves the order open, so the court stays held until it is settled or released. A capture of an order that is no longer open calls no PayPal capture and answers from what is stored.",
-      "consumerTimeoutBehavior": "Each PayPal request has its own 10-second deadline, the connection timeout included, so a client waits at most about 40 seconds for a create or a cancel and about 60 seconds for a capture whose order PayPal already captured, when each request answers just before its deadline; the first request that runs past it ends the call. The reference proxy sets no response deadline, and repeating create, capture or cancel is safe because a booking has one order, a capture is deduplicated by its order id and a settled order is answered from what is stored.",
+      "consumerTimeoutBehavior": "Each PayPal request has its own 10-second deadline, the connection timeout included. A capture or a cancel also shares one overall deadline of 30 seconds (courtside.payment.paypal.return-deadline) across all its PayPal requests: each request gets at most the time left, none starts once it is used up, a capture starts only with at least one request timeout left, and the call then answers PROCESSING. A create waits at most about 40 seconds when each request answers just before its deadline; the first request that runs past its deadline ends the call. The reference proxy sets no response deadline, and repeating create, capture or cancel is safe because a booking has one order, a capture is deduplicated by its order id and a settled order is answered from what is stored.",
       "productionPaths": [
         "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
         "src/main/java/org/courtside/payment/internal/PayPalClient.java",
+        "src/main/java/org/courtside/payment/internal/PayPalDeadline.java",
         "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
         "src/main/resources/application.yaml",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenACaptureTimeout_whenCapturing_thenTheOrderStaysOpenAndTheOutcomeIsProcessing",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenASlowPayPal_whenTheReturnWouldOutlastItsDeadline_thenItAnswersProcessingInTime",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnOrderExists_whenCreatingAgain_thenTheSameApproveUrlComes",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]

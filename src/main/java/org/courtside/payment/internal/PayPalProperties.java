@@ -14,5 +14,6 @@ import java.time.Duration;
 public record PayPalProperties(
         @NotNull URI sandboxEndpoint,
         @NotNull URI liveEndpoint,
-        @NotNull @DurationMin(millis = 100) @DurationMax(minutes = 1) Duration requestTimeout) {
+        @NotNull @DurationMin(millis = 100) @DurationMax(minutes = 1) Duration requestTimeout,
+        @NotNull @DurationMin(millis = 100) @DurationMax(minutes = 1) Duration returnDeadline) {
 }
