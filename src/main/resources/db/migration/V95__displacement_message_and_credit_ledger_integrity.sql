@@ -37,3 +37,19 @@ ALTER TABLE credit_entry
 
 CREATE UNIQUE INDEX credit_entry_idempotency_by_recorder ON credit_entry (recorded_by, idempotency_key)
     WHERE idempotency_key IS NOT NULL;
+
+CREATE TRIGGER credit_entry_no_truncate
+    BEFORE TRUNCATE ON credit_entry
+    FOR EACH STATEMENT EXECUTE FUNCTION reject_credit_entry_change();
+
+CREATE FUNCTION reject_credit_entry_note_change() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'credit_entry_note_append_only'
+        USING ERRCODE = '23514', CONSTRAINT = 'credit_entry_note_append_only';
+END;
+$$;
+
+CREATE TRIGGER credit_entry_note_append_only
+    BEFORE UPDATE ON credit_entry_note
+    FOR EACH ROW EXECUTE FUNCTION reject_credit_entry_note_change();

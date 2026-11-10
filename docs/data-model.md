@@ -441,7 +441,9 @@ a different file than the one previewed is visible after the fact.
 | `credit_entry_note` | The reason given for an entry | `credit_entry` |
 
 Entries are appended and never changed: the trigger `credit_entry_append_only` refuses every
-`UPDATE` and `DELETE`. `credit_entry_kind_sign` keeps a `CREDIT` and a `BOOKING_REFUND` positive and a
+`UPDATE` and `DELETE`, `credit_entry_no_truncate` refuses a `TRUNCATE`, also one cascading from
+`credit_account`, and `credit_entry_note_append_only` refuses rewriting a reason. A reason can still be
+deleted, which is how anonymising an account removes it. `credit_entry_kind_sign` keeps a `CREDIT` and a `BOOKING_REFUND` positive and a
 `PAYOUT` and a `BOOKING_DEBIT` negative, and `credit_entry_amount_bounded` holds an entry the treasury
 records within 10,000.00. `PAYPAL_PAYMENT`, `PAYPAL_LATE_CAPTURE` and `PAYPAL_REFUND_REVERSED` are
 positive like a `CREDIT`, `PAYPAL_REFUND` is negative like a `PAYOUT`.

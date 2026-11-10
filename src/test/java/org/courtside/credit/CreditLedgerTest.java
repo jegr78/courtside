@@ -275,6 +275,23 @@ class CreditLedgerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenALedgerEntry_whenTheLedgerIsTruncatedOrAReasonRewritten_thenTheDatabaseRefuses() {
+        // given
+        UUID entry = credit.credit(johnAccount, 1000);
+
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("TRUNCATE credit_entry CASCADE").update())
+                .hasMessageContaining("credit_entry_append_only");
+        assertThatThrownBy(() -> jdbc.sql("TRUNCATE credit_account CASCADE").update())
+                .as("a cascade reaches the entries too").hasMessageContaining("credit_entry_append_only");
+        assertThatThrownBy(() -> jdbc.sql("UPDATE credit_entry_note SET reason_text = 'Paid' WHERE entry_id = :id")
+                .param("id", entry).update()).hasMessageContaining("credit_entry_note_append_only");
+        assertThat(jdbc.sql("DELETE FROM credit_entry_note WHERE entry_id = :id").param("id", entry).update())
+                .as("anonymising an account still removes its reasons").isOne();
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(1000);
+    }
+
+    @Test
     void givenSeveralEntries_whenThePlayerPagesThroughThem_thenEachArrivesOnceWithItsRunningBalance()
             throws Exception {
         // given

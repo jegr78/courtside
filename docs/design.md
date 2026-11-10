@@ -393,8 +393,8 @@ amount. The card administration shows the price only while the card names `EXTER
 booking dialog shows the amount to an outsider before they confirm.
 
 Each account has a credit ledger in the `credit` module: money the club holds for it, as entries
-that are appended and never changed or removed. A trigger refuses every `UPDATE` and `DELETE` on
-`credit_entry`. An entry records its kind, the signed amount in the club currency's minor unit, the
+that are appended and never changed or removed. Triggers refuse every `UPDATE`, `DELETE` and
+`TRUNCATE` on `credit_entry` and every `UPDATE` of a reason in `credit_entry_note`. An entry records its kind, the signed amount in the club currency's minor unit, the
 time, the account that recorded it and the reason, which lives in `credit_entry_note` so that
 anonymising the account can delete it while the entry stays. The balance is the sum of the entries
 in the club currency. `TREASURER` and `ADMIN` record a `CREDIT`, open only to an account holding

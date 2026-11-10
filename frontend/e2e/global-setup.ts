@@ -549,8 +549,8 @@ export function journeyWorldIn(start: JourneyStart, worlds: ReadonlyMap<string, 
 
 async function resetJourneyData(postgres: StartedTestContainer, tables: string[], schema: string): Promise<void> {
   const sql = `
-    TRUNCATE TABLE ${tables.map((table) => `public.${table}`).join(", ")} RESTART IDENTITY CASCADE;
     SET session_replication_role = replica;
+    TRUNCATE TABLE ${tables.map((table) => `public.${table}`).join(", ")} RESTART IDENTITY CASCADE;
     ${tables.map((table) => `INSERT INTO public.${table} SELECT * FROM ${schema}.${table};`).join(" ")}
     SET session_replication_role = origin;
   `;
