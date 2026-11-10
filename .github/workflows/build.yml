@@ -263,7 +263,7 @@ jobs:
     needs: assessment-runtime
     if: needs.assessment-runtime.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 140
     permissions:
       contents: read
     steps:
