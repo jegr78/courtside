@@ -136,11 +136,11 @@ ends, which only a per-member dynamic code can do.
 
 When a club opens bookings to external players, anybody with a verified email address can register.
 Such an outsider reads the static code of every access point open to members as soon as it holds a
-confirmed booking on a card that grants access, however far ahead that booking starts. It may then
-cancel before the cancellation deadline, get the price back as credit and keep knowing the code until
-the board changes it at its keypad. The exposure needs a verified mailbox and a booking the club's
-rules accept, and it exists only in a club that switches external bookings on and opens a door to
-members. Reconsider if a club reports a stranger at a members' door, or if outsiders should read the
+confirmed booking on a card that grants access, however far ahead that booking starts, and receives
+every new code by mail while that booking holds. It may then cancel before the cancellation deadline,
+get the price back as credit and keep knowing the code until the board changes it at its keypad. The
+exposure needs a verified mailbox and a booking the club's rules accept, and it exists only in a club
+that switches external bookings on and opens a door to members. Reconsider if a club reports a stranger at a members' door, or if outsiders should read the
 code only once a cancellation can no longer return the price.
 
 ## An emergency code is a permanent shared code
