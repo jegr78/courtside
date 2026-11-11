@@ -357,7 +357,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       {knownValues.map((value) => <div key={value} className="grid gap-1">
         <label className="font-semibold" htmlFor={`${group}-category-${value}`}>{value}</label>
         <select data-testid={`category-${value}`} id={`${group}-category-${value}`} className="w-full min-w-0 rounded-md border p-2" disabled={disabled} value={categories[value] ?? ""} onChange={(event) => setCategories({ ...categories, [value]: event.target.value })}>
-          <option value="">{t("admin.import.noType")}</option>
+          <option value="">{t("admin.import.undecided")}</option>
           {typeOptions(categories[value] ?? "")}
           <option value={NOT_IN_ROSTER}>{t("admin.import.notInRoster")}</option>
         </select>
@@ -432,7 +432,7 @@ function AgeBands({ value, bands, disabled, typeOptions, birthDateMapped, change
           {t("admin.import.bandType")}
           <select data-testid={`age-band-type-${value}-${index}`} className="min-w-0 rounded-md border p-2" disabled={disabled}
             value={band.membershipTypeId} onChange={(event) => replace(index, { ...band, membershipTypeId: event.target.value })}>
-            <option value="">{t("admin.import.noType")}</option>
+            <option value="">{t("admin.import.undecided")}</option>
             {typeOptions(band.membershipTypeId)}
           </select>
         </label>

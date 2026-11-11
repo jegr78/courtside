@@ -74,6 +74,25 @@ describe("ImportSourceForm", () => {
     expect(select.querySelector("option[value='type-3']")).toHaveTextContent("Youth (no longer offered)");
   });
 
+  it("given a category and an age band without a type, when the choices are read, then they read as undecided while the fallback reads as no type", async () => {
+    // given
+    show(existing, vi.fn());
+    await userEvent.upload(screen.getByTestId("source-file"),
+      file("Member number;First name;Last name;Status;Born\n1;Jane;Doe;active;2010\n"));
+    await screen.findByTestId("column-MEMBERSHIP_TYPE");
+    await userEvent.selectOptions(screen.getByTestId("column-MEMBERSHIP_TYPE"), "Status");
+    await userEvent.selectOptions(screen.getByTestId("column-BIRTH_DATE"), "Born");
+    await userEvent.selectOptions(await screen.findByTestId("category-active"), "type-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("split-by-age-active"));
+
+    // then
+    expect(screen.getByTestId("category-active").querySelector("option[value='']"), "an empty category is not decided yet").toHaveTextContent("Not assigned yet");
+    expect(screen.getByTestId("age-band-type-active-0").querySelector("option[value='']"), "an empty band is not decided yet").toHaveTextContent("Not assigned yet");
+    expect(screen.getByTestId("source-default-type").querySelector("option[value='']"), "the fallback may really mean no type").toHaveTextContent("No membership type");
+  });
+
   it("given a chosen file, when it is read, then its headers become the columns to map", async () => {
     // given
     show(undefined, vi.fn());
