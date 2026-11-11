@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -172,7 +173,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
     {error && <div className="mt-4"><LoadFailure message={error} retry={() => { clear(); void load(); }} /></div>}
     {referenceError && <div className="mt-4"><LoadFailure message={referenceError} retry={() => { clearReference(); void loadReferenceData(); }} /></div>}
     {success && <div className="mt-4"><SuccessFeedback testId={success.testId}>{success.body}</SuccessFeedback></div>}
-    {managesAppointments && (loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
+    {managesAppointments && (loading ? <LoadingStatus className="mt-6" />
       : groups.length === 0 ? <p data-testid="managed-empty" className="text-muted mt-6">
         {t(createsSeries ? "managedAppointments.empty" : "managedAppointments.emptyWithoutSeries")}</p>
       : <div data-testid="managed-bookings" className="mt-6 grid gap-4">

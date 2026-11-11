@@ -1,3 +1,4 @@
+import { LoadingStatus, LoadingTracker } from "./components/LoadingGroup";
 import { Suspense, type ComponentProps, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -30,6 +31,7 @@ import { RecoveryCodesNotice } from "./components/RecoveryCodesNotice";
 import { warnAbout } from "./api/failureWarning";
 
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
+const IDENTITY_PATIENCE_MS = 3_000;
 
 const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
 const AccountRecoveryView = lazySurface<Record<string, never>>(() =>
@@ -61,7 +63,6 @@ interface AppRoutesProps {
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
   configurationChanged, offline = false }: AppRoutesProps) {
-  const { t } = useTranslation();
   const address = useLocation();
   const { pathname } = address;
   const signInFirst = <Navigate to={signInPath(address)} replace />;
@@ -79,7 +80,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <div key={session.username ?? "anonymous"} className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
-    <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
+    <Suspense fallback={<LoadingStatus />}>
     <Routes>
     <Route path="/" element={<HomeView session={session} offline={offline} />} />
     <Route path="/courts" element={<HomeView session={session} offline={offline} />} />
@@ -120,7 +121,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : signInFirst} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin/*" element={!session.authenticated ? signInFirst : reachesAdministration(session)
-      ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
+      ? <Suspense fallback={<LoadingStatus />}>
         <AdminRoutes administrator={administrator} treasurer={readsGuestFees(session)}
           managesAppointments={administrator || Boolean(session.managesAppointments)}
           createsSeries={administrator || Boolean(session.createsSeries)}
@@ -198,6 +199,8 @@ export function App() {
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
   const [offline, setOffline] = useState(() => !navigator.onLine);
+  const [identityPatienceOver, setIdentityPatienceOver] = useState(false);
+  const [pageQuiet, setPageQuiet] = useState(false);
   const [offlineClub, setOfflineClub] = useState<string>();
   const [passwordChanged, setPasswordChanged] = useState(false);
   const sessionInvalidations = useRef(0);
@@ -211,6 +214,11 @@ export function App() {
       warnAbout("Build identity unavailable", failure);
       setIdentityStatus("unavailable");
     }), []);
+
+  useEffect(() => {
+    const patience = setTimeout(() => setIdentityPatienceOver(true), IDENTITY_PATIENCE_MS);
+    return () => clearTimeout(patience);
+  }, []);
 
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
@@ -322,6 +330,8 @@ export function App() {
   }
 
   const authenticated = session?.authenticated ?? false;
+  // The environment bar changes height once the identity has answered, so the page waits for it a while.
+  const identified = identityStatus !== "loading" || offline || identityPatienceOver;
 
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
     <PwaLifecycle serverVersion={source?.version} />
@@ -335,7 +345,8 @@ export function App() {
         supported={club?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} offline={offline} />
-    <main className="flex flex-1 items-start justify-center px-4 py-8">
+    {identified ? <main className="flex flex-1 items-start justify-center px-4 py-8">
+      <LoadingTracker quiet={setPageQuiet}>
       <div className="flex w-full max-w-7xl flex-col items-center gap-4">
       {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert tone="warning">{t("status.offline")}</Alert></div>}
       {session
@@ -345,10 +356,11 @@ export function App() {
             configurationChanged(changed);
             refreshClub();
           }} offline={offline} />
-        : <p role="status">{t("status.loading")}</p>}
+        : <LoadingStatus />}
       </div>
-    </main>
-    <footer className="text-muted flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">
+      </LoadingTracker>
+    </main> : <div className="flex-1" />}
+    <footer className={`${identified && pageQuiet ? "" : "invisible "}text-muted flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4`}>
       <span data-testid="footer-product-identity" className="flex items-center gap-2 font-semibold">
         <CourtsideMark testId="footer-product-mark" className="h-6 w-6" />
         {t("app.name")}

@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useTranslation } from "react-i18next";
 import { LoadFailure } from "../components/LoadFailure";
 import { SetupProgress, SetupSteps } from "./setup/SetupChecklist";
@@ -13,7 +14,7 @@ export function AdminSetupView() {
       <p className="text-muted">{t("admin.setup.description")}</p>
     </div>
     {!steps
-      ? error ? <LoadFailure message={error} retry={retry} /> : <p role="status">{t("status.loading")}</p>
+      ? error ? <LoadFailure message={error} retry={retry} /> : <LoadingStatus />
       : <>
         <SetupProgress completed={completed} />
         <SetupSteps steps={steps} />

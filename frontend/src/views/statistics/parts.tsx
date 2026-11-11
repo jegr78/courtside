@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadFailure } from "../../components/LoadFailure";
+import { LoadingStatus } from "../../components/LoadingGroup";
 import { type Change, type ChangeKind, changeOf } from "./change";
 import type { StatisticsFormat } from "./format";
 import type { Read } from "./useStatisticsRead";
@@ -11,11 +12,10 @@ export function Section<T>({ testId, heading, read, children }: {
   read: Read<T>;
   children: (value: T) => ReactNode;
 }) {
-  const { t } = useTranslation();
   return <section data-testid={testId} aria-labelledby={`${testId}-heading`} className="grid min-w-0 gap-6">
     <h2 id={`${testId}-heading`} className="text-2xl font-bold">{heading}</h2>
     {read.value === undefined
-      ? read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <p role="status">{t("status.loading")}</p>
+      ? read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <LoadingStatus />
       : children(read.value)}
   </section>;
 }

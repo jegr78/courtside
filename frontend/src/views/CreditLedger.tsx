@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useTranslation } from "react-i18next";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
@@ -40,7 +41,7 @@ export function CreditLedger({ ledger, refunds }: { ledger: CreditLedgerState; r
   const { page, failure } = ledger;
   return <div className="grid min-w-0 gap-4">
     {failure !== undefined && <Alert testId="credit-error">{problemMessage(failure, t)}</Alert>}
-    {!page && failure === undefined && <p role="status">{t("status.loading")}</p>}
+    {!page && failure === undefined && <LoadingStatus />}
     {page && <>
       <p className="grid gap-1">
         <span className="text-muted text-sm">{t("creditLedger.balance")}</span>

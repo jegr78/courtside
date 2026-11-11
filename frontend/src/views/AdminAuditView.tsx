@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -106,7 +107,7 @@ export function AdminAuditView() {
   return <section data-testid="admin-audit-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("audit.title")}</h1>
     {!entries || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {searchIncomplete && <Alert tone="warning" testId="audit-search-incomplete">{t("audit.filter.incomplete")}</Alert>}

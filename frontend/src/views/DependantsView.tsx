@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
@@ -210,7 +211,7 @@ function DependantMessages({ dependant, refused, revision }: { dependant: Depend
     <h3 id="dependant-messages-title" className="text-xl font-semibold">{t("dependants.messages")}</h3>
     <p className="text-muted text-sm">{t("dependants.messagesReadOnly", { name })}</p>
     {error && <LoadFailure message={error} retry={() => void load()} />}
-    {loading && !entries && <p role="status">{t("status.loading")}</p>}
+    {loading && !entries && <LoadingStatus />}
     {entries && club && (entries.length === 0
       ? <p data-testid="dependant-messages-empty" className="text-muted">{t("dependants.noMessages", { name })}</p>
       : <ul data-testid="dependant-notifications" className="grid gap-3">

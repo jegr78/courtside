@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -146,7 +147,7 @@ export function AdminOperationalLogsView() {
     </form>
     {refusedFilter && <Alert testId="operational-logs-filter-refused">{refusedFilter}</Alert>}
     {!page || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : !refusedFilter && <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : !refusedFilter && <LoadingStatus />)
       : <>
         {problem && <Alert testId="operational-logs-problem">{problem}</Alert>}
         {page.availability === "UNAVAILABLE"

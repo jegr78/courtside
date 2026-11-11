@@ -1293,10 +1293,29 @@ describe("App build identity", () => {
 
     // when
     render(<RoutedShell><App /></RoutedShell>);
-    await screen.findByTestId("court-plan-view");
+    await screen.findByTestId("court-plan-view", {}, { timeout: 5_000 });
 
     // then
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
+  });
+
+  it("given the source endpoint has not answered yet, when the session has, then the page waits so the environment bar cannot move it", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    let identify: (value: Awaited<ReturnType<typeof api.source>>) => void = () => undefined;
+    vi.spyOn(api, "source").mockReturnValue(new Promise((resolve) => { identify = resolve; }));
+    render(<RoutedShell><App /></RoutedShell>);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    await act(() => Promise.resolve());
+    expect(screen.queryByTestId("court-plan-view"), "no page while the identity is pending").toBeNull();
+
+    // when
+    act(() => identify({ version: "0.1.0", commit: "f8b8268d97ab42be77e3cbe553869af085c6f687", environment: "PRODUCTION",
+      sourceUrl: "https://github.com/jegr78/courtside" }));
+
+    // then
+    expect(await screen.findByTestId("court-plan-view"), "the page follows the identity").toBeInTheDocument();
   });
 
   it("given short route, when shell renders, then the shell anchors content to the top", async () => {

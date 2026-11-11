@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -248,7 +249,7 @@ export function AdminRosterView() {
   return <section data-testid="admin-roster-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.roster.title")}</h1>
     {!entries
-      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {error && <Alert>{error}</Alert>}
         <form noValidate {...newPerson.form} onSubmit={(event) => void createPerson(event)} className="grid gap-3 rounded-xl border p-4">

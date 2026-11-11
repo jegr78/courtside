@@ -1,3 +1,4 @@
+import { LoadingGroup, LoadingStatus } from "../components/LoadingGroup";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -48,11 +49,10 @@ function Card<T>({ testId, title, link, read, children }: {
   read: { value?: T; error?: string; retry: () => void };
   children: (value: T) => ReactNode;
 }) {
-  const { t } = useTranslation();
   return <section data-testid={testId} aria-labelledby={`${testId}-heading`} className="surface-raised grid content-start gap-3 rounded-xl border p-5">
     <h2 id={`${testId}-heading`} className="text-xl font-bold">{title}</h2>
     {read.value === undefined
-      ? read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <p role="status">{t("status.loading")}</p>
+      ? read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <LoadingStatus />
       : children(read.value)}
     <Link data-testid={`${testId}-link`} to={link.to} className="justify-self-start font-semibold underline">{link.label}</Link>
   </section>;
@@ -89,7 +89,7 @@ function KeyFigure({ name, period, read, figure }: {
   if (!read.loaded || !figure) {
     return <div data-testid={testId} className={tile}>
       {label}
-      {read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <p role="status">{t("status.loading")}</p>}
+      {read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <LoadingStatus />}
     </div>;
   }
   const { value, detail, change } = figure;
@@ -124,7 +124,7 @@ function KeyFigures({ clock }: { clock: () => Date }) {
   const bookings = useRead(useMemo(() => periods && (() => api.bookingStatistics(periods.week)), [periods]));
   const members = useRead(useMemo(() => periods && (() => api.memberStatistics(periods.thirtyDays)), [periods]));
   if (!periods) {
-    return clubError ? <LoadFailure message={clubError} retry={loadClub} /> : <p role="status">{t("status.loading")}</p>;
+    return clubError ? <LoadFailure message={clubError} retry={loadClub} /> : <LoadingStatus />;
   }
 
   const count = new Intl.NumberFormat(language);
@@ -169,7 +169,7 @@ function SetupSection() {
   if (!steps) {
     return error
       ? <div data-testid="overview-setup-failure"><LoadFailure message={error} retry={retry} /></div>
-      : <p role="status">{t("status.loading")}</p>;
+      : <LoadingStatus />;
   }
   const complete = completed === REQUIRED_STEPS;
   return <details data-testid="overview-setup" open={!complete} className="group rounded-xl border p-5">
@@ -317,13 +317,15 @@ export function AdminOverviewView({ clock = systemClock }: { clock?: () => Date 
       <h1 className="text-3xl font-bold">{t("admin.overview.title")}</h1>
       <p className="text-muted">{t("admin.overview.description")}</p>
     </div>
-    <SetupSection />
-    <KeyFigures clock={clock} />
-    <div className="grid gap-4 md:grid-cols-2">
-      <TodayCard clock={clock} />
-      <CredentialsCard />
-      <MessagesCard />
-      <ChangesCard />
-    </div>
+    <LoadingGroup testId="admin-overview" className="grid gap-6">
+      <SetupSection />
+      <KeyFigures clock={clock} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <TodayCard clock={clock} />
+        <CredentialsCard />
+        <MessagesCard />
+        <ChangesCard />
+      </div>
+    </LoadingGroup>
   </section>;
 }

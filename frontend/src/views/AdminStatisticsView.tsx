@@ -1,3 +1,4 @@
+import { LoadingGroup } from "../components/LoadingGroup";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -89,11 +90,11 @@ export function AdminStatisticsView() {
     </div>
     {noBookings
       ? <p data-testid="statistics-no-bookings">{t("admin.statistics.allTimeEmpty")}</p>
-      : <div key={sections} className="grid min-w-0 gap-12">
+      : <LoadingGroup key={sections} testId="statistics-sections" className="grid min-w-0 gap-12">
         <UtilisationSection from={period?.from} to={period?.to} onAnswered={fill} />
         <BookingSection from={period?.from} to={period?.to} />
         <MemberSection from={period?.from} to={period?.to} />
         <MessageSection from={period?.from} to={period?.to} />
-      </div>}
+      </LoadingGroup>}
   </section>;
 }
