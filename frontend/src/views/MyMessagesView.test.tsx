@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api, type MessageChoice, type Notification } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationContext } from "../club/registry";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { MyMessagesView } from "./MyMessagesView";
 
@@ -83,6 +84,22 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownMessageChoices").mockResolvedValue(choices);
     vi.spyOn(api, "ownMessageChannels").mockResolvedValue([{ channel: "EMAIL", enabled: true }]);
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, reminderRead], nextCursor: null, unread: 1 });
+  });
+
+  it("given the club configuration failed, when the page opens, then it shows the failure and the settings instead of loading for good", async () => {
+    // given
+    const load = vi.fn();
+    render(<MemoryRouter><ClubConfigurationContext value={{ error: "The club settings are unavailable.", changed: () => undefined, load, refresh: () => undefined }}>
+      <MyMessagesView />
+    </ClubConfigurationContext></MemoryRouter>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("retry-load"));
+
+    // then
+    expect(load, "the failure offers to load the configuration again").toHaveBeenCalled();
+    expect(screen.getByTestId("my-messages-content"), "the settings show beside the failure").not.toHaveAttribute("aria-hidden");
+    expect(screen.queryByTestId("my-messages-loading"), "nothing is left loading").toBeNull();
   });
 
   it("given notifications addressed to the member, when the centre opens, then each shows its time, read state, content and link", async () => {

@@ -12,37 +12,39 @@ const widths = [
 function delayFor(pathname: string) {
   let hash = 0;
   for (const character of pathname) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return 150 + (hash % 8) * 150;
+  return 150 + (hash % 6) * 100;
 }
 
-test.describe("layout shift", () => {
-  for (const { device, viewport } of widths) {
-    test(`given slow answers on a ${device}, when every page loads, then none shifts beyond the budget`, async ({ page, browserName }) => {
-      test.skip(browserName !== "chromium", "only Chromium reports layout-shift entries");
-      // given
-      await admitExternalBookings(page);
-      await page.setViewportSize(viewport);
-      await page.addInitScript(() => {
-        const shifts: { value: number; sources: string[] }[] = [];
-        (window as unknown as { courtsideShifts: typeof shifts }).courtsideShifts = shifts;
-        new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as unknown as { value: number; hadRecentInput: boolean; sources: { node?: Node; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[] }[]) {
-            if (entry.hadRecentInput) continue;
-            shifts.push({ value: entry.value, sources: entry.sources.map(({ node, previousRect, currentRect }) => {
-              const element = node instanceof Element ? node : node?.parentElement;
-              const name = element ? `${element.tagName.toLowerCase()}${element.getAttribute("data-testid") ? `[${element.getAttribute("data-testid")}]` : ""}` : "?";
-              return `${name} y${Math.round(previousRect.y)}→${Math.round(currentRect.y)} h${Math.round(previousRect.height)}→${Math.round(currentRect.height)}`;
-            }) });
-          }
-        }).observe({ type: "layout-shift", buffered: true });
-      });
-      const findings: string[] = [];
+type Shift = { value: number; sources: string[] };
 
-      // when
-      for (const persona of PERSONAS.filter((persona) => persona !== "bootstrap-admin")) {
+test.describe("layout shift", () => {
+  for (const persona of PERSONAS.filter((persona) => persona !== "bootstrap-admin")) {
+    for (const { device, viewport } of widths) {
+      test(`given slow answers on a ${device}, when every page of ${persona} loads, then none shifts beyond the budget`, async ({ page, browserName }) => {
+        test.skip(browserName !== "chromium", "only Chromium reports layout-shift entries");
+        // given
+        await admitExternalBookings(page);
+        await page.setViewportSize(viewport);
+        await page.addInitScript(() => {
+          const shifts: Shift[] = [];
+          (window as unknown as { courtsideShifts: Shift[] }).courtsideShifts = shifts;
+          new PerformanceObserver((list) => {
+            type Entry = { value: number; hadRecentInput: boolean; sources: { node?: Node; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[] };
+            for (const entry of list.getEntries() as unknown as Entry[]) {
+              if (entry.hadRecentInput) continue;
+              shifts.push({ value: entry.value, sources: entry.sources.map(({ node, previousRect, currentRect }) => {
+                const element = node instanceof Element ? node : node?.parentElement;
+                const name = element ? `${element.tagName.toLowerCase()}${element.getAttribute("data-testid") ? `[${element.getAttribute("data-testid")}]` : ""}` : "?";
+                return `${name} y${Math.round(previousRect.y)}→${Math.round(currentRect.y)} h${Math.round(previousRect.height)}→${Math.round(currentRect.height)}`;
+              }) });
+            }
+          }).observe({ type: "layout-shift", buffered: true });
+        });
         const paths = routerPages().filter((route) => !route.redirect && personas(route.path).includes(persona)).map((route) => route.path);
-        if (paths.length === 0) continue;
+        const findings: string[] = [];
         await become(page, persona);
+
+        // when
         for (const path of paths) {
           const concrete = await concretePath(page, path);
           if (concrete === undefined) continue;
@@ -53,19 +55,20 @@ test.describe("layout shift", () => {
           await page.goto(concrete);
           await page.waitForLoadState("networkidle", { timeout: 20_000 });
           await page.waitForTimeout(500);
-          const shifts = await page.evaluate(() => (window as unknown as { courtsideShifts: { value: number; sources: string[] }[] }).courtsideShifts);
+          const shifts = await page.evaluate(() => (window as unknown as { courtsideShifts: Shift[] }).courtsideShifts);
           await page.context().unroute("**/api/**");
           const total = shifts.reduce((sum, shift) => sum + shift.value, 0);
           if (total > BUDGET) {
             const largest = [...shifts].sort((a, b) => b.value - a.value).slice(0, 2)
               .map((shift) => `${shift.value.toFixed(3)} ${shift.sources.join(",")}`).join("; ");
-            findings.push(`${concrete} as ${persona}: ${total.toFixed(3)} (${largest})`);
+            findings.push(`${concrete}: ${total.toFixed(3)} (${largest})`);
           }
         }
-      }
 
-      // then
-      expect(findings, "a page whose layout shifts beyond the budget while it loads").toEqual([]);
-    });
+        // then
+        expect(paths.length, "the persona has pages to measure").toBeGreaterThan(0);
+        expect(findings, "a page whose layout shifts beyond the budget while it loads").toEqual([]);
+      });
+    }
   }
 });

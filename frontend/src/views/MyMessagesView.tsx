@@ -1,3 +1,4 @@
+import { LoadFailure } from "../components/LoadFailure";
 import { LoadingGroup, LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -84,7 +85,7 @@ export function NotificationEntry({ notification, timeZone, marking = false, jus
 
 function NotificationCentre() {
   const { t, i18n } = useTranslation();
-  const { club } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entries, setEntries] = useState<Notification[]>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [marking, setMarking] = useState<string>();
@@ -142,7 +143,8 @@ function NotificationCentre() {
     <h2 id="notifications-title" className="text-2xl font-bold">{t("notifications.title")}</h2>
     {error && <Alert>{error}</Alert>}
     <p role="status" data-testid="notifications-status" className="sr-only">{justRead && t("notifications.markedRead")}</p>
-    {!error && !(entries && club) && <LoadingStatus />}
+    {clubError && <LoadFailure message={clubError} retry={loadClub} />}
+    {!error && !clubError && !(entries && club) && <LoadingStatus />}
     {entries && club && (entries.length === 0
       ? <p data-testid="notifications-empty" className="text-muted">{t("notifications.empty")}</p>
       : <ul data-testid="notifications" className="grid gap-3">

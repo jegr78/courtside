@@ -132,4 +132,43 @@ describe("LoadingGroup", () => {
     // then
     expect(quiet, "a new page load hides what waits for quiet again").toHaveBeenLastCalledWith(false);
   });
+
+  it("given a part that never answers, when five seconds have passed, then the group shows what it has", async () => {
+    // given
+    vi.useFakeTimers();
+    try {
+      const content = renderGroup(["a", "b"]);
+      finish.b("failed");
+      await act(() => Promise.resolve());
+
+      // when
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+
+      // then
+      expect(content.className, "a hanging read does not hide the other parts for good").not.toContain("invisible");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("given a tracker whose part never answers, when five seconds have passed, then it reports quiet and stays so", async () => {
+    // given
+    vi.useFakeTimers();
+    try {
+      const quiet = vi.fn();
+      render(<LoadingTracker quiet={quiet}><Part name="a" /><Part name="b" /></LoadingTracker>);
+      await act(() => Promise.resolve());
+
+      // when
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      finish.b("done");
+      await act(() => Promise.resolve());
+
+      // then
+      expect(quiet, "what waits for the page shows once patience is over").toHaveBeenLastCalledWith(true);
+      expect(quiet).not.toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

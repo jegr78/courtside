@@ -14,11 +14,32 @@ function usePending(active: boolean) {
   }, [pending, active]);
 }
 
+const PATIENCE_MS = 5_000;
+
 // A status that unmounts while the next one mounts in the same commit must not count as quiet.
 function useCount(quiet: (isQuiet: boolean) => void): Pending {
   const count = useRef(0);
-  const check = useCallback(() => queueMicrotask(() => quiet(count.current === 0)), [quiet]);
-  useLayoutEffect(check, [check]);
+  const patience = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const gaveUp = useRef(false);
+  const check = useCallback(() => queueMicrotask(() => {
+    if (count.current === 0) {
+      clearTimeout(patience.current);
+      patience.current = undefined;
+      gaveUp.current = false;
+      quiet(true);
+      return;
+    }
+    // A read that hangs must not keep everything else hidden.
+    patience.current ??= setTimeout(() => {
+      gaveUp.current = true;
+      quiet(true);
+    }, PATIENCE_MS);
+    if (!gaveUp.current) quiet(false);
+  }), [quiet]);
+  useLayoutEffect(() => {
+    check();
+    return () => clearTimeout(patience.current);
+  }, [check]);
   return useCallback((change) => {
     count.current += change;
     check();
