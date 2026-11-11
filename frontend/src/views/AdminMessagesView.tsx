@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
@@ -75,7 +76,7 @@ export function AdminMessagesView() {
       {t("messages.onlyUnsettled")}
     </label>
     {!entries || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {entries.some((entry) => entry.state === "REFUSED")

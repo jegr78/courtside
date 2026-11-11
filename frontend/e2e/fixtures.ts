@@ -203,7 +203,7 @@ export async function backAtTheJourneyInstant(page: Page): Promise<void> {
   await page.clock.setFixedTime(new Date(journeyInstant));
 }
 
-// The overview renders every card's loading line in its first frame, so none left means all answered.
+// The overview shows one loading line until every card has answered, so none left means all answered.
 export async function expectAdministrationOverview(page: Page): Promise<void> {
   const overview = page.getByTestId("admin-overview-view");
   await expect(overview).toBeVisible();

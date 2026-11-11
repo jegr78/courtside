@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type AccessCode, type AccessGrant, type BookingGrid, type EmergencyAccess, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
@@ -257,7 +258,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
     {payPalAbandoned && <div data-testid="paypal-outcome" data-outcome="REJECTED" className="mt-4">
       <Alert tone={payPalOutcomeTone("cancel", "REJECTED")}>{t(payPalOutcomeKey("cancel", "REJECTED"))}</Alert>
     </div>}
-    {loading && !loaded ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
+    {loading && !loaded ? <LoadingStatus /> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} payPal={payPal} paymentClock={paymentClock} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">

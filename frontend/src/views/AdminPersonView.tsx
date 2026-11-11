@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { ProofOwnerContext, reauthenticateForm } from "../security/reauthentication";
@@ -300,7 +301,7 @@ export function AdminPersonView() {
       <Link data-testid="back-to-roster" to="/admin/roster" className="font-semibold underline">{t("admin.person.backToRoster")}</Link>
     </div>
     {!entry || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { clear(); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { clear(); loadClub(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}

@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { DateTimeInput } from "../components/DateTimeInput";
 import { type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -523,7 +524,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         </li>)}
       </ul>
     </Alert>}
-    {!offline && !data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
+    {!offline && !data && !error && <LoadingStatus className="mt-6" />}
     {data && !hasCourts && <p data-testid="court-plan-empty" className="text-muted mt-6">{t("week.noCourtOpen")}</p>}
     {data && hasCourts && <div className="desktop-current-time mt-4 flex justify-end">
       <Button variant="secondary" type="button" data-testid="current-time" onClick={() => isToday

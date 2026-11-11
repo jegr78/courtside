@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../../components/LoadingGroup";
 import { DateTimeInput } from "../../components/DateTimeInput";
 import { formatDateTime } from "../../components/localizedDateTime";
 import { useEffect, useRef, useState } from "react";
@@ -249,7 +250,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
   return <section data-testid="admin-rule-sets-view" className="surface-panel min-w-0 grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl">
     <h1 className="text-3xl font-bold">{t("admin.rules.title")}</h1>
     {!config
-      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}

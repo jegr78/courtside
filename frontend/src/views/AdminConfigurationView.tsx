@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type AdminClubConfig, type ClubConfig } from "../api/client";
@@ -161,7 +162,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   return <section data-testid="admin-configuration-view" className="surface-panel min-w-0 grid gap-5 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl">
     <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
     {!config
-      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}

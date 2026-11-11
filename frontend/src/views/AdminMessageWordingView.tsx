@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
@@ -135,7 +136,7 @@ export function AdminMessageWordingView() {
     <h1 className="text-3xl font-bold">{t("admin.messageWording.title")}</h1>
     <p className="text-muted">{t("admin.messageWording.explain")}</p>
     {!templates || !template || !wording
-      ? (error ? <LoadFailure message={error} retry={() => { setError(undefined); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { setError(undefined); retryLoad(); }} /> : <LoadingStatus />)
       : <>
         {error && <Alert testId="wording-error">{error}</Alert>}
         {refusals.length > 0 && <Alert testId="wording-refusals"><ul className="grid gap-1">

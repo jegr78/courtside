@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
@@ -168,7 +169,7 @@ export function AdminRetentionView() {
     </div>
     {!policies
       ? (loadFailure ? <LoadFailure message={loadFailure} retry={() => { setLoadFailure(undefined); retryLoad(); }} />
-        : <p role="status">{t("status.loading")}</p>)
+        : <LoadingStatus />)
       : <>
         {error && <Alert testId="retention-error">{error}</Alert>}
         {success && <SuccessFeedback testId="retention-success">{success}</SuccessFeedback>}

@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type OperatorCheckReason, type OperatorCheckState, type OperatorHealth } from "../api/client";
@@ -102,7 +103,7 @@ export function AdminOperatorHealthView() {
       </p>
     </div>
     {!health || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retry(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retry(); }} /> : <LoadingStatus />)
       : <>
         {problem && <Alert testId="operator-health-problem">{problem}</Alert>}
         <ul className="grid gap-2" aria-label={t("operatorHealth.title")}>

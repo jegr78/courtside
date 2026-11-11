@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useContext, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type MfaAdministrativeStatus } from "../api/client";
@@ -47,7 +48,7 @@ export function AdminMfaRecovery({ accountId, disabled, run }: {
   return <section data-testid="admin-mfa-recovery" className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("mfa.adminRecoveryTitle")}</h2>
     {failure && <><Alert>{failure}</Alert><Button variant="secondary" type="button" data-testid="admin-mfa-retry" onClick={() => setVersion((value) => value + 1)}>{t("error.retry")}</Button></>}
-    {!status && !failure && <p role="status">{t("status.loading")}</p>}
+    {!status && !failure && <LoadingStatus />}
     {status && <p data-testid="admin-mfa-status">{t(status.recoveryPending ? "mfa.adminRecoveryPending" : status.enabled ? "mfa.enabled" : "mfa.disabled")}</p>}
     {(status?.enabled || status?.recoveryPending) && <>
       <p className="text-muted">{t("mfa.adminRecoveryHint")}</p>

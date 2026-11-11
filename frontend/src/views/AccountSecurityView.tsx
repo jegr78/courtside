@@ -1,3 +1,4 @@
+import { LoadingGroup, LoadingStatus } from "../components/LoadingGroup";
 import { type ComponentProps, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type AccountSession } from "../api/client";
@@ -32,6 +33,7 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
   const { t, i18n } = useTranslation();
   const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [sessions, setSessions] = useState<AccountSession[]>([]);
+  const [sessionsAnswered, setSessionsAnswered] = useState(false);
   const [failure, setFailure] = useState<string>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -48,7 +50,8 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
   }>();
 
   useEffect(() => {
-    void api.accountSessions().then(setSessions).catch((error) => setFailure(problemMessage(error, t)));
+    void api.accountSessions().then(setSessions).catch((error) => setFailure(problemMessage(error, t)))
+      .finally(() => setSessionsAnswered(true));
   }, [t]);
 
   useLayoutEffect(() => () => { actionVersion.current += 1; proofAttempt.current?.abort(); }, []);
@@ -132,11 +135,12 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
   return <section data-testid="account-security-view" className="surface-panel grid w-full max-w-3xl gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <header><Heading ref={heading} tabIndex={-1} data-testid="account-security-title"
       className="focus-ring scroll-mt-4 rounded text-2xl font-bold">{t("accountSecurity.title")}</Heading><p className="text-muted mt-2">{t("accountSecurity.description")}</p></header>
+    <LoadingGroup testId="account-security" className="grid gap-8">
     {failure && <Alert testId="account-security-failure">{failure}</Alert>}
     {mfaEnabled !== undefined && <MfaSettings username={username} pending={pending} run={run} signedOut={signedOut} />}
     <section className="grid gap-4">
       <Subheading className="text-xl font-bold">{t("accountSecurity.sessions.title")}</Subheading>
-      {clubError ? <LoadFailure message={clubError} retry={loadClub} /> : !club && <p role="status">{t("status.loading")}</p>}
+      {clubError ? <LoadFailure message={clubError} retry={loadClub} /> : !(club && sessionsAnswered) && <LoadingStatus />}
       <ul className="grid gap-3">
         {sessions.map((session) => <li key={session.handle} className="grid gap-2 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center">
           <div id={`account-session-${session.handle}`}><strong>{t(`accountSecurity.browser.${session.browserFamily}`)}</strong>{session.current && <span className="ml-2">({t("accountSecurity.sessions.current")})</span>}
@@ -191,5 +195,6 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
       </div> : <div><Button variant="destructive" disabled={pending} type="button" data-testid="close-account"
         onClick={() => setConfirmingClosure(true)}>{t("accountSecurity.closure.start")}</Button></div>}
     </section>}
+    </LoadingGroup>
   </section>;
 }

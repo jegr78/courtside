@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -98,7 +99,7 @@ export function AdminAccessGrantsView() {
       <p className="text-muted">{t("accessGrants.introduction")}</p>
     </div>
     {!overview || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); reload(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); reload(); }} /> : <LoadingStatus />)
       : <>
         {problem && <Alert testId="access-grants-problem">{problem}</Alert>}
         <p data-testid="access-grants-connector" className="font-semibold">

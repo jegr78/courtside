@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { type FormEvent, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import qrcode from "qrcode-generator";
@@ -117,7 +118,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
     <h3 className="text-xl font-bold">{t("mfa.title")}</h3>
     <p>{t("mfa.description")}</p>
     {failure && <><Alert>{failure}</Alert><Button variant="secondary" type="button" data-testid="mfa-retry" onClick={() => setLoadVersion((value) => value + 1)}>{t("error.retry")}</Button></>}
-    {!status && !failure && <p role="status">{t("status.loading")}</p>}
+    {!status && !failure && <LoadingStatus />}
     {status && <>
       <p data-testid="mfa-status">{t(status.enabled ? "mfa.enabled" : "mfa.disabled")}</p>
       {status.enabled && <p data-testid="mfa-recovery-remaining">{t("mfa.remaining", { count: status.recoveryCodesRemaining })}</p>}

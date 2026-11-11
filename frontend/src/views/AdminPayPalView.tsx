@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../components/LoadingGroup";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type PayPalConnectionCheckResult, type PayPalEnvironment, type PayPalSettings,
@@ -140,7 +141,7 @@ export function AdminPayPalView() {
     </div>
     {!settings && (loadError
       ? <LoadFailure message={loadError} retry={() => { setLoadError(undefined); setLoads((count) => count + 1); }} />
-      : <p role="status">{t("status.loading")}</p>)}
+      : <LoadingStatus />)}
     {settings && <>
       {stored && settings.environment === "SANDBOX"
         && <Alert tone="warning" testId="paypal-sandbox-warning">{t("admin.paypal.sandboxWarning")}</Alert>}

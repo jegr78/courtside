@@ -1,3 +1,5 @@
+import { LoadFailure } from "../components/LoadFailure";
+import { LoadingGroup, LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -83,7 +85,7 @@ export function NotificationEntry({ notification, timeZone, marking = false, jus
 
 function NotificationCentre() {
   const { t, i18n } = useTranslation();
-  const { club } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entries, setEntries] = useState<Notification[]>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [marking, setMarking] = useState<string>();
@@ -141,6 +143,8 @@ function NotificationCentre() {
     <h2 id="notifications-title" className="text-2xl font-bold">{t("notifications.title")}</h2>
     {error && <Alert>{error}</Alert>}
     <p role="status" data-testid="notifications-status" className="sr-only">{justRead && t("notifications.markedRead")}</p>
+    {clubError && <LoadFailure message={clubError} retry={loadClub} />}
+    {!error && !clubError && !(entries && club) && <LoadingStatus />}
     {entries && club && (entries.length === 0
       ? <p data-testid="notifications-empty" className="text-muted">{t("notifications.empty")}</p>
       : <ul data-testid="notifications" className="grid gap-3">
@@ -246,6 +250,7 @@ function MessageSettings() {
     <h2 id="message-settings-title" className="text-2xl font-bold">{t("myMessages.settings")}</h2>
     <p className="text-muted">{t("myMessages.description")}</p>
     {error && !(choices && channels) && <Alert>{error}</Alert>}
+    {!error && !(choices && channels) && <LoadingStatus />}
     {choices && channels && <>
       <MessageChoiceGroup
         heading={t("myMessages.declinable")}
@@ -287,7 +292,9 @@ export function MyMessagesView() {
   const { t } = useTranslation();
   return <section data-testid="my-messages-view" className="surface-panel grid w-full max-w-3xl gap-6 self-start rounded-2xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("myMessages.title")}</h1>
-    <NotificationCentre />
-    <MessageSettings />
+    <LoadingGroup testId="my-messages" className="grid gap-6">
+      <NotificationCentre />
+      <MessageSettings />
+    </LoadingGroup>
   </section>;
 }
