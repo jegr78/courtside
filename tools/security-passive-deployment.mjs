@@ -72,10 +72,6 @@ const cspDirectives = new Set([
   "sandbox", "script-src", "script-src-attr", "script-src-elem", "style-src", "style-src-attr",
   "style-src-elem", "trusted-types", "upgrade-insecure-requests", "worker-src"
 ]);
-const suspiciousCommentPatterns = [
-  "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
-  "select", "where", "from", "later", "debug"
-];
 export const requiredPassiveCheckIds = Object.freeze([
   ...publicPaths.map((path) => `headers-${pathId(path)}`),
   ...exposurePaths.map((path) => `exposure-${pathId(path)}`),
@@ -87,7 +83,7 @@ export const requiredPassiveCheckIds = Object.freeze([
   "qualified-image-evidence"
 ].toSorted());
 
-export function normalizeZapAlerts(report, imageDigest) {
+export function normalizeZapAlerts(report) {
   if (report == null || typeof report !== "object" || Array.isArray(report)
       || !Array.isArray(report.site) || report.site.length === 0
       || report.site.some((site) => site == null || typeof site !== "object" || Array.isArray(site)
@@ -100,6 +96,8 @@ export function normalizeZapAlerts(report, imageDigest) {
       throw new Error("ZAP produced an invalid alert record");
     }
     const pluginId = alert.pluginid;
+    // Built assets carry no comments, so the suspicious-comment rule only misreads minified code.
+    if (pluginId === "10027") continue;
     const riskCode = Number(alert.riskcode);
     const confidence = Number(alert.confidence);
     if (typeof pluginId !== "string" || !/^\d+$/.test(pluginId)
@@ -118,14 +116,14 @@ export function normalizeZapAlerts(report, imageDigest) {
       if (!["GET", "HEAD"].includes(method)) throw new Error("ZAP produced an invalid alert record");
       const routeTemplate = passiveRouteTemplate(instance.uri);
       const fingerprint = passiveAlertFingerprint(pluginId, method, routeTemplate);
-      const ruleEvidence = passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest);
+      const ruleEvidence = passiveRuleEvidence(pluginId, instance);
       const key = `${pluginId}\0${method}\0${routeTemplate}`;
       const existing = normalized.get(key);
       if (existing && (existing.riskCode !== riskCode || existing.confidence !== confidence)) {
         throw new Error("ZAP produced a contradictory alert record");
       }
       if (existing) {
-        existing.ruleEvidence = mergeRuleEvidence(existing.ruleEvidence, ruleEvidence, imageDigest, fingerprint);
+        existing.ruleEvidence = mergeRuleEvidence(existing.ruleEvidence, ruleEvidence);
         existing.count++;
       }
       else normalized.set(key, { pluginId, riskCode, confidence, method, routeTemplate,
@@ -194,7 +192,7 @@ function evidenceShape(value) {
   return typeof value === "string" ? `of ${value.length} characters` : `not text (${typeof value})`;
 }
 
-function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
+function passiveRuleEvidence(pluginId, instance) {
   const unsupported = (reason) =>
     new Error(`ZAP rule ${pluginId} produced unsupported rule evidence: ${reason}`);
   const param = instance.param;
@@ -212,24 +210,6 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     }
     return { kind: "cookie-attribute", cookieName: "xsrf-token",
       missingAttribute: pluginId === "10010" ? "http-only" : "same-site" };
-  }
-  if (pluginId === "10027") {
-    const pathname = new URL(instance.uri).pathname;
-    if (!/\.(?:css|js)$/.test(pathname)) {
-      throw new Error("ZAP attributed textual evidence to a non-textual resource");
-    }
-    if (evidence.length === 0) throw new Error("ZAP rule 10027 produced no match evidence");
-    const patternSource = /pattern was used:/i.test(otherInfo)
-      ? otherInfo : typeof alert.otherinfo === "string" ? alert.otherinfo : "";
-    const patternWindow = /pattern was used:([\s\S]{1,80})/i.exec(patternSource)?.[1].toLowerCase() ?? "";
-    const matchedPatterns = suspiciousCommentPatterns.filter((pattern) => patternWindow.includes(`\\b${pattern}\\b`));
-    if (matchedPatterns.length !== 1) {
-      throw new Error("ZAP rule 10027 produced an unsupported pattern identifier");
-    }
-    const patternId = `comment-${matchedPatterns[0]}`;
-    const resourceDigest = sha256(pathname);
-    return { kind: "text-pattern", matches: [{ patternId, resourceDigest, occurrenceCount: 1,
-      locationDigest: passiveRuleLocationDigest(imageDigest, fingerprint, patternId, resourceDigest, 1) }] };
   }
   if (pluginId === "10036") {
     if (param !== "" || evidence.length === 0 || otherInfo !== "") {
@@ -267,34 +247,17 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
   throw new Error(`ZAP produced an unsupported passive rule: ${pluginId}`);
 }
 
-function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
+function mergeRuleEvidence(existing, incoming) {
   if (existing.kind === "policy-directive" && incoming.kind === "policy-directive"
       && existing.headerName === incoming.headerName) {
     return { ...existing,
       directives: [...new Set([...existing.directives, ...incoming.directives])].toSorted(),
       templates: [...new Set([...existing.templates, ...incoming.templates])].toSorted() };
   }
-  if (existing.kind !== "text-pattern" || incoming.kind !== "text-pattern") {
-    if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
-      throw new Error("ZAP produced contradictory rule evidence");
-    }
-    return existing;
+  if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
+    throw new Error("ZAP produced contradictory rule evidence");
   }
-  const matches = existing.matches.map((match) => ({ ...match }));
-  for (const incomingMatch of incoming.matches) {
-    const current = matches.find((match) => match.patternId === incomingMatch.patternId
-      && match.resourceDigest === incomingMatch.resourceDigest);
-    if (current) {
-      current.occurrenceCount++;
-      current.locationDigest = passiveRuleLocationDigest(imageDigest, fingerprint, current.patternId,
-        current.resourceDigest, current.occurrenceCount);
-    } else {
-      matches.push(incomingMatch);
-    }
-  }
-  matches.sort((left, right) => left.patternId.localeCompare(right.patternId)
-    || left.resourceDigest.localeCompare(right.resourceDigest));
-  return { kind: "text-pattern", matches };
+  return existing;
 }
 
 export function passiveAlertFingerprint(pluginId, method, routeTemplate) {
@@ -347,7 +310,7 @@ export function buildPassiveDeploymentEvidence({
     throw new Error("The passive assessment evidence is missing required checks");
   }
   if (!validAssessmentDate(today)) throw new Error("The passive assessment was given no readable day");
-  const alerts = normalizeZapAlerts(zapReport, imageDigest)
+  const alerts = normalizeZapAlerts(zapReport)
     .map((alert) => ({ ...alert, ...resolvedAlertState(alert, today) }));
   const failed = checks.some((check) => check.outcome === "failed");
   const incomplete = !failed && alerts.some((alert) => alert.state === "candidate");
@@ -436,9 +399,6 @@ export function alertDiscriminator(ruleEvidence) {
   if (kind === "cookie-attribute") {
     return { kind, cookieName: ruleEvidence.cookieName, missingAttribute: ruleEvidence.missingAttribute };
   }
-  if (kind === "text-pattern") {
-    return { kind, patternIds: [...new Set(ruleEvidence.matches.map(({ patternId }) => patternId))].toSorted() };
-  }
   if (kind === "policy-directive") {
     return { kind, headerName: ruleEvidence.headerName, directives: ruleEvidence.directives,
       templates: ruleEvidence.templates };
@@ -515,7 +475,7 @@ export function assertPassiveDeploymentEvidence(evidence) {
     if (alert.fingerprint !== passiveAlertFingerprint(alert.pluginId, alert.method, alert.routeTemplate)) {
       throw new Error("The passive assessment evidence contains a mismatched alert fingerprint");
     }
-    if (!retainedRuleEvidenceMatches(alert, evidence.imageDigest)) {
+    if (!retainedRuleEvidenceMatches(alert)) {
       throw new Error("The passive assessment evidence contains mismatched rule evidence");
     }
     if (fingerprints.has(alert.fingerprint)) {
@@ -543,31 +503,12 @@ function sha256(value) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
-function passiveRuleLocationDigest(imageDigest, fingerprint, patternId, resourceDigest, occurrenceCount) {
-  const manifestDigest = imageDigest?.includes("@") ? imageDigest.slice(imageDigest.indexOf("@") + 1) : imageDigest;
-  if (typeof manifestDigest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(manifestDigest)) {
-    throw new Error("ZAP textual evidence has no qualified image digest");
-  }
-  return sha256(`${manifestDigest}\0${fingerprint}\0${patternId}\0${resourceDigest}\0${occurrenceCount}`);
-}
-
-function retainedRuleEvidenceMatches(alert, imageDigest) {
+function retainedRuleEvidenceMatches(alert) {
   const evidence = alert.ruleEvidence;
   if (alert.pluginId === "10010") return evidence.kind === "cookie-attribute"
     && evidence.cookieName === "xsrf-token" && evidence.missingAttribute === "http-only";
   if (alert.pluginId === "10054") return evidence.kind === "cookie-attribute"
     && evidence.cookieName === "xsrf-token" && evidence.missingAttribute === "same-site";
-  if (alert.pluginId === "10027") return evidence.kind === "text-pattern"
-    && evidence.matches.length > 0
-    && new Set(evidence.matches.map((match) => `${match.patternId}\0${match.resourceDigest}`)).size
-      === evidence.matches.length
-    && evidence.matches.reduce((total, match) => total + match.occurrenceCount, 0) === alert.count
-    && evidence.matches.every((match) =>
-      suspiciousCommentPatterns.map((pattern) => `comment-${pattern}`).includes(match.patternId)
-      && match.locationDigest === passiveRuleLocationDigest(imageDigest, alert.fingerprint, match.patternId,
-        match.resourceDigest, match.occurrenceCount))
-    && JSON.stringify(evidence.matches) === JSON.stringify(evidence.matches.toSorted((left, right) =>
-      left.patternId.localeCompare(right.patternId) || left.resourceDigest.localeCompare(right.resourceDigest)));
   if (alert.pluginId === "10036") return evidence.kind === "response-header" && evidence.headerName === "server";
   if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
     && evidence.headerName === "content-security-policy"

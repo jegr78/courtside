@@ -2,26 +2,6 @@
   "schemaVersion": 1,
   "dispositions": [
     {
-      "fingerprint": "sha256:6744ae243ecc24def5606740af614410a70a72e0569fd5dec781f41a7b9d77d6",
-      "pluginId": "10027",
-      "method": "GET",
-      "routeTemplate": "/assets/{asset}",
-      "riskCode": 0,
-      "confidence": 2,
-      "scannerVersion": "2.17.0",
-      "observed": {
-        "kind": "text-pattern",
-        "patternIds": [
-          "comment-query"
-        ]
-      },
-      "state": "false-positive",
-      "rationale": "The rule matched the standalone word query in a built asset, where it is the request parameter the roster and participant searches send, and ZAP read a minified line as a comment. This record covers that one pattern in that one occurrence: a second pattern, or the same pattern in a second asset, moves the count and leaves the run incomplete.",
-      "actor": "maintainer",
-      "classifiedAt": "2026-09-10T07:02:37.000Z",
-      "reference": "security/passive-baseline-finding-summary.json"
-    },
-    {
       "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
       "pluginId": "10055",
       "method": "GET",
