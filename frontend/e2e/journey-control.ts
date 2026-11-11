@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
-import type { DatabaseLock, JourneyService, JourneyStart, PeerLoginAttempt, PeerLoginSubjects } from "./global-setup";
+import type { DatabaseLock, JourneyService, JourneyStart, PeerLoginAttempt, PeerLoginSubjects, ServedInterface } from "./global-setup";
 import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason, type FailedTest } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
@@ -15,7 +15,7 @@ export interface JourneyControlReference {
 
 interface JourneyCommand {
   operation: "pinnedBrowser" | "releasePinnedBrowser" | "browserDiagnostics" | "recordBrowserTest" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
-    | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart"
+    | "releaseLock" | "publishServiceWorkerUpdate" | "serveInterfaceBuild" | "reset" | "restart"
     | "peerLoginSubjects" | "failedLoginFromSecondPeer";
   browserName?: string;
   locale?: string;
@@ -30,6 +30,8 @@ interface JourneyCommand {
   testPosition?: number;
   phase?: string;
   start?: string;
+  variant?: string;
+  version?: string;
 }
 
 interface JourneyResponse {
@@ -143,6 +145,8 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
       return undefined;
     }
     case "publishServiceWorkerUpdate": return service.publishServiceWorkerUpdate();
+    case "serveInterfaceBuild": return service.serveInterfaceBuild(requiredString(command.variant, "variant"),
+      command.version === undefined ? undefined : requiredString(command.version, "version"));
     case "reset": return service.reset(journeyStart(command.start), optionalLanguage(command.language));
     case "restart": return service.restart();
     default: throw new Error("Unknown journey control operation");
@@ -241,6 +245,7 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
       };
     },
     publishServiceWorkerUpdate: () => command(reference, { operation: "publishServiceWorkerUpdate" }),
+    serveInterfaceBuild: (variant, version) => command<ServedInterface>(reference, { operation: "serveInterfaceBuild", variant, version }),
     reset: (start, language) => command(reference, { operation: "reset", start, language }),
     restart: () => command(reference, { operation: "restart" })
   };

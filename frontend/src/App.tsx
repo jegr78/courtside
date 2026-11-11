@@ -324,7 +324,7 @@ export function App() {
   const authenticated = session?.authenticated ?? false;
 
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
-    <PwaLifecycle />
+    <PwaLifecycle serverVersion={source?.version} />
     <RecoveryCodesNotice session={session} signedOut={signOut} />
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">

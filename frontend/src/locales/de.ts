@@ -1702,6 +1702,7 @@ const de = {
   "week.offline": "Der Belegungsplan kann offline nicht aktualisiert werden. Deine gespeicherten Buchungen bleiben im Bereich Meine Buchungen verfügbar.",
   "pwa.updateAvailable": "Courtside wurde aktualisiert. Lade die Seite neu, um die neue Version zu verwenden.",
   "pwa.update": "Neu laden",
+  "pwa.staleInterface": "Diese Seite zeigt Courtside {{interface}}, der Server läuft mit {{server}}. Lade die Seite neu, um die aktuelle Version zu verwenden.",
   "pwa.registrationFailed": "Offline-Nutzung und automatische Update-Hinweise sind auf diesem Gerät nicht verfügbar. Prüfe, ob Courtside über ein vertrauenswürdiges HTTPS-Zertifikat geladen wird, und lade die Seite neu.",
   "error.generic": "Das hat nicht funktioniert. Bitte versuche es erneut.",
   "error.pageDefect": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",

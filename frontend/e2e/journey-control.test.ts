@@ -17,6 +17,7 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     executeSql: vi.fn().mockResolvedValue("result"),
     holdDatabaseLock: vi.fn().mockResolvedValue(lock),
     publishServiceWorkerUpdate: vi.fn().mockResolvedValue(undefined),
+    serveInterfaceBuild: vi.fn().mockResolvedValue({ index: "index-a.js", adminRoutes: "AdminRoutes-a.js" }),
     reset: vi.fn().mockResolvedValue(undefined),
     restart: vi.fn().mockResolvedValue(undefined)
   };
@@ -34,6 +35,7 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     executeSql: calls.executeSql,
     holdDatabaseLock: calls.holdDatabaseLock,
     publishServiceWorkerUpdate: calls.publishServiceWorkerUpdate,
+    serveInterfaceBuild: calls.serveInterfaceBuild,
     reset: calls.reset,
     restart: calls.restart
   };
@@ -60,6 +62,8 @@ describe("journey control", () => {
       const waiters = await lock.waitForWaiters(2);
       await lock.release();
       await remote.publishServiceWorkerUpdate();
+      const served = await remote.serveInterfaceBuild("stale", "0.0.1");
+      const plain = await remote.serveInterfaceBuild("plain");
       await remote.reset("seeded", "en");
       await remote.restart();
 
@@ -85,6 +89,10 @@ describe("journey control", () => {
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
       expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking", expect.any(AbortSignal));
       expect(calls.publishServiceWorkerUpdate).toHaveBeenCalledOnce();
+      expect(served).toEqual({ index: "index-a.js", adminRoutes: "AdminRoutes-a.js" });
+      expect(plain).toEqual(served);
+      expect(calls.serveInterfaceBuild).toHaveBeenNthCalledWith(1, "stale", "0.0.1");
+      expect(calls.serveInterfaceBuild).toHaveBeenNthCalledWith(2, "plain", undefined);
       expect(calls.reset).toHaveBeenCalledOnce();
       expect(calls.restart).toHaveBeenCalledOnce();
     } finally {

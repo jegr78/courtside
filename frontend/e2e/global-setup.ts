@@ -25,6 +25,7 @@ import { startPayPalStub, type StartedPayPalStub } from "./paypal-stub";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
 import { runJourneyProcess } from "./process-command";
+import { buildInterface, type InterfaceBuild } from "./interface-builds";
 import {
   ApplicationLifecycle,
   applicationResourceCommand,
@@ -378,6 +379,11 @@ export interface PeerLoginAttempt {
   type: string;
 }
 
+export interface ServedInterface {
+  index: string;
+  adminRoutes: string;
+}
+
 export interface JourneyService {
   baseURL: string;
   plainBaseURL: string;
@@ -394,6 +400,7 @@ export interface JourneyService {
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
+  serveInterfaceBuild(variant: string, version?: string): Promise<ServedInterface>;
   reset(start?: JourneyStart, language?: string): Promise<void>;
   restart(): Promise<void>;
 }
@@ -569,6 +576,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   // As many lines as a container hands over, so both sides of a failed run read alike.
   const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
+  let interfaceDirectory: string | undefined;
   const journeyId = randomUUID();
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string; locale?: string }>();
   const browserLifecycle = new BrowserLifecycleRecorder();
@@ -734,6 +742,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
     staticDirectory = mkdtempSync(resolve(tmpdir(), "courtside-pwa-"));
     cpSync(resolve("dist"), staticDirectory, { recursive: true });
+    interfaceDirectory = mkdtempSync(resolve(tmpdir(), "courtside-interfaces-"));
+    const interfaceBuilds = new Map<string, Promise<InterfaceBuild>>();
     const resetStaticAssets = () => {
       rmSync(staticDirectory!, { recursive: true, force: true });
       cpSync(resolve("dist"), staticDirectory!, { recursive: true });
@@ -1044,6 +1054,16 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         appendFileSync(resolve(staticDirectory!, "sw.js"), `\nself.addEventListener("message",event=>{if(event.data==="COURTSIDE_TEST_VERSION")event.source.postMessage({courtsideVersion:2})});\n`);
         return Promise.resolve();
       },
+      serveInterfaceBuild: async (variant, version) => {
+        const key = `${variant}:${version ?? ""}`;
+        const pending = interfaceBuilds.get(key)
+          ?? buildInterface(variant, version, resolve(interfaceDirectory!, String(interfaceBuilds.size)));
+        interfaceBuilds.set(key, pending);
+        const build = await pending;
+        rmSync(staticDirectory!, { recursive: true, force: true });
+        cpSync(build.directory, staticDirectory!, { recursive: true });
+        return { index: build.index, adminRoutes: build.adminRoutes };
+      },
       reset: async (start, language) => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         resetStaticAssets();
@@ -1077,6 +1097,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           () => breachCheck?.close() ?? Promise.resolve(),
           () => {
             rmSync(staticDirectory!, { recursive: true, force: true });
+            rmSync(interfaceDirectory!, { recursive: true, force: true });
             return Promise.resolve();
           }
         ]);
@@ -1091,6 +1112,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       throw new AggregateError([error, cleanupError], "Journey startup and cleanup failed", { cause: cleanupError });
     } finally {
       if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
+      if (interfaceDirectory) rmSync(interfaceDirectory, { recursive: true, force: true });
     }
     throw error;
   }

@@ -272,3 +272,78 @@ test("a waiting service-worker update activates once and reloads one coherent ap
   await page.evaluate(() => navigator.serviceWorker.getRegistration().then((registration) => registration?.update()));
   await expect(page.getByTestId("pwa-update-prompt")).not.toBeVisible();
 });
+
+async function runningBundles(page: import("@playwright/test").Page) {
+  return page.evaluate(() => [...document.scripts].map((script) => new URL(script.src || location.href).pathname.split("/").pop() ?? "")
+    .filter((file) => /^index-.*\.js$/.test(file)));
+}
+
+function recordedBundles(page: import("@playwright/test").Page) {
+  const bundles: string[] = [];
+  page.on("request", (request) => {
+    const file = new URL(request.url()).pathname.split("/").pop() ?? "";
+    if (/^(index|AdminRoutes)-.*\.js$/.test(file)) bundles.push(file);
+  });
+  return bundles;
+}
+
+async function requestUpdate(page: import("@playwright/test").Page) {
+  await page.evaluate(() => navigator.serviceWorker.getRegistration().then((registration) => registration?.update()));
+}
+
+test("confirming the update notice runs the build the server ships, not an older one still waiting", async ({ context, page, journeyService }) => {
+  // given
+  await install(page);
+  await journeyService.serveInterfaceBuild("waiting");
+  await requestUpdate(page);
+  await expect(page.getByTestId("pwa-update-prompt"), "the first tab keeps the waiting build from activating").toBeVisible();
+  const shipped = await journeyService.serveInterfaceBuild("shipped");
+  let releaseInstall: () => void = () => undefined;
+  const installReleased = new Promise<void>((resolve) => { releaseInstall = resolve; });
+  await context.route((url) => url.pathname === `/assets/${shipped.index}`, async (route) => {
+    await installReleased;
+    await route.continue();
+  });
+  const later = await context.newPage();
+  await later.goto("/");
+  await expect(later.getByTestId("pwa-update-prompt")).toBeVisible();
+
+  // when
+  const loaded = recordedBundles(later);
+  const reloaded = later.waitForEvent("load");
+  await later.getByTestId("pwa-update").click();
+  releaseInstall();
+  await reloaded;
+
+  // then
+  await expect.poll(() => runningBundles(later), "the reload ends on the server's entry bundle").toEqual([shipped.index]);
+  await later.goto("/login");
+  await later.getByTestId("username").fill("configuration-admin");
+  await later.getByTestId("password").fill("temporary-password");
+  await later.getByTestId("login-submit").click();
+  await later.getByTestId("administration-link").click();
+  await expect(later.getByTestId("admin-shell")).toBeVisible();
+  await expect.poll(() => loaded).toContain(shipped.adminRoutes);
+  expect(new Set(loaded), "no bundle of an older build is loaded").toEqual(new Set([shipped.index, shipped.adminRoutes]));
+  await requestUpdate(later);
+  await expect(later.getByTestId("pwa-update-prompt"), "nothing newer waits").not.toBeVisible();
+});
+
+test("an interface of another version than the server reports both and ends on the server's interface", async ({ page, journeyService }) => {
+  // given
+  await journeyService.serveInterfaceBuild("stale", "0.0.1-stale");
+  await install(page);
+  const prompt = page.getByTestId("pwa-update-prompt");
+  await expect(prompt).toBeVisible();
+  await expect(prompt).toContainText("0.0.1-stale");
+  const current = await journeyService.serveInterfaceBuild("current");
+
+  // when
+  const reloaded = page.waitForEvent("load");
+  await page.getByTestId("pwa-update").click();
+  await reloaded;
+
+  // then
+  await expect.poll(() => runningBundles(page)).toEqual([current.index]);
+  await expect(prompt).not.toBeVisible();
+});

@@ -1704,6 +1704,7 @@ const en: Record<keyof typeof de, string> = {
   "week.offline": "The court plan cannot be refreshed offline. Your saved bookings remain available under My bookings.",
   "pwa.updateAvailable": "Courtside has been updated. Reload the page to use the new version.",
   "pwa.update": "Reload",
+  "pwa.staleInterface": "This page shows Courtside {{interface}} while the server runs {{server}}. Reload to use the current version.",
   "pwa.registrationFailed": "Offline use and automatic update notices are unavailable on this device. Check that Courtside uses a trusted HTTPS certificate, then reload the page.",
   "error.generic": "That did not work. Please try again.",
   "error.pageDefect": "The page sent a request Courtside cannot process. Reload the page and try again.",
