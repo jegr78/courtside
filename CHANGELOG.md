@@ -1,23 +1,5 @@
 # Changelog
 
-## [0.5.0-rc.2](https://github.com/jegr78/courtside/compare/v0.5.0-rc.1...v0.5.0-rc.2) (2026-11-11)
-
-
-### Bug fixes
-
-* correct the guest fee report, age-banded imports and the application shell ([#1924](https://github.com/jegr78/courtside/issues/1924)) ([1790f47](https://github.com/jegr78/courtside/commit/1790f4738a4640e351a1b2a2cecf054e0e73da7a))
-* keep external players' money reachable through closure, displacement and the ledger ([#1927](https://github.com/jegr78/courtside/issues/1927)) ([d9bd1f8](https://github.com/jegr78/courtside/commit/d9bd1f8650acd039be75967d9645444c5b38080d))
-* keep pages from shifting while their data loads ([#1944](https://github.com/jegr78/courtside/issues/1944)) ([74f06be](https://github.com/jegr78/courtside/commit/74f06be0617dac01cfd8f1c0b5f4ede7486c4bad))
-* name the categories an import refuses and mark an undecided one ([#1945](https://github.com/jegr78/courtside/issues/1945)) ([6ff76b6](https://github.com/jegr78/courtside/commit/6ff76b6483de4a5d07356c1af16653940c67ccb2))
-* replace the whole interface when the update notice is confirmed ([#1942](https://github.com/jegr78/courtside/issues/1942)) ([c8f1c31](https://github.com/jegr78/courtside/commit/c8f1c3175db0b9691c73e35306ecd13300f3870c))
-* say what the booking card's access and occupancy switches change ([#1946](https://github.com/jegr78/courtside/issues/1946)) ([8251b59](https://github.com/jegr78/courtside/commit/8251b596a959cfc8ec88f18b8dabecfad222250c))
-* update the frontend, build and deployment dependencies ([#1941](https://github.com/jegr78/courtside/issues/1941)) ([39c5ad8](https://github.com/jegr78/courtside/commit/39c5ad8dac45f9b527c31c60b38171b67f92808b))
-
-
-### Documentation
-
-* record that an external booker reads the members' door code from confirmation on ([#1923](https://github.com/jegr78/courtside/issues/1923)) ([e26b1d7](https://github.com/jegr78/courtside/commit/e26b1d7ae11cc433d51cc8c6eaea1c870c608c60))
-
 ## 0.5.0 (2026-11-09)
 
 ### Features
@@ -42,6 +24,13 @@
 
 ### Bug fixes
 
+* correct the guest fee report, age-banded imports and the application shell ([#1924](https://github.com/jegr78/courtside/issues/1924)) ([1790f47](https://github.com/jegr78/courtside/commit/1790f4738a4640e351a1b2a2cecf054e0e73da7a))
+* keep external players' money reachable through closure, displacement and the ledger ([#1927](https://github.com/jegr78/courtside/issues/1927)) ([d9bd1f8](https://github.com/jegr78/courtside/commit/d9bd1f8650acd039be75967d9645444c5b38080d))
+* keep pages from shifting while their data loads ([#1944](https://github.com/jegr78/courtside/issues/1944)) ([74f06be](https://github.com/jegr78/courtside/commit/74f06be0617dac01cfd8f1c0b5f4ede7486c4bad))
+* name the categories an import refuses and mark an undecided one ([#1945](https://github.com/jegr78/courtside/issues/1945)) ([6ff76b6](https://github.com/jegr78/courtside/commit/6ff76b6483de4a5d07356c1af16653940c67ccb2))
+* replace the whole interface when the update notice is confirmed ([#1942](https://github.com/jegr78/courtside/issues/1942)) ([c8f1c31](https://github.com/jegr78/courtside/commit/c8f1c3175db0b9691c73e35306ecd13300f3870c))
+* say what the booking card's access and occupancy switches change ([#1946](https://github.com/jegr78/courtside/issues/1946)) ([8251b59](https://github.com/jegr78/courtside/commit/8251b596a959cfc8ec88f18b8dabecfad222250c))
+* update the frontend, build and deployment dependencies ([#1941](https://github.com/jegr78/courtside/issues/1941)) ([39c5ad8](https://github.com/jegr78/courtside/commit/39c5ad8dac45f9b527c31c60b38171b67f92808b))
 * book cards without a role list only with a running membership ([#1882](https://github.com/jegr78/courtside/issues/1882)) ([6abc723](https://github.com/jegr78/courtside/commit/6abc7232f8086ba9b2bc73ad8b6e58a80aa10a6e))
 * bump lighthouse from 13.5.0 to 13.6.0 in /lighthouse ([#1874](https://github.com/jegr78/courtside/issues/1874)) ([c8ffa1a](https://github.com/jegr78/courtside/commit/c8ffa1a98b0a74b5583760c5b69c4a99834755da))
 * bump the deployment images, frontend packages, CI actions and the OpenAPI generator ([#1898](https://github.com/jegr78/courtside/issues/1898)) ([4d40d0e](https://github.com/jegr78/courtside/commit/4d40d0e735df03de0d9a418051c28cb30a994188))
@@ -52,6 +41,10 @@
 ### Performance
 
 * load the account area only when a member opens it ([#1884](https://github.com/jegr78/courtside/issues/1884)) ([d582269](https://github.com/jegr78/courtside/commit/d5822698344072e1457d3f30f3e705b56de8428e))
+
+### Documentation
+
+* record that an external booker reads the members' door code from confirmation on ([#1923](https://github.com/jegr78/courtside/issues/1923)) ([e26b1d7](https://github.com/jegr78/courtside/commit/e26b1d7ae11cc433d51cc8c6eaea1c870c608c60))
 
 ### Chores
 
