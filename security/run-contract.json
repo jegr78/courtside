@@ -12,14 +12,14 @@
       "expectedDuration": "up to 10 minutes"
     },
     "active": {
-      "durationSeconds": 1800,
+      "durationSeconds": 3600,
       "requests": 10000,
       "concurrency": 10,
       "generatedDataMegabytes": 100,
       "cpu": 4,
       "memoryMegabytes": 4096,
       "evidenceMegabytes": 100,
-      "expectedDuration": "up to 30 minutes"
+      "expectedDuration": "up to 60 minutes"
     },
     "destructive": {
       "durationSeconds": 900,

@@ -263,7 +263,7 @@ jobs:
     needs: assessment-runtime
     if: needs.assessment-runtime.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 140
     permissions:
       contents: read
     steps:
@@ -435,6 +435,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Record the job start
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -465,12 +467,17 @@ jobs:
           -Dmaven.test.redirectTestOutputToFile=true
           -Dsurefire.includesFile="$RUNNER_TEMP/backend-shard.txt"
           -Dcoverage.skip=true -DskipITs="$SKIP_INTEGRATION"
+      - name: Record suite metrics
+        if: always() && hashFiles('target/surefire-reports/*.xml') != ''
+        run: node tools/surefire-metrics.mjs target/surefire-reports target/surefire-reports/suite-metrics.json
       - name: Upload backend test evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: backend-test-evidence-${{ strategy.job-index }}-${{ github.run_id }}
-          path: target/surefire-reports/*.xml
+          path: |
+            target/surefire-reports/*.xml
+            target/surefire-reports/suite-metrics.json
           if-no-files-found: warn
           retention-days: 14
       - name: Upload backend coverage data
@@ -482,6 +489,19 @@ jobs:
             ${{ strategy.job-index == 0 && 'target/classes' || '' }}
           if-no-files-found: error
           retention-days: 1
+      - name: Measure timeout headroom
+        if: success()
+        env:
+          HEADROOM_LABEL: backend-${{ strategy.job-index }}
+        run: node tools/ci-headroom.mjs measure "$RUNNER_TEMP/headroom"
+      - name: Upload timeout headroom
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: headroom-backend-${{ strategy.job-index }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/headroom/headroom.json
+          if-no-files-found: error
+          retention-days: 14
 
   backend-coverage:
     needs: [test-profile-plan, backend]
@@ -639,10 +659,12 @@ jobs:
           - { label: webkit-accessibility-1, group: webkit-accessibility, shard: 1/2 }
           - { label: webkit-accessibility-2, group: webkit-accessibility, shard: 2/2 }
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
+      - name: Record the job start
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -679,6 +701,37 @@ jobs:
             frontend/test-results/browser-gate-outcome.json
           if-no-files-found: warn
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
+      - name: Measure timeout headroom
+        if: success()
+        env:
+          HEADROOM_LABEL: browser-${{ matrix.label }}
+        run: node tools/ci-headroom.mjs measure "$RUNNER_TEMP/headroom"
+      - name: Upload timeout headroom
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: headroom-browser-${{ matrix.label }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/headroom/headroom.json
+          if-no-files-found: error
+          retention-days: 14
+
+  timeout-headroom:
+    needs: [backend, browser]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: headroom-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/headroom
+      - name: Check timeout headroom
+        run: node tools/ci-headroom.mjs report "$RUNNER_TEMP/headroom"
 
   deployment:
     needs: [test-profile-plan, frontend]
