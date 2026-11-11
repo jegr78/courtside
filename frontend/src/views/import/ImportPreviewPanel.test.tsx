@@ -322,6 +322,26 @@ describe("ImportPreviewPanel", () => {
   });
 
   it.each([
+    ["de", "\"Passiv\" und \"passiv\""],
+    ["en", "\"Passiv\" and \"passiv\""]
+  ])("given categories the source does not map, when the file is refused in %s, then the refusal names each of them", async (language, expected) => {
+    // given
+    await i18n.changeLanguage(language);
+    vi.spyOn(api, "createImportPreview").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:import-snapshot-blocked", title: "Snapshot blocked", status: 400,
+      violations: [{ code: "import.snapshot.membershipType.unmapped", params: { values: ["Passiv", "passiv"] } }]
+    }));
+    show(undefined);
+
+    // when
+    await userEvent.upload(screen.getByTestId("snapshot-file"), new File(["1;Jane;Doe;Passiv\n"], "members.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+
+    // then
+    expect(await screen.findByTestId("snapshot-refusal"), "the board learns which values to map").toHaveTextContent(expected);
+  });
+
+  it.each([
     ["de", "Nicht zugeordnet und beim Import übersprungen: Spalte 4, Spalte 6"],
     ["en", "Not mapped and skipped on import: Column 4, Column 6"]
   ])("given a source read by position, when the preview names unmapped columns in %s, then each is named as a column", async (language, expected) => {

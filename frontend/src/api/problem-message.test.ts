@@ -48,6 +48,38 @@ for (const [language, expected] of [
 }
 
 for (const [language, expected] of [
+  ["en", "This source does not map these membership categories from the file yet: \"Passiv\" and \"passiv\"."],
+  ["de", "Diese Quelle ordnet folgende Mitgliedskategorien der Datei noch nicht zu: \"Passiv\" und \"passiv\"."]
+]) {
+  it(`given ${language}, when an unmapped-category refusal is resolved, then it names every value in quotes`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    const message = violationMessage("import.snapshot.membershipType.unmapped", { values: ["Passiv", "passiv"] }, i18n.t);
+
+    // then
+    expect(message, `the ${language} refusal names each category as the file spells it`).toBe(expected);
+  });
+}
+
+for (const [language, expected] of [
+  ["en", "These categories point to a membership type that is no longer offered: \"Youth\"."],
+  ["de", "Diese Kategorien verweisen auf eine nicht mehr angebotene Mitgliedsart: \"Youth\"."]
+]) {
+  it(`given ${language}, when an inactive-category refusal is resolved, then it names the value`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    const message = violationMessage("import.snapshot.membershipType.inactive", { values: ["Youth"] }, i18n.t);
+
+    // then
+    expect(message, `the ${language} refusal names the category`).toBe(expected);
+  });
+}
+
+for (const [language, expected] of [
   ["en", "€15.00"],
   ["de", "15,00 €"]
 ]) {
