@@ -48,8 +48,8 @@ for (const [language, expected] of [
 }
 
 for (const [language, expected] of [
-  ["en", "This source does not map these membership categories from the file yet: \u201cPassiv\u201d and \u201cpassiv\u201d."],
-  ["de", "Diese Quelle ordnet folgende Mitgliedskategorien der Datei noch nicht zu: \u201ePassiv\u201c und \u201epassiv\u201c."]
+  ["en", "This source does not map these membership categories from the file yet: \"Passiv\" and \"passiv\"."],
+  ["de", "Diese Quelle ordnet folgende Mitgliedskategorien der Datei noch nicht zu: \"Passiv\" und \"passiv\"."]
 ]) {
   it(`given ${language}, when an unmapped-category refusal is resolved, then it names every value in quotes`, async () => {
     // given
@@ -64,8 +64,8 @@ for (const [language, expected] of [
 }
 
 for (const [language, expected] of [
-  ["en", "These categories point to a membership type that is no longer offered: \u201cYouth\u201d."],
-  ["de", "Diese Kategorien verweisen auf eine nicht mehr angebotene Mitgliedsart: \u201eYouth\u201c."]
+  ["en", "These categories point to a membership type that is no longer offered: \"Youth\"."],
+  ["de", "Diese Kategorien verweisen auf eine nicht mehr angebotene Mitgliedsart: \"Youth\"."]
 ]) {
   it(`given ${language}, when an inactive-category refusal is resolved, then it names the value`, async () => {
     // given

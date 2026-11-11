@@ -44,7 +44,7 @@ export function failureReference(failure: unknown): string | undefined {
 
 export function violationMessage(code: string, params: Record<string, unknown>, t: Translate): string {
   const message = t(code, {
-    ...params, ...clockTimes(params), ...amounts(params), ...instants(params), ...lists(params, t), defaultValue: MISSING
+    ...params, ...clockTimes(params), ...amounts(params), ...instants(params), ...quotedValues(params, t), defaultValue: MISSING
   });
   if (message !== MISSING) return message;
   const unknown = t("error.unknownViolation");
@@ -73,12 +73,11 @@ function instants(params: Record<string, unknown>): Record<string, string> {
 }
 
 // Each value is quoted, so a spelling variant or a stray space stays visible in the sentence.
-function lists(params: Record<string, unknown>, t: Translate): Record<string, string> {
+function quotedValues(params: Record<string, unknown>, t: Translate): Record<string, string> {
+  const { values } = params;
+  if (!Array.isArray(values) || !values.every((value) => typeof value === "string")) return {};
   const locale = i18n.resolvedLanguage ?? i18n.language;
-  const format = new Intl.ListFormat(locale, { type: "conjunction" });
-  return Object.fromEntries(Object.entries(params)
-    .filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].every((item) => typeof item === "string"))
-    .map(([name, values]) => [name, format.format(values.map((value) => t("list.quoted", { value })))]));
+  return { values: new Intl.ListFormat(locale, { type: "conjunction" }).format(values.map((value) => t("list.quoted", { value }))) };
 }
 
 function clockTimes(params: Record<string, unknown>): Record<string, string> {

@@ -322,8 +322,8 @@ describe("ImportPreviewPanel", () => {
   });
 
   it.each([
-    ["de", "\u201ePassiv\u201c und \u201epassiv\u201c"],
-    ["en", "\u201cPassiv\u201d and \u201cpassiv\u201d"]
+    ["de", "\"Passiv\" und \"passiv\""],
+    ["en", "\"Passiv\" and \"passiv\""]
   ])("given categories the source does not map, when the file is refused in %s, then the refusal names each of them", async (language, expected) => {
     // given
     await i18n.changeLanguage(language);
