@@ -410,6 +410,53 @@ class CreditLedgerTest extends AbstractIntegrationTest {
         assertThat(entries(johnAccount)).isEqualTo(1);
     }
 
+    @Test
+    void givenAKeyRecordedForAnotherAccountButNotYetCommitted_whenTheSameKeyArrives_thenItIsRefusedAsAnotherRequest()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.EXTERNAL));
+        CountDownLatch firstWritten = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // when
+        try {
+            Future<Integer> first = pool.submit(() -> transactions.execute(status -> {
+                int recorded = recordedStatus(janeAccount);
+                firstWritten.countDown();
+                await(releaseFirst);
+                return recorded;
+            }));
+            assertThat(firstWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<ResultActions> second = pool.submit(() ->
+                    record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-race"));
+            Thread.sleep(500);
+            boolean secondWaited = !second.isDone();
+            releaseFirst.countDown();
+
+            // then
+            assertThat(secondWaited).as("the second insert waits on the uncommitted key").isTrue();
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(201);
+            second.get(10, TimeUnit.SECONDS)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"));
+        } finally {
+            releaseFirst.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(entries(johnAccount)).as("the refused request leaves no entry").isZero();
+    }
+
+    private int recordedStatus(UUID account) {
+        try {
+            return record("miles.richard", account, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-race")
+                    .andReturn().getResponse().getStatus();
+        } catch (Exception failed) {
+            throw new IllegalStateException(failed);
+        }
+    }
+
     private org.springframework.test.web.servlet.RequestBuilder search(String query, UserDetails treasurer) {
         return post("/api/treasury/credit/account-search").with(user(treasurer)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"query\":\"%s\"}".formatted(query));
