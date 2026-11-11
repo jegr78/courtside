@@ -473,8 +473,8 @@ the reconciliation job, and confirms a booking only after it holds the captured 
    currency stored with the booking, and return and cancel addresses built from the instance's
    public address. The request carries the booking id and nothing else, so the client never names
    an amount.
-   The order is stored in `paypal_order` with the environment it was created in and audited as
-   `payment.paypal.order.created`; calling again for the same booking answers the stored order.
+   The order is stored in `paypal_order` with the environment it was created in and the SHA-256
+   fingerprint of the client id that created it, and audited as `payment.paypal.order.created`; calling again for the same booking answers the stored order.
    Without a public address the request is refused with `payment.paypal.publicUrlMissing`.
 3. The browser goes to PayPal's approve link and comes back to the shell routes
    `/payment/paypal/return` or `/payment/paypal/cancel` with the order id. A payer whose session
@@ -482,8 +482,8 @@ the reconciliation job, and confirms a booking only after it holds the captured 
 4. The return calls `POST /api/payments/paypal/orders/{orderId}/capture`. Courtside first reads the
    order at PayPal and checks `custom_id`, amount, currency and status `APPROVED`; a mismatch marks
    the order `REJECTED`, releases the booking and moves no money. A booking that is no longer held
-   or has started is never charged: without an earlier capture attempt its order is voided and the
-   return answers `REJECTED`. Otherwise it stamps `capture_attempted_at` in a short transaction of
+   or has started is never charged: its order is voided and the return answers `REJECTED`, also
+   when an earlier capture attempt timed out. Otherwise it stamps `capture_attempted_at` in a short transaction of
    its own and asks PayPal to capture, with the order id as `PayPal-Request-Id`. Only after PayPal
    answered does one transaction lock the order row, the booking grid and the booking, confirm the
    booking and append `PAYPAL_PAYMENT` and `BOOKING_DEBIT` of the amount, so the balance stays as it
@@ -499,16 +499,24 @@ Capture and cancel answer one of four outcomes. `CONFIRMED` means the booking is
 amount differed: the booking stays released and the amount is appended to the booker's credit as
 `PAYPAL_LATE_CAPTURE` and audited as `payment.paypal.lateCapture`, so money is never neither a
 booking nor credit. When the account was anonymised or the club currency changed since, the order is
-marked `LATE_CAPTURED` without credit and the audit says so, for the treasurer to return it.
-`REJECTED` means no money moved and the court is free: PayPal declined, the order did not match or
-the payer turned back. `PROCESSING` means the outcome is not known yet, because PayPal did not
-answer, the capture timed out, a capture is still pending at PayPal or the credentials are no longer
-active; the order stays open and the court stays held for the reconciliation. A PayPal refusal with
-HTTP 409, `DUPLICATE_REQUEST_ID` or `PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a
-decline. Every order endpoint answers only the signed-in booker; another account's order is not
+marked `LATE_CAPTURED` without credit and the audit says so, for the treasurer to return it. A
+capture PayPal shows as partly refunded, which only a refund in the club's PayPal account causes,
+releases its booking and becomes `LATE_CAPTURED` with the captured amount less the refunds PayPal
+lists as completed as credit. While PayPal lists such a refund as still pending, the club's share is
+not known yet, so the order is marked without credit for the treasurer. The audit's `reason` tells
+the cases apart: `HOLD_ENDED`, `CAPTURE_DIFFERS`, `PARTLY_REFUNDED` or `REFUND_PENDING`.
+`REJECTED` means no money moved and the court is free: PayPal declined, PayPal shows the capture fully
+refunded, the order did not match or the payer turned back. `PROCESSING` means the outcome is not
+known yet, because PayPal did not answer, the capture timed out, the request used up the 30 seconds
+it may spend on all its PayPal calls together or has less than one request timeout of it left
+before a capture, a capture is still pending at PayPal or the
+credentials are no longer active; the order stays open and the court stays held for the
+reconciliation. A PayPal refusal with HTTP 409, `DUPLICATE_REQUEST_ID` or
+`PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a decline. Every order endpoint answers only the signed-in booker; another account's order is not
 found.
 
-`PayPalReconciliation` runs every 60 seconds. Each run reads at PayPal up to 50 open orders older
+`PayPalReconciliation` runs every 60 seconds on a thread of its own, so a slow PayPal never holds up
+the other scheduled jobs such as the mail outbox. Each run reads at PayPal up to 50 open orders older
 than five minutes, longest unchecked first, and in addition every open order whose booking is past
 its deadline. A capture found is recorded through the same locked
 transition as the return. An `APPROVED` order is captured while its booking is still pending, also
@@ -524,7 +532,7 @@ order as merely approved again, or its booking has started, the job voids it loc
 PayPal. A capture that completes after the booking's start never confirms it and becomes credit as
 well. For 72 hours the job also rereads voided orders whose capture was attempted, at most once per five minutes each, and records a
 capture PayPal completed after all as a late capture. A run stops after three consecutive orders
-PayPal does not answer. A hold therefore ends at its deadline plus at most one run while PayPal
+PayPal does not answer, a capture PayPal does not answer included. A hold therefore ends at its deadline plus at most one run while PayPal
 answers clearly, and in every case at the earlier of 24 hours past its deadline and the
 booking's start.
 
@@ -533,7 +541,8 @@ open orders of the former credentials after the change commits. An order without
 cannot have moved money, so it is voided and its booking released without asking PayPal. One with
 an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
-environment it was created in, and sandbox credentials work on every instance.
+environment and the client id fingerprint it was created with, and sandbox credentials work on every
+instance.
 
 #### Returning a PayPal payment
 
@@ -543,8 +552,12 @@ account's PayPal payments and says for each whether it can be returned, and why 
 A payment can be returned when its order is `CAPTURED` and its booking was cancelled with a
 `BOOKING_REFUND`, or `LATE_CAPTURED` and credited with a `PAYPAL_LATE_CAPTURE`; when the order has
 no refund in any status; when the payer's balance still covers the amount of the order's credit
-entry; and when PayPal is on with the environment the order was created in. Otherwise
+entry; and when PayPal is on with the environment and the client id the order was created with,
+because another PayPal account cannot see the payment. An order from before Courtside kept the
+fingerprint is matched by its environment alone, unless the upgrade tied it to the client id then
+stored, which it does for an order of that environment created after the stored secret. Otherwise
 `POST /api/treasury/paypal/refunds` refuses it with `payment.paypal.refund.notRefundable`,
+`payment.paypal.refund.notCredited` for a late capture Courtside kept no credit for,
 `payment.paypal.refund.alreadyRefunded`, `payment.paypal.refund.creditSpent` with amount, balance
 and currency, or `payment.paypal.refund.unavailable`, and writes nothing. The request needs a
 recent authentication.
@@ -578,7 +591,9 @@ refund `PENDING` with its credit taken.
 `PayPalReconciliation` also resolves `PENDING` refunds older than five minutes, up to 50 per run and
 longest unchecked first: one without a PayPal refund id is requested again with the same request id
 after reading the order, one with an id is read at PayPal, and the answer is recorded as in step 3.
-These calls count towards the run's stop after three unanswered reads. A refund that stays unclear
+These calls count towards the run's stop after three unanswered reads. A pending refund whose order
+another PayPal account created than the one now stored is not asked again and stays pending. A
+refund that stays unclear
 keeps its credit taken, and the treasurer page shows it as unclear with the advice to check the
 PayPal account.
 

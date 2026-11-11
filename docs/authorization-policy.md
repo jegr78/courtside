@@ -548,11 +548,11 @@ Negative tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.jav
 
 ### Outsider account closure
 
-Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended and no credit balance; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking or a credit balance is refused without any change.
+Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.
 
 Attributes: `current-account`, `role`, `current-membership`.
 
-Production: `src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn`, `src/main/java/org/courtside/identity/internal/AccountAnonymiser.java#anonymise`, `src/main/java/org/courtside/booking/internal/OwnUpcomingBookings.java#heldBy`, `src/main/java/org/courtside/credit/internal/LedgerBalances.java#heldBy`.
+Production: `src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn`, `src/main/java/org/courtside/identity/internal/AccountAnonymiser.java#anonymise`, `src/main/java/org/courtside/booking/internal/OwnUpcomingBookings.java#heldBy`, `src/main/java/org/courtside/payment/internal/PayPalPaymentsInFlight.java#moneyHeldBy`.
 
 Positive tests: `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutABooking_whenTheyCloseTheirAccount_thenNothingOfThemRemainsAndTheyCannotSignIn`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWhoseBookingHasEnded_whenTheyCloseTheirAccount_thenItCloses`.
 

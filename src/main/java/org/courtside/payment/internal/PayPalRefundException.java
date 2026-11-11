@@ -20,6 +20,10 @@ class PayPalRefundException extends CodedDomainFailure {
         return new PayPalRefundException(PayPalRefunds.NOT_REFUNDABLE, Map.of());
     }
 
+    static PayPalRefundException notCredited() {
+        return new PayPalRefundException(PayPalRefunds.NOT_CREDITED, Map.of());
+    }
+
     static PayPalRefundException alreadyRefunded() {
         return new PayPalRefundException(PayPalRefunds.ALREADY_REFUNDED, Map.of());
     }

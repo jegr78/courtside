@@ -16,16 +16,6 @@ class LedgerBalances implements HeldCredit {
     private final JdbcClient jdbc;
 
     @Override
-    @Transactional(readOnly = true)
-    public boolean heldBy(UUID accountId) {
-        return accountId != null && jdbc.sql("""
-                        SELECT EXISTS (SELECT 1 FROM credit_entry WHERE account_id = :account
-                                       GROUP BY currency HAVING sum(amount_minor) <> 0)
-                        """)
-                .param("account", accountId).query(Boolean.class).single();
-    }
-
-    @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(UUID accountId) {
         if (accountId == null) {

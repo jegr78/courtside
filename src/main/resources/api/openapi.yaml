@@ -4309,6 +4309,7 @@ components:
       type: string
       enum:
         - payment.paypal.refund.notRefundable
+        - payment.paypal.refund.notCredited
         - payment.paypal.refund.alreadyRefunded
         - payment.paypal.refund.creditSpent
         - payment.paypal.refund.unavailable
@@ -9065,10 +9066,13 @@ paths:
         Takes the credit the payment left behind off the payer's balance and asks PayPal to refund the
         capture in full. A payment whose order was not captured, whose booking was not cancelled or
         that never became credit is refused with `payment.paypal.refund.notRefundable`; a payment
+        PayPal took after the hold ended that Courtside kept no credit for, with
+        `payment.paypal.refund.notCredited`; a payment
         returned before, in any status, with `payment.paypal.refund.alreadyRefunded`; a balance that no
         longer covers the amount with `payment.paypal.refund.creditSpent`. Each of these answers
         `urn:courtside:error:paypal-refund-refused`. PayPal switched off, or an order of the other
-        environment, answers `urn:courtside:error:paypal-refund-unavailable` and takes nothing.
+        environment or of another PayPal client id, answers `urn:courtside:error:paypal-refund-unavailable`
+        and takes nothing.
 
         `COMPLETED` means PayPal returned the money. `FAILED` means PayPal refused the refund, the
         credit is restored and `failureReason` carries PayPal's reason; a failed refund is final.

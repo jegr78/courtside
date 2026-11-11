@@ -2,8 +2,10 @@ package org.courtside.payment;
 
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.BookingPayments;
 import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
@@ -20,8 +22,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -29,6 +33,7 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -44,6 +49,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.courtside.payment.FakePayPal.CAPTURE;
 import static org.courtside.payment.FakePayPal.CREATE;
 import static org.courtside.payment.FakePayPal.ORDER;
@@ -142,6 +151,37 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
                 Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
         assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
         assertThat(captureAttempted()).as("the attempt is stored before the capture is sent").isTrue();
+    }
+
+    @Test
+    void givenACaptureWhoseRecordFailed_whenTheJobRunsNext_thenTheBookingIsConfirmedWithOnePayment() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        doThrow(new UncategorizedSQLException("pay by PayPal", "INSERT INTO credit_entry",
+                new SQLException("ledger write failed", "XX000")))
+                .doCallRealMethod().when(AopTestUtils.<BookingPayments>getUltimateTargetObject(bookingPayments))
+                .payByPayPal(any(), any(), anyString(), anyInt(), any());
+        captureRequest().andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:internal-error"));
+        assertThat(orderStatus()).as("the failed record rolled back").isEqualTo("CREATED");
+        assertThat(captureAttempted()).isTrue();
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
+        age(Duration.ofMinutes(6));
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("the money PayPal holds is recorded, not captured again").hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(orderStatus()).isEqualTo("CAPTURED");
+        assertThat(entries(booking)).containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+        assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
     }
 
     @Test
@@ -253,6 +293,74 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
                 .as("an outage costs a run at most three PayPal calls").isEqualTo(3);
         assertThat(jdbc.sql("SELECT count(*) FROM paypal_order WHERE status = 'CREATED'").query(Integer.class).single())
                 .isEqualTo(5);
+    }
+
+    @Test
+    void givenACaptureWithoutAnAnswer_whenTwoMoreOrdersGoUnanswered_thenTheRunStopsBeforeTheNext() throws Exception {
+        // given
+        captureThenThreeUnreadableOrders(503, UNAVAILABLE);
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERB"))).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERC"))).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERD"))).as("a capture PayPal did not answer counts towards the outage")
+                .isEmpty();
+    }
+
+    @Test
+    void givenACaptureStillInProgressAtPayPal_whenTwoMoreOrdersGoUnanswered_thenTheRunGoesOn() throws Exception {
+        // given
+        captureThenThreeUnreadableOrders(409, "{\"name\":\"RESOURCE_CONFLICT\",\"message\":\"in progress\"}");
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).hasSize(1);
+        assertThat(PAYPAL.seen(readOf("ORDERD"))).as("PayPal answered the capture, so it is no outage").hasSize(1);
+    }
+
+    @Test
+    void givenASlowPayPal_whenTheSchedulerTicksTwice_thenOneRunLeavesTheSchedulerThreadAtOnce() throws Exception {
+        // given
+        storeAttemptedOrder("ORDERA", "EUR");
+        PAYPAL.reply(readOf("ORDERA"), 503, UNAVAILABLE);
+        CountDownLatch held = PAYPAL.holdFirst(readOf("ORDERA"));
+        Instant unchecked = orderUpdatedAt("ORDERA");
+
+        // when
+        reconciliation.poll();
+        Instant whenTheTickReturned = orderUpdatedAt("ORDERA");
+        reconciliation.poll();
+
+        // then
+        assertThat(whenTheTickReturned).as("the tick returned before the run read PayPal").isEqualTo(unchecked);
+        awaitRequest(readOf("ORDERA"));
+        held.countDown();
+        awaitChecked("ORDERA");
+        assertThat(PAYPAL.seen(readOf("ORDERA"))).as("a tick during a busy run starts no second run").hasSize(1);
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void givenARunThatFails_whenTheSchedulerTicks_thenTheFailureIsLogged(CapturedOutput output) throws Exception {
+        // given
+        doThrow(new IllegalStateException("the pending bookings cannot be read"))
+                .when(AopTestUtils.<PendingPayments>getUltimateTargetObject(pendingPayments)).expiredAt(any());
+
+        // when
+        reconciliation.poll();
+
+        // then
+        for (int attempt = 0; attempt < 500 && !output.getOut().contains("PayPal reconciliation run failed"); attempt++) {
+            Thread.sleep(10);
+        }
+        assertThat(output.getOut()).as("a failed run reaches the log with its cause")
+                .contains("PayPal reconciliation run failed").contains("the pending bookings cannot be read");
     }
 
     @Test
@@ -747,6 +855,27 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAVoidedOrderWithACaptureAttempt_whenPayPalShowsTheCapturePartlyRefunded_thenTheRestBecomesCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, null));
+        cancel().andExpect(jsonPath("$.outcome").value("REJECTED"));
+        age(Duration.ofMinutes(6));
+        PAYPAL.replaceReply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "5.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1000));
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("PARTLY_REFUNDED"));
+    }
+
+    @Test
     void givenAVoidedOrderWithoutACaptureAttempt_whenTheJobRuns_thenPayPalIsNotAsked() throws Exception {
         // given
         UUID booking = bookWithOrder();
@@ -971,6 +1100,29 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     private void expire(UUID booking, Duration ago) {
         jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
                 .param("at", Timestamp.from(clock.instant().minus(ago))).param("id", booking).update();
+    }
+
+    private void captureThenThreeUnreadableOrders(int captureStatus, String captureBody) throws Exception {
+        UUID booking = bookWithOrder();
+        age(Duration.ofHours(2));
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, captureStatus, captureBody);
+        for (String orderId : List.of("ORDERB", "ORDERC", "ORDERD")) {
+            storeAttemptedOrder(orderId, "EUR");
+            PAYPAL.reply(readOf(orderId), 503, UNAVAILABLE);
+        }
+    }
+
+    private void awaitChecked(String orderId) throws InterruptedException {
+        for (int attempt = 0; attempt < 500 && !clock.instant().equals(orderUpdatedAt(orderId)); attempt++) {
+            Thread.sleep(10);
+        }
+        assertThat(orderUpdatedAt(orderId)).as("the run finished on its own thread").isEqualTo(clock.instant());
+    }
+
+    private Instant orderUpdatedAt(String orderId) {
+        return jdbc.sql("SELECT updated_at FROM paypal_order WHERE order_id = :order").param("order", orderId)
+                .query(Timestamp.class).single().toInstant();
     }
 
     private void storeAttemptedOrder(String orderId, String currency) {

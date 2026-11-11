@@ -31,7 +31,7 @@ class PayPalConnectionCheckTest {
         // given
         URI endpoint = serve(200, "{}", Duration.ofSeconds(5));
         PayPalConnectionCheck check = connectionCheck(
-                new PayPalProperties(endpoint, endpoint, Duration.ofMillis(300)));
+                new PayPalProperties(endpoint, endpoint, Duration.ofMillis(300), Duration.ofSeconds(30)));
 
         // when
         PayPalConnectionCheck.Result result = check.check(PayPalEnvironment.SANDBOX, "client", "secret");
@@ -49,7 +49,7 @@ class PayPalConnectionCheckTest {
             port = socket.getLocalPort();
         }
         URI closed = URI.create("http://127.0.0.1:" + port);
-        PayPalConnectionCheck check = connectionCheck(new PayPalProperties(closed, closed, Duration.ofSeconds(2)));
+        PayPalConnectionCheck check = connectionCheck(new PayPalProperties(closed, closed, Duration.ofSeconds(2), Duration.ofSeconds(30)));
 
         // when / then
         assertThat(check.check(PayPalEnvironment.LIVE, "client", "secret").outcome())
@@ -61,7 +61,7 @@ class PayPalConnectionCheckTest {
         // given
         URI endpoint = serve(503, "<html>\u001b[31mmaintenance " + "x".repeat(500) + "</html>", Duration.ZERO);
         PayPalConnectionCheck check = connectionCheck(
-                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
+                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2), Duration.ofSeconds(30)));
 
         // when
         PayPalConnectionCheck.Result result = check.check(PayPalEnvironment.SANDBOX, "client", "secret");
@@ -77,7 +77,7 @@ class PayPalConnectionCheckTest {
         URI endpoint = serve(400, "{\"error\":\"invalid_request\",\"error_description\":\"bad\\u0007 " + "y".repeat(500)
                 + "\"}", Duration.ZERO);
         PayPalConnectionCheck check = connectionCheck(
-                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
+                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2), Duration.ofSeconds(30)));
 
         // when
         String reason = check.check(PayPalEnvironment.SANDBOX, "client", "secret").providerReason();
@@ -101,7 +101,7 @@ class PayPalConnectionCheckTest {
         server.start();
         URI endpoint = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
         PayPalConnectionCheck check = connectionCheck(
-                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
+                new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2), Duration.ofSeconds(30)));
 
         // when
         PayPalConnectionCheck.Result result = check.check(PayPalEnvironment.SANDBOX, "client", "secret");

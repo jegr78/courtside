@@ -969,7 +969,7 @@
       "failurePaths": [
         "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
         "A missing recent authentication, a payment that was not captured, not cancelled or not credited back, a payment returned before and a balance that no longer covers the amount are refused before anything is written.",
-        "PayPal switched off or an order of the other environment is refused as unavailable and takes nothing.",
+        "PayPal switched off or an order of the other environment or of another PayPal client id is refused as unavailable and takes nothing.",
         "No answer, a timeout, 429, 5xx, 409, a duplicate or in-progress request, an unreadable answer, a refused or unusable token, a 401 or 403 on the refund and a malformed capture id leave the refund pending with its credit taken."
       ],
       "productionPaths": [
@@ -1011,7 +1011,7 @@
         "cancelPayPalOrder"
       ],
       "backgroundEntryPoints": [
-        "PayPalReconciliation#run"
+        "PayPalReconciliation#poll"
       ],
       "stateTransitions": [
         "The booker of a pending booking creates one PayPal order carrying the booking id and the amount stored with the booking, and one audit entry.",

@@ -6,8 +6,10 @@ import org.courtside.payment.internal.PayPalCheckout.Outcome;
 import org.courtside.payment.internal.PayPalOrders.Status;
 import org.courtside.payment.internal.PayPalOrders.StoredOrder;
 import org.courtside.payment.internal.PayPalRefunds.RefundStatus;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -36,11 +38,13 @@ public class PayPalReconciliation {
     private final PayPalRefunds refunds;
     private final PayPalRefundStore refundStore;
     private final Clock clock;
+    private final TaskExecutor executor;
     private final Duration reconcileAfter;
     private final Duration unresolvedReleaseAfter;
 
     PayPalReconciliation(PayPalOrders orders, PayPalCheckout checkout, PendingPayments pendingPayments,
                          PayPalRefunds refunds, PayPalRefundStore refundStore, Clock clock,
+                         @Qualifier("payPalReconciliationExecutor") TaskExecutor executor,
                          @Value("${courtside.payment.paypal.reconcile-after}") Duration reconcileAfter,
                          @Value("${courtside.payment.paypal.unresolved-release-after}")
                          Duration unresolvedReleaseAfter) {
@@ -50,12 +54,24 @@ public class PayPalReconciliation {
         this.refunds = refunds;
         this.refundStore = refundStore;
         this.clock = clock;
+        this.executor = executor;
         this.reconcileAfter = reconcileAfter;
         this.unresolvedReleaseAfter = unresolvedReleaseAfter;
     }
 
+    /** Starts a run on the job's own thread, so a slow PayPal never holds the scheduler other jobs share. */
     @Scheduled(initialDelay = 30, timeUnit = TimeUnit.SECONDS,
             fixedDelayString = "${courtside.payment.paypal.reconcile-interval}")
+    public void poll() {
+        executor.execute(() -> {
+            try {
+                run();
+            } catch (RuntimeException failed) {
+                log.error("PayPal reconciliation run failed and retries on the next tick", failed);
+            }
+        });
+    }
+
     public void run() {
         Instant now = clock.instant();
         Set<String> due = new LinkedHashSet<>(orders.openSince(now.minus(reconcileAfter), PAGE_SIZE));
@@ -98,8 +114,8 @@ public class PayPalReconciliation {
             }
         }
         if (unreachable.outage()) {
-            log.warn("PayPal did not answer {} reads in a row; the remaining orders and refunds wait for the next"
-                    + " run", OUTAGE_AFTER);
+            log.warn("PayPal did not answer {} requests in a row; the remaining orders and refunds wait for the"
+                    + " next run", OUTAGE_AFTER);
         }
     }
 
