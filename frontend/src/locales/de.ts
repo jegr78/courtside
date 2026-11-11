@@ -891,7 +891,7 @@ const de = {
   "admin.facility.externalPriceHelp": "Gilt für Buchungen nach der Änderung. Andere Dauern kosten anteilig, bestehende Buchungen behalten ihren Betrag.",
   "admin.facility.showGenericOccupancy": "Im Platzplan neutral als gebucht anzeigen",
   "admin.facility.grantsAccess": "Buchungen erhalten den Zugangscode",
-  "admin.facility.grantsAccessHint": "Wer an einer Buchung mit dieser Karte teilnimmt, sieht den Zugangscode unter Meine Buchungen.",
+  "admin.facility.grantsAccessHint": "Wer mit eigenem Konto an einer Buchung mit dieser Karte teilnimmt, sieht unter Meine Buchungen den Zugangscode der Zugänge zu ihrem Platz, sofern ein Zugang dorthin einen Code hat.",
   "admin.facility.grantsAccessClosure": "Eine Platzsperrung erhält nie einen Zugangscode.",
   "admin.facility.signalsOccupancy": "Buchungen gelten für die Gebäudesteuerung als belegt",
   "admin.facility.signalsOccupancyHint": "Flutlicht- oder Bewässerungssteuerungen, die Courtside fragen, sehen den Platz während der Buchung als belegt.",

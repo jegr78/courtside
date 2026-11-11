@@ -55,7 +55,7 @@ describe("AdminBookingCardsView", () => {
     show();
 
     // then
-    expect(await screen.findByTestId("new-card-grants-access-hint"), "the access switch names where the code appears").toHaveTextContent("sees the access code under My bookings");
+    expect(await screen.findByTestId("new-card-grants-access-hint"), "the access switch names where the code appears").toHaveTextContent("see the access code of the access points to its court under My bookings");
     expect(screen.getByTestId("new-card-signals-occupancy-hint"), "the occupancy switch names who asks").toHaveTextContent("see the court as occupied");
   });
 

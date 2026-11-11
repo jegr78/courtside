@@ -893,7 +893,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.externalPriceHelp": "Applies to bookings made after the change. Other durations cost proportionally, existing bookings keep their amount.",
   "admin.facility.showGenericOccupancy": "Show as neutrally booked in the court plan",
   "admin.facility.grantsAccess": "Bookings receive the access code",
-  "admin.facility.grantsAccessHint": "Everyone taking part in a booking with this card sees the access code under My bookings.",
+  "admin.facility.grantsAccessHint": "Players with an account who take part in a booking with this card see the access code of the access points to its court under My bookings, provided an access point there has a code.",
   "admin.facility.grantsAccessClosure": "A court closure never receives an access code.",
   "admin.facility.signalsOccupancy": "Bookings count as occupied for building automation",
   "admin.facility.signalsOccupancyHint": "Floodlight or irrigation controls that ask Courtside see the court as occupied during the booking.",
