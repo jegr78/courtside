@@ -121,8 +121,8 @@ function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, fe
         <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
         <AmountField kind="guestFee" testId="new-card-guest-fee" disabled={disabled} {...fee} />
         {price && <AmountField kind="externalPrice" testId="new-card-external-price" disabled={disabled} {...price} />}
-        <Checkbox disabled={disabled} name="grantsAccess" data-testid="new-card-grants-access" label={t("admin.facility.grantsAccess")} />
-        <Checkbox disabled={disabled} name="signalsOccupancy" data-testid="new-card-signals-occupancy" defaultChecked label={t("admin.facility.signalsOccupancy")} />
+        <Checkbox disabled={disabled} name="grantsAccess" data-testid="new-card-grants-access" label={t("admin.facility.grantsAccess")} hint={t("admin.facility.grantsAccessHint")} />
+        <Checkbox disabled={disabled} name="signalsOccupancy" data-testid="new-card-signals-occupancy" defaultChecked label={t("admin.facility.signalsOccupancy")} hint={t("admin.facility.signalsOccupancyHint")} />
       </BookingRules>
     </div>
     <Button variant="primary" data-testid="create-card" disabled={disabled} className="justify-self-start" type="submit">{t("admin.create")}</Button>

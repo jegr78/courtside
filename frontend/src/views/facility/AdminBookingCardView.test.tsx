@@ -354,6 +354,18 @@ describe("AdminBookingCardView", () => {
     await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ grantsAccess: true })));
   });
 
+  it("given an ordinary card, when the page loads, then each switch says what it changes for a booking", async () => {
+    // when
+    show();
+    await screen.findByTestId("card-label");
+
+    // then
+    expect(screen.getByTestId("card-grants-access-hint"), "the access switch names where the code appears").toHaveTextContent("sees the access code under My bookings");
+    expect(screen.getByTestId("card-grants-access")).toHaveAccessibleDescription(screen.getByTestId("card-grants-access-hint").textContent ?? "");
+    expect(screen.getByTestId("card-signals-occupancy-hint"), "the occupancy switch names who asks").toHaveTextContent("Floodlight or irrigation controls that ask Courtside");
+    expect(screen.getByTestId("card-signals-occupancy")).toHaveAccessibleDescription(screen.getByTestId("card-signals-occupancy-hint").textContent ?? "");
+  });
+
   it("given the closure card, when the page loads, then it offers no access code switch and says why", async () => {
     // given
     const closure = "44444444-4444-4444-4444-444444444444";

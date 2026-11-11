@@ -136,10 +136,10 @@ export function AdminBookingCardView() {
                            value={priceDraft ?? minorAsDecimal(card.externalPriceMinor, i18n.language, club.currency)} />}
             {card.id === COURT_CLOSED
               ? <p data-testid="card-grants-access-closure" className="text-muted text-sm">{t("admin.facility.grantsAccessClosure")}</p>
-              : <Checkbox disabled={disabled} data-testid="card-grants-access" label={t("admin.facility.grantsAccess")} checked={card.grantsAccess} changed={(grantsAccess) => setCard({ ...card, grantsAccess })} />}
+              : <Checkbox disabled={disabled} data-testid="card-grants-access" label={t("admin.facility.grantsAccess")} hint={t("admin.facility.grantsAccessHint")} checked={card.grantsAccess} changed={(grantsAccess) => setCard({ ...card, grantsAccess })} />}
             {card.id === COURT_CLOSED
               ? <p data-testid="card-signals-occupancy-closure" className="text-muted text-sm">{t("admin.facility.signalsOccupancyClosure")}</p>
-              : <Checkbox disabled={disabled} data-testid="card-signals-occupancy" label={t("admin.facility.signalsOccupancy")} checked={card.signalsOccupancy} changed={(signalsOccupancy) => setCard({ ...card, signalsOccupancy })} />}
+              : <Checkbox disabled={disabled} data-testid="card-signals-occupancy" label={t("admin.facility.signalsOccupancy")} hint={t("admin.facility.signalsOccupancyHint")} checked={card.signalsOccupancy} changed={(signalsOccupancy) => setCard({ ...card, signalsOccupancy })} />}
           </BookingRules>
         </div>
       </div>
