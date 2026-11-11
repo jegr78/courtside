@@ -249,6 +249,32 @@ class CreditPaymentTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPaidBookingWhoseCardWentOutOfService_whenTheDisplacementReachesIt_thenItIsCancelledAndRefundedOnce() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = book(0);
+        cards.deactivateBookingCard(winterHall);
+
+        // when
+        transactions.execute(status -> displacedPayments.cancelCharged(booking));
+
+        // then
+        assertThat(status(booking)).as("a card out of service refuses the booking").isEqualTo("CANCELLED");
+        assertThat(balance()).isEqualTo(1500);
+        assertThat(entriesFor(booking)).extracting(entry -> entry.get("kind"))
+                .containsExactly("BOOKING_DEBIT", "BOOKING_REFUND");
+    }
+
+    @Test
+    void givenABookingThatNoLongerExists_whenADisplacementReachesIt_thenNothingIsCancelled() {
+        // when
+        Boolean cancelled = transactions.execute(status -> displacedPayments.cancelCharged(UUID.randomUUID()));
+
+        // then
+        assertThat(cancelled).as("a booking deleted since the walk began has nothing to refund").isFalse();
+    }
+
+    @Test
     void givenACancelledPaidBooking_whenItIsCancelledAgain_thenItIsRefundedOnce() {
         // given
         credit.credit(johnAccount, 1500);

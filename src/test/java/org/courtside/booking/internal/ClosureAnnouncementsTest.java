@@ -161,6 +161,25 @@ class ClosureAnnouncementsTest {
     }
 
     @Test
+    void givenAPaidBookingWhoseCancellationFails_whenAnnouncing_thenItIsAnnouncedAsDisplacedWithoutARefund() {
+        // given
+        UUID courtId = UUID.randomUUID();
+        UUID paid = UUID.randomUUID();
+        Fixture fixture = new Fixture();
+        when(fixture.impact.pageOfDeactivating(courtId, NOW, null, 100))
+                .thenReturn(new ImpactService.ImpactPage(null, List.of(affected(paid))));
+        when(fixture.displacedPayments.cancelCharged(paid)).thenThrow(new IllegalStateException("lock timeout"));
+
+        // when
+        fixture.announcements.on(new FacilityEvent.CourtAvailabilityChanged(courtId, false));
+
+        // then
+        verify(fixture.events).publishEvent(new BookingDisplaced(paid, BookingDisplaced.Closure.COURT_OUT_OF_SERVICE));
+        verify(fixture.events, never()).publishEvent(
+                new BookingDisplaced(paid, BookingDisplaced.Closure.COURT_OUT_OF_SERVICE, true));
+    }
+
+    @Test
     void givenAHeldBookingPaidDuringTheWalk_whenTheReleaseFindsItConfirmed_thenItIsCancelledAndRefunded() {
         // given
         UUID courtId = UUID.randomUUID();
