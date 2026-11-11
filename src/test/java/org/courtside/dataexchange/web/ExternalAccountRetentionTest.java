@@ -11,6 +11,7 @@ import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -79,6 +80,9 @@ class ExternalAccountRetentionTest extends AbstractIntegrationTest {
 
     @Autowired
     private CreditTestFixture credit;
+
+    @Autowired
+    private PaymentTestFixture payment;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -210,6 +214,56 @@ class ExternalAccountRetentionTest extends AbstractIntegrationTest {
 
         // then
         assertThat(anonymised(john)).as("the club still owes this account money").isFalse();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnInactiveExternalAccountWithAPayPalRefundAwaitingPayPal_whenPreviewed_thenItIsLeftOut()
+            throws Exception {
+        // given
+        UUID john = external("John", "Roe");
+        payment.pendingRefund(john, bookings.insertBookingThatHasStarted(court, winterDoubles,
+                new TimeSlot(LONG_AGO, LONG_AGO.plusSeconds(3600)), john));
+        UUID jane = external("Jane", "Doe");
+        payment.orderWithCaptureAttempted(jane, bookings.insertBookingThatHasStarted(court, winterDoubles,
+                new TimeSlot(LONG_AGO.plusSeconds(7200), LONG_AGO.plusSeconds(10800)), jane));
+        keep("EXTERNAL_ACCOUNTS", 12);
+
+        // when
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.externalAccounts.accounts").value(0))
+                .andReturn().getResponse().getContentAsString();
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", JsonPath.<String>read(preview, "$.previewId"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalAccountsAnonymised").value(0));
+
+        // then
+        assertThat(anonymised(john)).as("a refund that fails restores credit to this account").isFalse();
+        assertThat(anonymised(jane)).as("a capture still to come pays this account").isFalse();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPreviewedExternalAccount_whenAPayPalRefundStartsBeforeTheRun_thenTheRunSkipsIt() throws Exception {
+        // given
+        UUID john = external("John", "Roe");
+        UUID booking = bookings.insertBookingThatHasStarted(court, winterDoubles,
+                new TimeSlot(LONG_AGO, LONG_AGO.plusSeconds(3600)), john);
+        keep("EXTERNAL_ACCOUNTS", 12);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(jsonPath("$.externalAccounts.accounts").value(1))
+                .andReturn().getResponse().getContentAsString();
+        payment.pendingRefund(john, booking);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", JsonPath.<String>read(preview, "$.previewId"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalAccountsAnonymised").value(0))
+                .andExpect(jsonPath("$.externalAccountsSkipped").value(1));
+        assertThat(anonymised(john)).as("the run checks the refund again before it anonymises").isFalse();
     }
 
     @Test

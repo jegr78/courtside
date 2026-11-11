@@ -104,7 +104,7 @@ it("given an opened account, when a credit is recorded, then the amount goes out
 
   // then
   await waitFor(() => expect(within(account).getByTestId("credit-balance")).toHaveTextContent("€27.50"));
-  expect(record).toHaveBeenCalledWith(accountId, { kind: "CREDIT", amountMinor: 1250, note: "Season refund" });
+  expect(record).toHaveBeenCalledWith(accountId, { kind: "CREDIT", amountMinor: 1250, note: "Season refund" }, expect.any(String));
   expect(read).toHaveBeenCalledTimes(2);
   expect(read).toHaveBeenLastCalledWith(accountId, {});
   expect(listed, "the balance list follows the new entry").toHaveBeenCalledTimes(2);
@@ -163,6 +163,73 @@ it("given an amount that is no money, when it is recorded, then nothing is sent 
   // then
   expect(await screen.findByTestId("credit-form-error")).toHaveTextContent(i18n.t("admin.credit.amountInvalid"));
   expect(record).not.toHaveBeenCalled();
+});
+
+it("given an entry whose answer never arrived, when it is submitted again, then it carries the same key and a new entry carries another", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(ledger);
+  const record = vi.spyOn(api, "recordCreditEntry").mockRejectedValueOnce(new TypeError("Failed to fetch"))
+    .mockResolvedValue(recorded);
+  show();
+  await openJane();
+  await enter("CREDIT", "12,50", "Season refund");
+  await screen.findByTestId("credit-form-error");
+
+  // when
+  await userEvent.click(screen.getByTestId("credit-form-submit"));
+  await screen.findByTestId("credit-form-success");
+  await userEvent.clear(screen.getByTestId("credit-form-amount"));
+  await userEvent.clear(screen.getByTestId("credit-form-note"));
+  await enter("CREDIT", "12,50", "Season refund");
+
+  // then
+  await waitFor(() => expect(record).toHaveBeenCalledTimes(3));
+  expect(record.mock.calls[1][2], "the repeated submission may already have been recorded").toBe(record.mock.calls[0][2]);
+  expect(record.mock.calls[2][2], "an entry recorded before is a new entry").not.toBe(record.mock.calls[1][2]);
+});
+
+it.each([
+  ["a server failure", new ApiError(503, { type: "about:blank", title: "Service Unavailable", status: 503 })],
+  ["a timeout", new ApiError(408)],
+  ["a rate limit", new ApiError(429, { type: "urn:courtside:error:rate-limited", title: "Too many requests", status: 429 })]
+])("given %s answered an entry, when it is submitted again, then it carries the same key", async (_case, failure) => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(ledger);
+  const record = vi.spyOn(api, "recordCreditEntry").mockRejectedValueOnce(failure).mockResolvedValue(recorded);
+  show();
+  await openJane();
+  await enter("CREDIT", "12,50", "Season refund");
+  await screen.findByTestId("credit-form-error");
+
+  // when
+  await userEvent.click(screen.getByTestId("credit-form-submit"));
+
+  // then
+  await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+  expect(record.mock.calls[1][2], "the first attempt may have been recorded").toBe(record.mock.calls[0][2]);
+});
+
+it("given the ledger refused an entry, when it is submitted again, then it carries a new key", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(ledger);
+  const record = vi.spyOn(api, "recordCreditEntry").mockRejectedValueOnce(new ApiError(409, {
+    type: "urn:courtside:error:credit-insufficient", title: "Credit insufficient", status: 409,
+    violations: [{ code: "credit.insufficient", params: { balanceMinor: 1500, currency: "EUR" } }]
+  })).mockResolvedValue(recorded);
+  show();
+  await openJane();
+  await enter("CREDIT", "12,50", "Season refund");
+  await screen.findByTestId("credit-form-error");
+
+  // when
+  await userEvent.click(screen.getByTestId("credit-form-submit"));
+
+  // then
+  await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+  expect(record.mock.calls[1][2], "a refused entry was not recorded").not.toBe(record.mock.calls[0][2]);
 });
 
 it("given an entry that needs a fresh proof, when the treasurer confirms the password, then the same entry is sent again", async () => {

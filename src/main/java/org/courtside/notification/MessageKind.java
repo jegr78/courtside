@@ -15,6 +15,7 @@ public enum MessageKind {
     BOOKING_PLAYER_RECORDED("booking.playerRecorded", false, false),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew", true, false),
     BOOKING_DISPLACED("booking.displaced", false, false),
+    BOOKING_DISPLACED_CANCELLED("booking.displacedCancelled", false, false),
     BOOKING_REMINDER("booking.reminder", true, false),
     BOOKING_CANCELLED("booking.cancelled", true, false),
     BOOKING_CANCELLED_BY_CLUB("booking.cancelledByClub", false, false),

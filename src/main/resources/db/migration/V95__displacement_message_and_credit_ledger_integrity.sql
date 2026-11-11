@@ -1,0 +1,55 @@
+ALTER TABLE message_record
+    DROP CONSTRAINT message_record_kind_known,
+    ADD CONSTRAINT message_record_kind_known CHECK (
+        kind IN ('ACCOUNT_WELCOME', 'CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET', 'BOOKING_CONFIRMED',
+                 'BOOKING_PLAYER_RECORDED', 'BOOKING_PLAYER_WITHDREW', 'BOOKING_DISPLACED', 'BOOKING_DISPLACED_CANCELLED',
+                 'BOOKING_REMINDER', 'ACCOUNT_USERNAME_REMINDER', 'ACCOUNT_PASSWORD_RESET_CODE', 'ACCOUNT_SECURITY_CHANGED', 'ACCOUNT_MFA_RECOVERY_CODE',
+                 'ACCOUNT_FACTOR_GUESSING_BLOCKED', 'ACCOUNT_ADDRESS_CHANGED',
+                 'BOOKING_CANCELLED', 'BOOKING_CANCELLED_BY_CLUB', 'BOOKING_RELEASED', 'BOOKING_SERIES_CREATED',
+                 'BOOKING_SERIES_CANCELLED_BY_CLUB', 'BOOKING_SERIES_MOVED_BY_CLUB', 'WAITLIST_OFFER',
+                 'BOOKING_PARTNER_FOUND', 'BOOKING_PLACE_TAKEN', 'ACCESS_CODE_CHANGED', 'MEMBERS_DOOR_CODE_CHANGED',
+                 'ACCESS_CODE_READY',
+                 'REGISTRATION_VERIFICATION', 'REGISTRATION_NAME_TAKEN', 'PAYPAL_REFUNDED'));
+
+ALTER TABLE notification
+    DROP CONSTRAINT notification_kind_known,
+    ADD CONSTRAINT notification_kind_known CHECK (
+        kind IN ('ACCOUNT_WELCOME', 'CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET', 'BOOKING_CONFIRMED',
+                 'BOOKING_PLAYER_RECORDED', 'BOOKING_PLAYER_WITHDREW', 'BOOKING_DISPLACED', 'BOOKING_DISPLACED_CANCELLED',
+                 'BOOKING_REMINDER', 'ACCOUNT_USERNAME_REMINDER', 'ACCOUNT_PASSWORD_RESET_CODE', 'ACCOUNT_SECURITY_CHANGED', 'ACCOUNT_MFA_RECOVERY_CODE',
+                 'ACCOUNT_FACTOR_GUESSING_BLOCKED', 'ACCOUNT_ADDRESS_CHANGED',
+                 'BOOKING_CANCELLED', 'BOOKING_CANCELLED_BY_CLUB', 'BOOKING_RELEASED', 'BOOKING_SERIES_CREATED',
+                 'BOOKING_SERIES_CANCELLED_BY_CLUB', 'BOOKING_SERIES_MOVED_BY_CLUB', 'WAITLIST_OFFER',
+                 'BOOKING_PARTNER_FOUND', 'BOOKING_PLACE_TAKEN', 'ACCESS_CODE_CHANGED', 'MEMBERS_DOOR_CODE_CHANGED',
+                 'ACCESS_CODE_READY',
+                 'REGISTRATION_VERIFICATION', 'REGISTRATION_NAME_TAKEN', 'PAYPAL_REFUNDED'));
+
+DELETE FROM credit_account a
+WHERE NOT EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = a.account_id);
+
+ALTER TABLE credit_entry
+    ADD COLUMN idempotency_key text,
+    ADD COLUMN request_fingerprint text,
+    ADD CONSTRAINT credit_entry_idempotency_complete CHECK (
+        (idempotency_key IS NULL) = (request_fingerprint IS NULL)),
+    ADD CONSTRAINT credit_entry_idempotency_key_length CHECK (
+        idempotency_key IS NULL OR length(idempotency_key) BETWEEN 1 AND 128);
+
+CREATE UNIQUE INDEX credit_entry_idempotency_by_recorder ON credit_entry (recorded_by, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
+
+CREATE TRIGGER credit_entry_no_truncate
+    BEFORE TRUNCATE ON credit_entry
+    FOR EACH STATEMENT EXECUTE FUNCTION reject_credit_entry_change();
+
+CREATE FUNCTION reject_credit_entry_note_change() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'credit_entry_note_append_only'
+        USING ERRCODE = '23514', CONSTRAINT = 'credit_entry_note_append_only';
+END;
+$$;
+
+CREATE TRIGGER credit_entry_note_append_only
+    BEFORE UPDATE ON credit_entry_note
+    FOR EACH ROW EXECUTE FUNCTION reject_credit_entry_note_change();

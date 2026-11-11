@@ -225,7 +225,9 @@ pending" with the minutes left. There, **Continue to PayPal** takes you back to 
 the hold has ended, Courtside keeps the money as credit for you, or the club gets in touch with you. If you
 cancel before your club's cancellation deadline, the full amount goes back to your credit. After the
 deadline you can no longer cancel. If the club cancels your booking before it starts, you always get
-the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
+the amount back. The same holds when the club closes the court, the day or the hours your paid booking
+falls into: Courtside then cancels the booking, puts the amount back on your credit and tells you by
+email, also after the deadline. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
 
 If you would rather have the money of a cancelled PayPal booking back in your PayPal account, ask the
@@ -410,7 +412,8 @@ retired booking type or shorter opening hours.
 
 Courtside tells you the reason under *Messages*, and by email if you chose email. This does
 not cancel the booking automatically. The club
-decides how to handle it.
+decides how to handle it. The exception is a booking you paid for as an external player: Courtside
+cancels it and puts the amount back on your credit.
 
 ## Messages
 
@@ -482,9 +485,10 @@ The board can correct errors in your name or username from the people administra
 As an external player you can close your account yourself. In *My account*, choose the button under
 *Close account* and confirm. If you signed in more than five minutes ago, Courtside asks for your
 password again first. If you still have an upcoming booking, cancel it first. If you still hold
-credit, ask the treasurer to pay it out first. Closing removes your
+credit, ask the treasurer to pay it out first. While PayPal has not yet settled a payment or a
+refund of yours, wait until it has. Closing removes your
 name, email address, username and password and signs you out. Past bookings stay with the club
-without your name. Somebody else may register your username afterwards. As a member, the board ends
+without your name, without your notes and without the names of the guests you brought. Somebody else may register your username afterwards. As a member, the board ends
 your account.
 
 ![Account security with two-factor authentication, security keys, active sessions and the password form.](../screenshots/en/account-security.png)

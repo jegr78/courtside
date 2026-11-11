@@ -26,7 +26,7 @@ const stored: AdminClubConfig = {
   passwordResetTokenMinutes: 60,
   bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   noMembershipTypeRuleSetId: "rule-set",
-  logoUploaded: false, externalBookings: false, currency: "EUR"
+  logoUploaded: false, externalBookings: false, currency: "EUR", currencyFractionDigits: 2
 };
 
 function show(configurationChanged = () => undefined) {

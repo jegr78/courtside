@@ -275,6 +275,23 @@ class CreditLedgerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenALedgerEntry_whenTheLedgerIsTruncatedOrAReasonRewritten_thenTheDatabaseRefuses() {
+        // given
+        UUID entry = credit.credit(johnAccount, 1000);
+
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("TRUNCATE credit_entry CASCADE").update())
+                .hasMessageContaining("credit_entry_append_only");
+        assertThatThrownBy(() -> jdbc.sql("TRUNCATE credit_account CASCADE").update())
+                .as("a cascade reaches the entries too").hasMessageContaining("credit_entry_append_only");
+        assertThatThrownBy(() -> jdbc.sql("UPDATE credit_entry_note SET reason_text = 'Paid' WHERE entry_id = :id")
+                .param("id", entry).update()).hasMessageContaining("credit_entry_note_append_only");
+        assertThat(jdbc.sql("DELETE FROM credit_entry_note WHERE entry_id = :id").param("id", entry).update())
+                .as("anonymising an account still removes its reasons").isOne();
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(1000);
+    }
+
+    @Test
     void givenSeveralEntries_whenThePlayerPagesThroughThem_thenEachArrivesOnceWithItsRunningBalance()
             throws Exception {
         // given
@@ -332,6 +349,114 @@ class CreditLedgerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:credit-account-not-found"));
     }
 
+    @Test
+    void givenARecordedCredit_whenTheSameRequestIsSentAgainWithItsKey_thenTheFirstEntryAnswersAndNothingDoubles()
+            throws Exception {
+        // given
+        String first = record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        String again = record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(again).as("the resubmission answers with the entry it repeats").isEqualTo(first);
+        assertThat(entries(johnAccount)).as("a resubmitted cash credit is recorded once").isEqualTo(1);
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(1500);
+    }
+
+    @Test
+    void givenAClientWithoutAKey_whenItRecordsTheSameCreditTwice_thenBothAreRecordedAsBefore() throws Exception {
+        // when
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, null)
+                .andExpect(status().isCreated());
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, null)
+                .andExpect(status().isCreated());
+
+        // then
+        assertThat(entries(johnAccount)).as("without a key every request is a new entry").isEqualTo(2);
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(3000);
+    }
+
+    @Test
+    void givenARecordedCredit_whenItsKeyComesBackWithAnotherReason_thenItIsRefusedAsAnotherRequest()
+            throws Exception {
+        // given
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated());
+
+        // when / then
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Season refund", true, "entry-1")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"))
+                .andExpect(jsonPath("$.violations[0].code").value("credit.idempotencyKey.reused"));
+        assertThat(entries(johnAccount)).isEqualTo(1);
+    }
+
+    @Test
+    void givenARecordedCredit_whenAnotherRequestReusesItsKey_thenItIsRefusedAndNothingIsRecorded() throws Exception {
+        // given
+        record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isCreated());
+
+        // when / then
+        record("miles.richard", johnAccount, "CREDIT", 2000, "Cash at the clubhouse", true, "entry-1")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"))
+                .andExpect(jsonPath("$.violations[0].code").value("credit.idempotencyKey.reused"));
+        assertThat(entries(johnAccount)).isEqualTo(1);
+    }
+
+    @Test
+    void givenAKeyRecordedForAnotherAccountButNotYetCommitted_whenTheSameKeyArrives_thenItIsRefusedAsAnotherRequest()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.EXTERNAL));
+        CountDownLatch firstWritten = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // when
+        try {
+            Future<Integer> first = pool.submit(() -> transactions.execute(status -> {
+                int recorded = recordedStatus(janeAccount);
+                firstWritten.countDown();
+                await(releaseFirst);
+                return recorded;
+            }));
+            assertThat(firstWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<ResultActions> second = pool.submit(() ->
+                    record("miles.richard", johnAccount, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-race"));
+            Thread.sleep(500);
+            boolean secondWaited = !second.isDone();
+            releaseFirst.countDown();
+
+            // then
+            assertThat(secondWaited).as("the second insert waits on the uncommitted key").isTrue();
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(201);
+            second.get(10, TimeUnit.SECONDS)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"));
+        } finally {
+            releaseFirst.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(entries(johnAccount)).as("the refused request leaves no entry").isZero();
+    }
+
+    private int recordedStatus(UUID account) {
+        try {
+            return record("miles.richard", account, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-race")
+                    .andReturn().getResponse().getStatus();
+        } catch (Exception failed) {
+            throw new IllegalStateException(failed);
+        }
+    }
+
     private org.springframework.test.web.servlet.RequestBuilder search(String query, UserDetails treasurer) {
         return post("/api/treasury/credit/account-search").with(user(treasurer)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"query\":\"%s\"}".formatted(query));
@@ -339,12 +464,20 @@ class CreditLedgerTest extends AbstractIntegrationTest {
 
     private ResultActions record(String username, UUID account, String kind, int amountMinor, String note,
                                  boolean recentlyProven) throws Exception {
+        return record(username, account, kind, amountMinor, note, recentlyProven, UUID.randomUUID().toString());
+    }
+
+    private ResultActions record(String username, UUID account, String kind, int amountMinor, String note,
+                                 boolean recentlyProven, String idempotencyKey) throws Exception {
         var request = post("/api/treasury/credit/accounts/{id}/entries", account)
                 .with(user(userDetails.loadUserByUsername(username))).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"kind\":\"%s\",\"amountMinor\":%d,\"note\":\"%s\"}".formatted(kind, amountMinor, note));
         if (recentlyProven) {
             request.sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli());
+        }
+        if (idempotencyKey != null) {
+            request.header("Idempotency-Key", idempotencyKey);
         }
         return mockMvc.perform(request);
     }

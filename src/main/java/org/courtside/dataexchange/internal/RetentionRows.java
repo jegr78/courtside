@@ -225,7 +225,11 @@ public class RetentionRows {
                                    OR EXISTS (SELECT 1 FROM booking b WHERE b.booked_by = o.id
                                               AND %s >= :inactiveBefore)
                                    OR EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = o.id
-                                              GROUP BY e.currency HAVING sum(e.amount_minor) <> 0)))""".formatted(BOOKING_END);
+                                              GROUP BY e.currency HAVING sum(e.amount_minor) <> 0)
+                                   OR EXISTS (SELECT 1 FROM paypal_refund f WHERE f.account_id = o.id
+                                              AND f.status = 'PENDING')
+                                   OR EXISTS (SELECT 1 FROM paypal_order po WHERE po.account_id = o.id
+                                              AND po.status = 'CREATED')))""".formatted(BOOKING_END);
 
     /** External accounts of people without a membership period that did nothing since the cut-off. */
     public List<UUID> inactiveExternalAccounts(Instant inactiveBefore) {
@@ -247,6 +251,11 @@ public class RetentionRows {
         jdbc.sql("SELECT id FROM user_account WHERE person_id = :person ORDER BY id FOR UPDATE")
                 .param("person", person.getFirst()).query(UUID.class).list();
         jdbc.sql("SELECT id FROM member WHERE person_id = :person FOR UPDATE")
+                .param("person", person.getFirst()).query(UUID.class).list();
+        jdbc.sql("""
+                        SELECT a.account_id FROM credit_account a JOIN user_account u ON u.id = a.account_id
+                        WHERE u.person_id = :person ORDER BY a.account_id FOR UPDATE OF a
+                        """)
                 .param("person", person.getFirst()).query(UUID.class).list();
         return jdbc.sql("SELECT u.id FROM user_account u WHERE u.id = :id AND " + INACTIVE_EXTERNAL)
                 .param("id", accountId)

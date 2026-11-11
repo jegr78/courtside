@@ -1,6 +1,7 @@
 package org.courtside.booking;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.internal.DisplacedPayments;
 import org.courtside.booking.internal.UnattendedRelease;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
@@ -45,6 +46,8 @@ class CreditPaymentTest extends AbstractIntegrationTest {
     private BookingService bookingService;
     @Autowired
     private UnattendedRelease unattendedRelease;
+    @Autowired
+    private DisplacedPayments displacedPayments;
     @Autowired
     private FacilityTestFixture facility;
     @Autowired
@@ -228,6 +231,47 @@ class CreditPaymentTest extends AbstractIntegrationTest {
         // then
         assertThat(entriesFor(booking)).as("credit on an anonymised account could never be paid out")
                 .extracting(entry -> entry.get("kind")).containsExactly("BOOKING_DEBIT");
+    }
+
+    @Test
+    void givenAPaidBookingNothingClosesAnyMore_whenAStaleDisplacementReachesIt_thenItStaysAndNothingIsRefunded() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = book(0);
+
+        // when
+        boolean cancelled = transactions.execute(status -> displacedPayments.cancelCharged(booking));
+
+        // then
+        assertThat(cancelled).as("the court, card and hours admit the booking again").isFalse();
+        assertThat(status(booking)).isEqualTo("CONFIRMED");
+        assertThat(entriesFor(booking)).containsExactly(Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+    }
+
+    @Test
+    void givenAPaidBookingWhoseCardWentOutOfService_whenTheDisplacementReachesIt_thenItIsCancelledAndRefundedOnce() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = book(0);
+        cards.deactivateBookingCard(winterHall);
+
+        // when
+        transactions.execute(status -> displacedPayments.cancelCharged(booking));
+
+        // then
+        assertThat(status(booking)).as("a card out of service refuses the booking").isEqualTo("CANCELLED");
+        assertThat(balance()).isEqualTo(1500);
+        assertThat(entriesFor(booking)).extracting(entry -> entry.get("kind"))
+                .containsExactly("BOOKING_DEBIT", "BOOKING_REFUND");
+    }
+
+    @Test
+    void givenABookingThatNoLongerExists_whenADisplacementReachesIt_thenNothingIsCancelled() {
+        // when
+        Boolean cancelled = transactions.execute(status -> displacedPayments.cancelCharged(UUID.randomUUID()));
+
+        // then
+        assertThat(cancelled).as("a booking deleted since the walk began has nothing to refund").isFalse();
     }
 
     @Test

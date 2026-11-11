@@ -26,7 +26,7 @@ const courtAdded: AuditEntry = {
 const clubConfig: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
   logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
-  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR"
+  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
 };
 
 function show({ club = clubConfig, at = "/admin/audit" }: { club?: ClubConfig; at?: string } = {}) {
@@ -336,8 +336,8 @@ describe("AdminAuditView", () => {
     ["card.bookingCard.changed", { changedFields: [] }, /^Booking card changed$/],
     ["config.club.changed", { changedFields: ["currency", "noMembershipTypeRuleSetId"] }, "Club configuration changed: Currency, Rule set for people without a membership type"],
     ["config.club.changed", { changedFields: ["externalBookings"] }, "Club configuration changed: Admit external bookings"],
-    ["credit.entry.recorded", { kind: "PAYOUT", amountMinor: -1250, currency: "EUR" }, "Credit ledger entry recorded: Payout of €12.50"],
-    ["credit.entry.recorded", { kind: "CREDIT", amountMinor: 500, currency: "EUR" }, "Credit ledger entry recorded: Credit of €5.00"],
+    ["credit.entry.recorded", { kind: "PAYOUT", amountMinor: -1250, currency: "EUR", currencyFractionDigits: 2 }, "Credit ledger entry recorded: Payout of €12.50"],
+    ["credit.entry.recorded", { kind: "CREDIT", amountMinor: 500, currency: "EUR", currencyFractionDigits: 2 }, "Credit ledger entry recorded: Credit of €5.00"],
     ["payment.paypal.settings.changed", { environment: "LIVE", enabled: true, clientIdChanged: true, secretReplaced: false },
       "PayPal settings changed: Live, PayPal payment on, client id changed, secret kept"],
     ["payment.paypal.settings.changed", { environment: "SANDBOX", enabled: false, clientIdChanged: false, secretReplaced: true },

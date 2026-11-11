@@ -450,7 +450,11 @@ lower by the amount, although PayPal may not have sent the money. The reconcilia
 and the treasurer page shows the refund as unclear. Causing it needs no access beyond a treasurer
 starting a refund during a PayPal outage, and the player loses at most the one payment's amount
 until somebody acts. The treasurer checks the club's PayPal account and, if the money did not go
-back, corrects the balance with a `CREDIT` entry and a note. Reconsider this bound when PayPal
+back, corrects the balance with a `CREDIT` entry and a note. The account stays open for that
+correction: neither the player's own closure nor the retention run anonymises it while the refund is
+pending or one of its PayPal orders is still open. Nothing in Courtside settles such a refund or order
+without an answer from PayPal, and a correcting `CREDIT` entry does not end it, so a refund PayPal
+never settles keeps the account open for good. Reconsider this bound when PayPal
 webhooks become part of the product, or when clubs report refunds that stay pending for days.
 
 ## Sandbox credentials confirm bookings with test money

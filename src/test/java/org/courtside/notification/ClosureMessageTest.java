@@ -6,6 +6,9 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.card.CardService;
+import org.courtside.card.testfixture.CardTestFixture;
+import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.FacilityService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
@@ -67,6 +70,15 @@ class ClosureMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private MemberTestFixture members;
+
+    @Autowired
+    private CardTestFixture cardFixture;
+
+    @Autowired
+    private ConfigTestFixture config;
+
+    @Autowired
+    private CreditTestFixture credit;
 
     @Autowired
     private JdbcClient jdbc;
@@ -254,6 +266,106 @@ class ClosureMessageTest extends AbstractIntegrationTest {
 
         // then
         verify(sender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenAnOutsidersPaidBooking_whenTheBoardClosesItsCourtAndThenTakesTheCourtOutOfService_thenItIsCancelledAndRefundedOnce()
+            throws Exception {
+        // given
+        config.admitExternalBookings(true);
+        UUID hall = cardFixture.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        cardFixture.priceForExternals(hall, 1500);
+        UUID richardPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        UUID richard = identity.createEnabledAccount(richardPerson, "miles.richard", Set.of(Role.EXTERNAL));
+        credit.credit(richard, 1500);
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
+        UUID paid = bookings.create(new CreateBookingCommand(List.of(secondCourt), hall,
+                new TimeSlot(SIX_PM, SEVEN_PM), richard, richardPerson, Set.of(Role.EXTERNAL), null, List.of(),
+                null));
+        UUID unpaid = bookings.create(new CreateBookingCommand(List.of(secondCourt), MEMBER_BOOKING_CARD,
+                new TimeSlot(SEVEN_PM, SEVEN_PM.plusSeconds(3600)), bookerAccountId, bookerPersonId,
+                Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(playerPersonId)), null));
+        clearInvocations(sender);
+
+        // when
+        facility.createCourtClosure(secondCourt, "Nets", WEDNESDAY, WEDNESDAY);
+        facility.setCourtActive(secondCourt, false);
+
+        // then
+        assertThat(statusOf(paid)).as("the club cancels a booking it charged for").isEqualTo("CANCELLED");
+        assertThat(statusOf(unpaid)).as("a booking nobody paid for stays").isEqualTo("CONFIRMED");
+        assertThat(jdbc.sql("SELECT kind FROM credit_entry WHERE booking_id = :id ORDER BY position")
+                .param("id", paid).query(String.class).list())
+                .as("the charge goes back exactly once").containsExactly("BOOKING_DEBIT", "BOOKING_REFUND");
+        assertThat(credit.balance(richard)).isEqualTo(1500);
+        assertThat(lastBodyTo("richard.miles@example.org"))
+                .contains("gesperrt", "Court 2", "13. Mai 2026", "Courtside hat diese Buchung", "storniert",
+                        "wieder auf deinem Guthaben")
+                .doesNotContain("nicht storniert");
+        assertThat(lastBodyTo("jane.doe@example.org")).contains("Courtside hat die Buchung nicht storniert");
+    }
+
+    @Test
+    void givenTheClubsOwnDisplacementWording_whenAPaidBookingIsCancelledByAClosure_thenTheBookerGetsTheCancellationWording()
+            throws Exception {
+        // given
+        config.admitExternalBookings(true);
+        UUID hall = cardFixture.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        cardFixture.priceForExternals(hall, 1500);
+        UUID richardPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        UUID richard = identity.createEnabledAccount(richardPerson, "miles.richard", Set.of(Role.EXTERNAL));
+        credit.credit(richard, 1500);
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
+        bookings.create(new CreateBookingCommand(List.of(secondCourt), hall, new TimeSlot(SIX_PM, SEVEN_PM), richard,
+                richardPerson, Set.of(Role.EXTERNAL), null, List.of(), null));
+        jdbc.sql("""
+                INSERT INTO message_template_override (kind, language, subject, body, changed_at)
+                VALUES ('BOOKING_DISPLACED', 'de', 'Platzsperre am {day}',
+                        'Hallo {firstName}, deine Buchung bleibt bestehen.', now())
+                """).update();
+        clearInvocations(sender);
+
+        // when
+        facility.createCourtClosure(secondCourt, "Nets", WEDNESDAY, WEDNESDAY);
+
+        // then
+        assertThat(lastBodyTo("richard.miles@example.org"))
+                .as("the club's wording promises a booking that no longer stands, so it is not used here")
+                .doesNotContain("bleibt bestehen")
+                .contains("Courtside hat diese Buchung", "wieder auf deinem Guthaben");
+    }
+
+    @Test
+    void givenTheClubsOwnCancellationWordingForClosures_whenAPaidBookingIsCancelledByAClosure_thenTheBookerGetsIt()
+            throws Exception {
+        // given
+        config.admitExternalBookings(true);
+        UUID hall = cardFixture.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        cardFixture.priceForExternals(hall, 1500);
+        UUID richardPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        UUID richard = identity.createEnabledAccount(richardPerson, "miles.richard", Set.of(Role.EXTERNAL));
+        credit.credit(richard, 1500);
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
+        bookings.create(new CreateBookingCommand(List.of(secondCourt), hall, new TimeSlot(SIX_PM, SEVEN_PM), richard,
+                richardPerson, Set.of(Role.EXTERNAL), null, List.of(), null));
+        jdbc.sql("""
+                INSERT INTO message_template_override (kind, language, subject, body, changed_at)
+                VALUES ('BOOKING_DISPLACED_CANCELLED', 'de', 'Abgesagt am {day}',
+                        'Hallo {firstName}, der Vorstand hat abgesagt.{refund}', now())
+                """).update();
+        clearInvocations(sender);
+
+        // when
+        facility.createCourtClosure(secondCourt, "Nets", WEDNESDAY, WEDNESDAY);
+
+        // then
+        assertThat(lastBodyTo("richard.miles@example.org")).as("the club words this message like every other")
+                .contains("der Vorstand hat abgesagt", "wieder auf deinem Guthaben");
+    }
+
+    private String statusOf(UUID booking) {
+        return jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", booking).query(String.class)
+                .single();
     }
 
     private void book(UUID court) {

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ClubConfig } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { rememberFractionDigits } from "../money";
 import { ClubConfigurationContext } from "./registry";
 
 export function ClubConfigurationProvider({ children }: { children: ReactNode }) {
@@ -20,6 +21,7 @@ export function ClubConfigurationProvider({ children }: { children: ReactNode })
     void api.config()
       .then((value) => {
         held.current = true;
+        rememberFractionDigits(value.currency, value.currencyFractionDigits);
         setClub(value);
       })
       .catch((thrown: unknown) => setFailure({ thrown }))
@@ -31,12 +33,16 @@ export function ClubConfigurationProvider({ children }: { children: ReactNode })
   // An administration page reports the stored logo, while the header reads the server's smaller variant.
   const refresh = useCallback(() => {
     void api.config()
-      .then((value) => setClub((current) => current ? { ...current, logoUrl: value.logoUrl } : value))
+      .then((value) => {
+        rememberFractionDigits(value.currency, value.currencyFractionDigits);
+        setClub((current) => current ? { ...current, logoUrl: value.logoUrl } : value);
+      })
       .catch(() => undefined);
   }, []);
 
   const changed = useCallback((value: ClubConfig) => {
     held.current = true;
+    rememberFractionDigits(value.currency, value.currencyFractionDigits);
     setClub(value);
     setFailure(undefined);
   }, []);

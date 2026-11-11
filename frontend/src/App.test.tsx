@@ -557,7 +557,7 @@ describe("AppRoutes", () => {
       logoUrl: null, imprintUrl: null, privacyUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
       slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
-      logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR"
+      logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "adminCourts").mockResolvedValue([]);
     vi.spyOn(api, "adminOpeningHours").mockResolvedValue([]);
@@ -619,7 +619,7 @@ describe("AppRoutes", () => {
     // given
     const asked = vi.spyOn(api, "config").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland", currency: "EUR"
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);
     vi.spyOn(api, "adminOpeningSchedule").mockResolvedValue([{ id: "week-1", effectiveFrom: null, days: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }] }]);
@@ -644,7 +644,7 @@ describe("AppRoutes", () => {
 describe("App build identity", () => {
   const club = {
     clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR"
+    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
   };
 
   afterEach(() => { vi.useRealTimers(); clearRecoveryCodes(); vi.unstubAllGlobals(); });
@@ -683,7 +683,7 @@ describe("App build identity", () => {
   });
   const adminClub = {
     ...club, newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-    bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
+    bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR", currencyFractionDigits: 2
   };
 
   beforeEach(async () => {
@@ -1324,7 +1324,7 @@ describe("App build identity", () => {
       defaultLocale: "de",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1347,7 +1347,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1372,7 +1372,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1396,7 +1396,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1419,7 +1419,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1444,7 +1444,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1474,7 +1474,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1496,7 +1496,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1525,7 +1525,7 @@ describe("App build identity", () => {
       defaultLocale: "en",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1640,7 +1640,7 @@ describe("App build identity", () => {
       defaultLocale: "de",
       supportedLocales: ["de", "en"],
       slotMinutes: 30,
-      timeZone: "Europe/Berlin", currency: "EUR"
+      timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -1754,7 +1754,7 @@ it("given an account without member features, when it opens the dependants addre
   vi.spyOn(api, "session").mockResolvedValue({ ...signedInMember, roles: ["EXTERNAL"], memberFeatures: false });
   vi.spyOn(api, "config").mockResolvedValue({
     clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR"
+    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
   });
   vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
   const dependants = vi.spyOn(api, "dependants").mockResolvedValue([]);

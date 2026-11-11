@@ -7,6 +7,7 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
@@ -374,6 +375,28 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:currency-change-blocked-by-credit"));
         mockMvc.perform(get("/api/public/config")).andExpect(jsonPath("$.currency").value("EUR"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ALL, 2", "IQD, 3", "JPY, 0", "EUR, 2"})
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClubCurrency_whenTheConfigIsRead_thenItCarriesTheFractionDigitsTheServerChargesIn(String code,
+                                                                                                int digits)
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"currency\": \"" + code + "\","))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencyFractionDigits").value(digits));
+
+        // when / then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value(code))
+                .andExpect(jsonPath("$.currencyFractionDigits").value(digits));
     }
 
     @Test

@@ -167,7 +167,9 @@ A court needs a unique number and a name. Edit both directly in the list and sav
 courts together.
 
 Deactivate a court that the club no longer uses. It disappears from the court plan but remains in
-past bookings and reports. Courtside notifies members whose future bookings are affected.
+past bookings and reports. Courtside notifies members whose future bookings are affected. Those
+bookings stay; a booking an external player paid for is cancelled instead, and the amount goes back
+to their credit.
 
 ![The court list with number, name, state and the form for a new court.](../screenshots/en/courts.png)
 
@@ -364,7 +366,7 @@ entries of their own for that, see the next section.
 
 Courtside does not save a day when either time is missing. Members cannot book outside the opening
 hours. If you shorten opening hours later, Courtside notifies members with affected bookings. Those
-bookings stay and remain visible in the court plan.
+bookings stay and remain visible in the court plan. A booking an external player paid for is cancelled instead, and the amount goes back to their credit.
 
 ![Winter hours from 2 November, scheduled beside the week in force and open for editing.](../screenshots/en/opening-hours.png)
 
@@ -384,7 +386,8 @@ An entry starts today or later. Until its first day you can change everything or
 has started, its first day and hours stay fixed; you can still rename it or end it earlier. Ended
 entries stay as they were, so past days keep their hours.
 
-Bookings already on a closed day stay. Courtside refuses new bookings and moves there. The court
+Bookings already on a closed day stay, except a booking an external player paid for: Courtside
+cancels it and puts the amount back on their credit. Courtside refuses new bookings and moves there. The court
 plan names a holiday, and a closed court reads *Court closed*.
 
 When an entry affects existing bookings, the form shows how many before you save. On saving, the
@@ -420,7 +423,7 @@ court and so end any waitlist offer.
 A neutral display does not hide the label from
 technical access because the public API still returns it. Do not use confidential labels.
 
-Deactivate cards that are no longer needed. Existing bookings remain in place.
+Deactivate cards that are no longer needed. Existing bookings remain in place. A booking an external player paid for is cancelled instead, and the amount goes back to their credit.
 
 ![A booking card with label, colour, roles, player counts and further options.](../screenshots/en/booking-card.png)
 

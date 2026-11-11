@@ -204,7 +204,8 @@ withdraws, when a series is created, cancelled or moved, and when a freed slot i
 waiting member. A series change is one event naming the series and every occurrence it touched, and
 no occurrence announces itself beside it. Cancelling an occurrence as a single booking announces
 that booking alone. Cancellations and moves name the acting account, so a consumer can tell an
-owner's change from a board's. A cancellation carries its reason code when one was given, and a move
+owner's change from a board's. A paid booking a closure cancels announces no cancellation; its
+displacement event carries `cancelled` instead and names no account. A cancellation carries its reason code when one was given, and a move
 the slot and courts its earliest occurrence held before. A cancellation that finds the booking
 already cancelled changes nothing and announces nothing.
 
@@ -343,13 +344,19 @@ An outsider closes its own account with `DELETE /api/account` after a re-authent
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
 with `identity.account.closureNotOpen` and an outsider holding a confirmed or pending booking of its
 own that has not ended, read through `shared.UpcomingBookings`, with
-`identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance,
-read through `shared.HeldCredit`, is refused with `identity.account.closureBlockedByCredit` and asks
-the treasurer for a payout first. Closing anonymises the account in place through
+`identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance
+is refused with `identity.account.closureBlockedByCredit` and asks the treasurer for a payout first.
+An outsider with a PayPal refund still `PENDING` or a PayPal order still `CREATED` is refused with
+`identity.account.closureBlockedByPayment`, because a refused refund puts the credit back and a late
+capture becomes credit. `shared.PaymentsInFlight` reads the balance and the unsettled payments in
+one statement, after the closure has locked the account row and any `credit_account` row it has, so
+a refund or capture holding the ledger lock commits first. A late capture reads the account row
+`FOR SHARE` and therefore waits for a closure underway and then finds the account anonymised. Closing anonymises the account in place through
 `AccountAnonymisation`: the person's name and email become placeholders, the username becomes
 `anonymised-` and the account id so the name is free again, the account is disabled and records
 `anonymised_at`, its password, second factors, challenges, reset code, queued messages, notification
-entries, import references and the reasons of its credit ledger entries are deleted and its sessions
+entries, import references and the reasons of its credit ledger entries are deleted, the notes of
+the bookings and waitlist entries it made are cleared and their guests lose the names it typed, and its sessions
 end after commit. Person and account rows stay, so bookings keep a reference that names nobody.
 `identity.account.closed` names the account id only. The roster refuses to change, enable or issue
 credentials to an anonymised account with `identity.account.anonymised`, a roster synchronisation
@@ -367,6 +374,11 @@ count do not track participants.
 
 A booking card carries a guest fee per guest place, zero by default, in the currency of the club
 configuration. Amounts are stored and exchanged in the currency's minor unit, cents for the euro.
+The minor unit is the one ISO 4217 states, as Java's `Currency` reports it; the club configuration
+carries its digits as `currencyFractionDigits`, and the client reads and writes amounts in the club
+currency with them instead of the browser's own count, which differs for currencies such as the
+Albanian lek. An amount in another currency, such as a ledger entry from before a currency change,
+is shown with the browser's count.
 When a booking names a guest, `BookingWriter` stamps the card's current fee and the club currency
 on that guest, so a later fee change or currency change leaves every booked guest with what applied
 when it was booked. Changing the currency converts nothing: card fees keep their number. The booking
@@ -382,14 +394,17 @@ amount. The card administration shows the price only while the card names `EXTER
 booking dialog shows the amount to an outsider before they confirm.
 
 Each account has a credit ledger in the `credit` module: money the club holds for it, as entries
-that are appended and never changed or removed. A trigger refuses every `UPDATE` and `DELETE` on
-`credit_entry`. An entry records its kind, the signed amount in the club currency's minor unit, the
+that are appended and never changed or removed. Triggers refuse every `UPDATE`, `DELETE` and
+`TRUNCATE` on `credit_entry` and every `UPDATE` of a reason in `credit_entry_note`. An entry records its kind, the signed amount in the club currency's minor unit, the
 time, the account that recorded it and the reason, which lives in `credit_entry_note` so that
 anonymising the account can delete it while the entry stays. The balance is the sum of the entries
 in the club currency. `TREASURER` and `ADMIN` record a `CREDIT`, open only to an account holding
 `EXTERNAL`, or a `PAYOUT` of at most the balance, each between 0.01 and 10,000.00 with a reason of at
-most 200 characters and after a re-authentication no older than five minutes. A correction is an
-entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
+most 200 characters and after a re-authentication no older than five minutes. An attempt may carry an
+`Idempotency-Key`, which the treasury form always sends; the entry stores it with a fingerprint of account, kind, amount and reason, so a
+resubmitted request returns the entry the first one recorded and the same key with another request
+is refused with `credit.idempotencyKey.reused`. A request without a key appends as before. The treasury form keeps a key until the server has
+answered it. A correction is an entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
 it reads the balance, so two writes against one account run one after the other and a balance never
 goes below zero. `credit.entry.recorded` names the account, the entry, its kind, amount, currency
 and booking, never the reason. The account holder reads its balance and entries, most recent first with
@@ -412,7 +427,17 @@ with the violation `booking.payment.creditInsufficient`, carrying amount, balanc
 nothing is written. A booking that costs nothing writes no entry. Cancelling a paid booking before
 it starts appends a `BOOKING_REFUND` of the debited amount in the same transaction. The booker can
 cancel only before the cancellation deadline of their rule set, so a refund after the deadline
-happens only when somebody else, the club, cancels the booking. Once the booking has started nothing
+happens only when somebody else, the club, cancels the booking. A closure, holiday, season, narrowed
+hours, closed day or court or card taken out of service that displaces a paid booking before it
+starts cancels it for the club, with no acting account and no reason, and refunds it in the same
+transaction, past the deadline too. Under the booking-grid lock it first checks that the courts, the
+card, the current hours and the court closures still refuse the booking, so a closure ended or a
+court reactivated after the walk read it leaves the booking alone. The displacement mail then says the booking is cancelled and the
+amount is back on the booker's credit. That mail is its own message kind,
+`BOOKING_DISPLACED_CANCELLED`, so a club words it apart from the displacement of a booking that
+stays. A displaced booking without a debit stays, and a booking still
+awaiting PayPal is released as any closure releases it, so a capture that arrives later becomes credit
+as a late capture. Once the booking has started nothing
 is refunded, nor is a booking released because nobody turned up, nor one whose account has been
 anonymised since. A unique index allows one debit and one refund per booking. The treasury cannot
 record either kind by hand. The confirmation mail names the amount and whether it was paid from
@@ -542,6 +567,8 @@ PayPal reports as `FAILED` or `CANCELLED`. Before restoring it Courtside reads t
 a refund of the full amount PayPal lists there instead. A refusal marks the refund `FAILED` with
 PayPal's reason, appends a `PAYPAL_REFUND_REVERSED` of the amount and is audited as
 `payment.paypal.refundFailed`. `FAILED` is final for the order; the treasurer then pays out by hand.
+Neither a closure nor the retention run anonymises an account while a refund of it is `PENDING`, so
+the restored credit lands on an account the treasurer can still pay out.
 A capture PayPal reports as already fully refunded, for example after a refund in the PayPal
 account, is resolved by reading the order: a completed refund listed there is recorded as completed,
 otherwise the refund stays pending. Every other answer, including no answer, a timeout, a 5xx, a
@@ -762,7 +789,8 @@ booking rule that judges the booking itself runs again. The row lock orders ever
 a second one and against a cancellation; a unique index on the booking's members refuses a member
 who already plays. The offer is deleted with the acceptance. A cancelled or started booking offers
 nothing from that moment, and a sweep every five minutes deletes those offers. A closure that
-displaces the booking leaves the offer standing, as it leaves the booking.
+displaces the booking leaves the offer standing, as it leaves the booking; a paid booking the closure
+cancels offers nothing from then on.
 
 The holder is told who took the place, as they are told who withdrew; the member is told where they
 now play. Both messages may be switched off.
@@ -852,7 +880,8 @@ cannot be removed; it can only be renamed and ended early, as early as yesterday
 ended is read-only. This is a deliberate exception to correcting whatever a club entered: the days
 before today keep the hours that governed them, so statistics and the audit trail stay true. A
 board corrects a running entry by ending it yesterday and adding a new one from today.
-Bookings already on a day that a new entry closes stay; the opening-hours rule refuses every booking
+Bookings already on a day that a new entry closes stay, except a paid one, which the club cancels and
+refunds as the credit section describes; the opening-hours rule refuses every booking
 written or moved after it, a closed court with `booking.rule.openingHours.courtClosed`. Storing an
 entry tells the people in each future booking it newly leaves outside the hours or on a closed
 court, naming the kind of entry and never its name; a booking the stored version or another entry
@@ -1473,7 +1502,8 @@ booking cancellations, bookings freed without a check-in, new series, waitlist o
 a changed access code, a booking's own access code that followed its confirmation and a members' door code. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
-does not cancel the booking.
+does not cancel the booking, except a paid booking, which the club cancels and refunds and announces
+as `BOOKING_DISPLACED_CANCELLED`.
 
 Creating an account queues a welcome ahead of the first password in the same transaction, also for
 an account an import opens. It names the club, says that the sign-in details follow in a separate
@@ -1490,7 +1520,7 @@ goes out without a link. A template line holding nothing but an empty link is dr
 sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
 reminder, both messages about a taken open place, a changed and a followed access code lead to the booking on
 `/my-bookings#booking-<id>`. Cancellations, cancellations by the
-club, series messages and a members' door code lead to `/my-bookings`. A waitlist offer leads to its entry on
+club, a paid booking a closure cancelled, series messages and a members' door code lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
 the same link as its `URL`. The shipped messages with a generated credential, a reset code or a
 username carry neither a link nor the address, so members learn that a genuine one does not ask
@@ -1702,7 +1732,9 @@ account of theirs has credit ledger entries, which are never removed.
 `EXTERNAL_ACCOUNTS` anonymises, through `AccountAnonymisation` as a closure does, an account that is
 not anonymised yet, whose person holds no membership period, whose person's accounts all hold
 `EXTERNAL` and none `ADMIN`, and that was neither created nor signed in since the cut-off and has no
-own booking ending on or after it, an upcoming one included, and that holds no credit balance.
+own booking ending on or after it, an upcoming one included, and that holds no credit balance, no
+PayPal refund still `PENDING` and no PayPal order still `CREATED`. The run's re-check takes the
+`credit_account` locks of the person's accounts first, as a closure does.
 Person and account rows stay, so its bookings and ledger entries keep a reference that names nobody.
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the

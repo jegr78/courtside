@@ -1,6 +1,7 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type CreditEntry, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions, type PayPalRefundOption, type PayPalRefundStatus } from "../api/client";
+import { idempotencyKey } from "../api/idempotency";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -101,6 +102,12 @@ export function AdminCreditView() {
   </section>;
 }
 
+// Only an application refusal proves nothing was recorded; any other failure may follow a recorded entry.
+function refusedByTheLedger(failure: unknown): boolean {
+  return failure instanceof ApiError && failure.status >= 400 && failure.status < 500 && failure.status !== 408
+    && failure.status !== 429 && (failure.problem?.type.startsWith("urn:courtside:error:") ?? false);
+}
+
 const OUTCOME_TONES: Record<PayPalRefundStatus, AlertTone> = { COMPLETED: "success", PENDING: "warning", FAILED: "error" };
 
 function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: () => void }) {
@@ -116,6 +123,7 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [retry, setRetry] = useState<{ send: () => Promise<void> }>();
+  const unanswered = useRef<{ entry: CreditEntryRequest; key: string }>(undefined);
   const [refundOptions, setRefundOptions] = useState<ReadonlyMap<string, PayPalRefundOption>>(new Map());
   const [refundOptionsFailure, setRefundOptionsFailure] = useState<string>();
   const [refunding, setRefunding] = useState<CreditEntry>();
@@ -160,20 +168,25 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
     }
   }
 
-  async function send(entry: CreditEntryRequest) {
+  async function send(entry: CreditEntryRequest, key: string) {
     setPending(true);
     setError(undefined);
     setSuccess(undefined);
     try {
-      await api.recordCreditEntry(accountId, entry);
+      await api.recordCreditEntry(accountId, entry, key);
+      unanswered.current = undefined;
       entryForm.form.ref.current?.reset();
       entryForm.saved();
       setSuccess(t("admin.credit.recorded"));
       recorded();
       await ledger.reload();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) setRetry({ send: () => send(entry) });
-      else setError(problemMessage(failure, t));
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
+        setRetry({ send: () => send(entry, key) });
+      } else {
+        if (refusedByTheLedger(failure)) unanswered.current = undefined;
+        setError(problemMessage(failure, t));
+      }
     } finally {
       setPending(false);
     }
@@ -195,7 +208,13 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
       setError(t("admin.credit.noteRequired"));
       return;
     }
-    void send({ kind, amountMinor, note });
+    const entry: CreditEntryRequest = { kind, amountMinor, note };
+    const previous = unanswered.current;
+    const repeated = previous && previous.entry.kind === kind && previous.entry.amountMinor === amountMinor
+      && previous.entry.note === note;
+    const key = repeated ? previous.key : idempotencyKey();
+    unanswered.current = { entry, key };
+    void send(entry, key);
   }
 
   async function reauthenticate(event: FormEvent<HTMLFormElement>) {

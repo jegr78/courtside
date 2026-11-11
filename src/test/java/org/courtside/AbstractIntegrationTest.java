@@ -22,6 +22,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,6 +58,9 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     @Autowired
     private TestClock testClock;
@@ -97,8 +102,12 @@ public abstract class AbstractIntegrationTest {
         if (!currentTables.equals(baselineTables)) {
             throw new IllegalStateException("Integration-test schema changed after baseline capture: " + currentTables);
         }
-        jdbc.sql("TRUNCATE TABLE " + String.join(", ", baselineTables.stream()
-                .map(table -> "public." + table).toList()) + " RESTART IDENTITY CASCADE").update();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            // The ledger refuses TRUNCATE, so only this reset steps past its triggers, and only in this transaction.
+            jdbc.sql("SET LOCAL session_replication_role = replica").update();
+            jdbc.sql("TRUNCATE TABLE " + String.join(", ", baselineTables.stream()
+                    .map(table -> "public." + table).toList()) + " RESTART IDENTITY CASCADE").update();
+        });
         insertionOrder.forEach(table -> jdbc.sql("INSERT INTO public." + table
                 + " SELECT * FROM " + BASELINE_SCHEMA + "." + table).update());
     }

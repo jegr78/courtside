@@ -10,6 +10,8 @@ import org.courtside.booking.internal.CourtReservations;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtUnavailableException;
+import org.courtside.booking.internal.DisplacedPayments;
+import org.courtside.booking.internal.StandingDisplacement;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
@@ -38,6 +40,7 @@ import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -60,7 +63,7 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Transactional
-class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, UnattendedRelease {
+class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, UnattendedRelease, DisplacedPayments {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
@@ -88,6 +91,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final BookingPayments payments;
     private final PaymentMethods paymentMethods;
     private final PendingPaymentService pendingPayments;
+    private final StandingDisplacement standingDisplacement;
 
     @Override
     public UUID write(CreateBookingCommand command) {
@@ -274,12 +278,35 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
                     .increment());
             throw failure;
         }
+        return cancelAndRefund(booking, cancelledBy, cancelledAt, reason);
+    }
+
+    @Override
+    public boolean cancelCharged(UUID bookingId) {
+        bookingGridCoordination.lock();
+        if (bookings.lockById(bookingId).isEmpty()) {
+            return false;
+        }
+        entityManager.clear();
+        Booking booking = bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        Instant cancelledAt = clock.instant();
+        boolean charged = payments.paymentOf(bookingId).filter(payment -> !payment.refunded()).isPresent();
+        if (booking.getStatus() != BookingStatus.CONFIRMED || !charged || !cancelledAt.isBefore(startOf(booking))
+                || !standingDisplacement.refuses(booking)) {
+            return false;
+        }
+        return cancelAndRefund(booking, null, cancelledAt, null);
+    }
+
+    private boolean cancelAndRefund(Booking booking, @Nullable UUID cancelledBy, Instant cancelledAt,
+                                    @Nullable CancellationReason reason) {
         boolean changed = booking.cancel(cancelledBy, cancelledAt, reason);
         bookings.saveAndFlush(booking);
         if (changed) {
             pendingPayments.releaseCourtsOf(booking);
             if (cancelledAt.isBefore(startOf(booking))) {
-                payments.refund(bookingId);
+                payments.refund(booking.getId());
             }
         }
         return changed;

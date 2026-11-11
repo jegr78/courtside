@@ -86,6 +86,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:account-anonymised",
             "urn:courtside:error:account-closure-blocked-by-booking",
             "urn:courtside:error:account-closure-blocked-by-credit",
+            "urn:courtside:error:account-closure-blocked-by-payment",
             "urn:courtside:error:credit-account-not-external",
             "urn:courtside:error:credit-account-not-found",
             "urn:courtside:error:credit-insufficient",

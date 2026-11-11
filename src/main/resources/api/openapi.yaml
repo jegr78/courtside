@@ -1496,7 +1496,7 @@ components:
     ClubConfig:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale, supportedLocales, slotMinutes,
-                 timeZone, currency]
+                 timeZone, currency, currencyFractionDigits]
       properties:
         clubName: { type: string }
         installedAppName:
@@ -1565,6 +1565,15 @@ components:
             The ISO 4217 code every amount of this instance is stated in, such as a booking card's
             guest fee. Amounts travel in the currency's minor unit.
           example: EUR
+        currencyFractionDigits:
+          type: integer
+          minimum: 0
+          maximum: 4
+          description: |
+            How many digits of `currency` follow the decimal point, as ISO 4217 states them. Every amount
+            the server stores, charges and formats in this currency uses this scale, so a client reads and
+            writes amounts with it instead of a locale library's own count.
+          example: 2
 
     AdminClubConfig:
       description: |
@@ -4944,7 +4953,7 @@ components:
       enum: [ACCOUNT_WELCOME, CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
              ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_MFA_RECOVERY_CODE, ACCOUNT_SECURITY_CHANGED,
              ACCOUNT_FACTOR_GUESSING_BLOCKED, ACCOUNT_ADDRESS_CHANGED, BOOKING_CONFIRMED,
-             BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
+             BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED, BOOKING_DISPLACED_CANCELLED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
              WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED,
@@ -5102,7 +5111,7 @@ components:
 
     NotificationClosure:
       type: string
-      description: Why a displaced booking no longer fits, present on `BOOKING_DISPLACED` entries only.
+      description: Why a displaced booking no longer fits, present on `BOOKING_DISPLACED` and `BOOKING_DISPLACED_CANCELLED` entries only.
       enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED, HOLIDAY, SEASON, COURT_CLOSED]
 
     NotificationLink:
@@ -6332,8 +6341,9 @@ paths:
         Anonymises the signed-in account in place: the person's name and email become placeholders,
         the username is released, the account is disabled and its password, second factors and
         sessions are removed. Open only to an external account without a running membership and
-        without ADMIN, without an upcoming confirmed booking of its own, and with a re-authentication
-        no older than five minutes.
+        without ADMIN, without an upcoming confirmed booking of its own, without a credit balance,
+        without a PayPal order or refund PayPal has not settled, and with a re-authentication no older
+        than five minutes.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8863,7 +8873,10 @@ paths:
         `PAYOUT` larger than the balance is refused with `urn:courtside:error:credit-insufficient`.
         An anonymised account is refused with `urn:courtside:error:account-anonymised`. Requires a
         re-authentication no older than five minutes. The audit record carries the amount and
-        kind, never the reason.
+        kind, never the reason. An attempt may carry an idempotency key; repeating the same request
+        with the same key returns the entry the first one recorded instead of appending a second,
+        and the same key with another request is refused with
+        `urn:courtside:error:idempotency-key-reused`. Without a key every request appends an entry.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8872,6 +8885,15 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: An opaque key unique to this entry attempt for the authenticated account.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[\x21-\x7E]+$'
       requestBody:
         required: true
         content:

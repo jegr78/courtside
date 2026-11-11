@@ -32,7 +32,7 @@ const withoutAccount: RosterEntry = {
 const club: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#004f2d", accentColor: "#c8a415",
   logoUrl: null, imprintUrl: null, defaultLocale: "de", supportedLocales: ["de", "en"],
-  slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR"
+  slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
 };
 
 const handedOver: MessageEntry = {

@@ -700,6 +700,32 @@
       ]
     },
     {
+      "id": "credit-entry-request-fingerprint",
+      "purpose": "Recognise a repeated credit entry request so a resubmitted cash credit or payout is recorded once",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output over account, kind, amount and reason. The fingerprint recognises a repeated request and protects nothing."
+      },
+      "class": "content-hash",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, beside the credit entry it identifies.",
+      "permittedUse": "Comparing one credit entry request to another, and only within the entries the same treasury account recorded under one key. It carries no security claim and protects nothing.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; it is recomputed from what it names.",
+      "retirement": "Replaceable with any digest, since nothing outside the instance reads it.",
+      "evidence": "src/test/java/org/courtside/credit/CreditLedgerTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java"
+      ]
+    },
+    {
       "id": "club-logo-digest",
       "purpose": "Name the stored club logo so a browser can be told whether its copy is current",
       "algorithm": "SHA-256",
