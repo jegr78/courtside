@@ -801,6 +801,13 @@ reads its session from the database before it reaches the shell and still fails.
 answers navigations from the `index.html` it cached at build time, which carries neither; the
 frontend sets the language there once it starts.
 
+The update notice ends on the build the server ships. Confirming it first checks for a newer worker
+and lets one that is still installing finish, because a worker left waiting by an older open window
+would otherwise reload the page into that older build. The interface also compares its own version
+with the one `GET /api/source` reports and offers the same reload, naming both versions, when they
+differ. Without a waiting worker that reload unregisters the service worker first, so the next
+navigation reaches the server.
+
 An installed instance carries the club rather than the product. `/api/public/config/icon` serves PNG
 icons at 180, 192 and 512 pixels, rasterised from the uploaded logo or drawn from the Courtside mark.
 A maskable icon is opaque and keeps its content inside the central 80 % a launcher may crop to: a logo

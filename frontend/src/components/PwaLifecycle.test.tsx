@@ -24,14 +24,17 @@ function registrationHolds(registration: { active: ServiceWorker | null; waiting
 describe("PwaLifecycle", () => {
   beforeEach(() => registerSW.mockReset());
 
-  it("given a waiting service worker, when the user reloads, then the prompt describes the browser action and the new version is activated", async () => {
+  it("given a waiting service worker, when the user reloads, then the prompt describes the browser action and the waiting worker is confirmed", async () => {
     // given
-    registrationHolds({ active: worker, waiting: worker });
-    const update = vi.fn().mockResolvedValue(undefined);
+    const waiting = { state: "installed", postMessage: vi.fn(), addEventListener: vi.fn() };
+    const registration = { active: worker, waiting, installing: null, update: vi.fn().mockResolvedValue(undefined), unregister: vi.fn() };
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
+      getRegistration: vi.fn().mockResolvedValue(registration), addEventListener: vi.fn()
+    } });
     let needRefresh: (() => void) | undefined;
     registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
       needRefresh = options?.onNeedRefresh;
-      return update;
+      return vi.fn();
     });
     render(<PwaLifecycle />);
 
@@ -48,8 +51,53 @@ describe("PwaLifecycle", () => {
     await userEvent.click(reload);
 
     // then
-    expect(update).toHaveBeenCalledOnce();
-    expect(update).toHaveBeenCalledWith(true);
+    expect(registration.update, "the newest build may still be on its way").toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" }));
+  });
+
+  it("given the update check is still running, when the user reloads, then the button stays busy", async () => {
+    // given
+    const registration = { active: worker, waiting: worker, installing: null, update: vi.fn().mockReturnValue(new Promise(() => undefined)), unregister: vi.fn() };
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
+      getRegistration: vi.fn().mockResolvedValue(registration), addEventListener: vi.fn()
+    } });
+    let needRefresh: (() => void) | undefined;
+    registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
+      needRefresh = options?.onNeedRefresh;
+      return vi.fn();
+    });
+    render(<PwaLifecycle />);
+    needRefresh?.();
+
+    // when
+    await userEvent.click(await screen.findByTestId("pwa-update"));
+
+    // then
+    expect(screen.getByTestId("pwa-update"), "a second click would start a second replacement").toBeDisabled();
+  });
+
+  it("given the server runs another version than this interface, when the shell knows it, then the notice names both versions", async () => {
+    // given
+    registerSW.mockReturnValue(vi.fn());
+
+    // when
+    render(<PwaLifecycle serverVersion="99.0.0" />);
+
+    // then
+    const prompt = await screen.findByTestId("pwa-update-prompt");
+    expect(prompt).toHaveTextContent(`Diese Seite zeigt Courtside ${__COURTSIDE_APP_VERSION__}, der Server läuft mit 99.0.0.`);
+    expect(screen.getByTestId("pwa-update")).toHaveTextContent("Neu laden");
+  });
+
+  it("given the server runs this interface's version, when the shell knows it, then no notice is shown", () => {
+    // given
+    registerSW.mockReturnValue(vi.fn());
+
+    // when
+    render(<PwaLifecycle serverVersion={__COURTSIDE_APP_VERSION__} />);
+
+    // then
+    expect(screen.queryByTestId("pwa-update-prompt")).not.toBeInTheDocument();
   });
 
   it("given a first install still in the waiting slot, when workbox reports it as waiting, then no update prompt is shown", async () => {
