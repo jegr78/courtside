@@ -12,7 +12,9 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.payment.internal.PayPalRefunds;
 import org.courtside.payment.testfixture.PaymentTestFixture;
+import org.courtside.shared.HeldCredit;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.PaymentsInFlight;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -105,6 +108,10 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     @Autowired
     private PayPalRefunds payPalRefunds;
     @Autowired
+    private PaymentsInFlight paymentsInFlight;
+    @Autowired
+    private HeldCredit heldCredit;
+    @Autowired
     private BookingPayments bookingPayments;
     @Autowired
     private Clock clock;
@@ -142,6 +149,17 @@ class PayPalRefundTest extends PayPalIntegrationTest {
         winterHall = cards.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
         cards.priceForExternals(winterHall, 1500);
         payment.storePayPalCredentials("SANDBOX", "client-sandbox", "paypal-secret-value");
+    }
+
+    @Test
+    void whenAClosureAsksWithoutAnAccount_thenNeitherLedgerNorPayPalIsReadForNobody() {
+        // when / then
+        assertThatThrownBy(() -> paymentsInFlight.moneyHeldBy(null))
+                .as("a closure that lost its account is a bug, not an account without money")
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> heldCredit.lock(null)))
+                .as("a ledger lock without an account would hold nothing")
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

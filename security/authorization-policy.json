@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "380a7d632d557e8bd74c1bf637cf499c5ca0cc68192a3a6dac7e3550c76aa2f8",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "abb5b081d408854cd8191f92888f7591355ccbbe71316c6d214cc4fbf69fdd8d",
+  "productionAuthorizationSha256": "6e371da96dbe9d50be4ae526994d437e132585ca760da8491a945dc819c79716",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -6269,7 +6269,7 @@
     {
       "id": "outsider-account-closure",
       "title": "Outsider account closure",
-      "rule": "Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended and no credit balance; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking or a credit balance is refused without any change.",
+      "rule": "Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.",
       "attributes": [
         "current-account",
         "role",
@@ -6279,7 +6279,7 @@
         "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
         "src/main/java/org/courtside/identity/internal/AccountAnonymiser.java#anonymise",
         "src/main/java/org/courtside/booking/internal/OwnUpcomingBookings.java#heldBy",
-        "src/main/java/org/courtside/credit/internal/LedgerBalances.java#heldBy"
+        "src/main/java/org/courtside/payment/internal/PayPalPaymentsInFlight.java#moneyHeldBy"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutABooking_whenTheyCloseTheirAccount_thenNothingOfThemRemainsAndTheyCannotSignIn",
