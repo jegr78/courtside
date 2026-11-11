@@ -1,8 +1,10 @@
-import i18n from "i18next";
+import i18n, { type TFunction } from "i18next";
 import { initReactI18next } from "react-i18next";
 import de from "./locales/de";
 
 type Translation = Record<keyof typeof de, string>;
+
+export type Translate = TFunction<string | readonly string[]>;
 
 // The default language ships with the entry, so a bundle that fails to arrive never leaves keys on screen.
 export const localeBundles = {

@@ -9,6 +9,7 @@ import { TextField } from "../components/TextField";
 import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { formatBookingPeriod } from "../time/clubZone";
 import { violationMessage } from "../api/problem-message";
+import type { Translate } from "../i18n";
 
 const WEEKDAYS: DayOfWeek[] = [
   "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
@@ -246,7 +247,7 @@ export function SeriesCreatedNotice({ result, durationMinutes, timeZone }: {
   </div>;
 }
 
-function blockedBy(occurrence: Occurrence, t: (key: string, params?: Record<string, unknown>) => string): string {
+function blockedBy(occurrence: Occurrence, t: Translate): string {
   if (occurrence.violations.length > 0) {
     return occurrence.violations.map((violation) => violationMessage(violation.code, violation.params, t)).join(", ");
   }

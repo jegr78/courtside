@@ -13,6 +13,7 @@ import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 import { formatCalendarDate } from "../time/clubZone";
+import type { Translate } from "../i18n";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
@@ -52,7 +53,6 @@ function isTableHeadShown(): boolean {
   return window.matchMedia(TABLE_HEAD_FROM).matches;
 }
 
-type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 function accessFilter(value: string | null): AccessFilter | undefined {
   return value === NOT_CHOSEN || CREDENTIAL_STATES.includes(value as CredentialState) ? value as AccessFilter : undefined;

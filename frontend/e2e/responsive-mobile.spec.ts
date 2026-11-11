@@ -1586,7 +1586,9 @@ for (const [width, locale] of [[390, "de-DE"], [390, "en-GB"], [1280, "de-DE"], 
       const style = getComputedStyle(input);
       const context = document.createElement("canvas").getContext("2d")!;
       context.font = style.font;
-      const content = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      // Chrome 158 leaves the spin control out of clientWidth, so the box is measured from its border edge.
+      const content = input.offsetWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+        - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       return { placeholder: input.placeholder, text: Math.ceil(context.measureText(input.placeholder).width), content: Math.floor(content) };
     });
     expect(room.placeholder, "the empty count shows a placeholder").not.toBe("");

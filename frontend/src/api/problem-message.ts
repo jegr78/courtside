@@ -3,6 +3,7 @@ import i18n from "../i18n";
 import { formatMinor } from "../money";
 import { formatClockTime, formatTime } from "../time/clubZone";
 import { ApiError, type Problem } from "./client";
+import type { Translate } from "../i18n";
 
 const TYPE_PREFIX = "urn:courtside:error:";
 // A default no bundle carries, so a missing key is told apart from a translation.
@@ -41,7 +42,7 @@ export function failureReference(failure: unknown): string | undefined {
   return spanId ? `${traceId}/${spanId}` : traceId;
 }
 
-export function violationMessage(code: string, params: Record<string, unknown>, t: (key: string, options?: Record<string, unknown>) => string): string {
+export function violationMessage(code: string, params: Record<string, unknown>, t: Translate): string {
   const message = t(code, {
     ...params, ...clockTimes(params), ...amounts(params), ...instants(params), defaultValue: MISSING
   });
