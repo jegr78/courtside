@@ -62,18 +62,23 @@ class FakeWorker {
   }
 }
 
+const controlling = new FakeWorker("activated");
+
 function registrationWith(waiting: FakeWorker | null, installing: FakeWorker | null = null) {
   return {
-    waiting, installing,
+    waiting, installing, active: controlling as FakeWorker | null,
     update: vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
     unregister: vi.fn<() => Promise<boolean>>().mockResolvedValue(true)
-  } satisfies UpdatableRegistration & { waiting: FakeWorker | null; installing: FakeWorker | null };
+  } satisfies UpdatableRegistration & { waiting: FakeWorker | null; installing: FakeWorker | null; active: FakeWorker | null };
 }
 
 function controllerChanges() {
   const listeners: Array<() => void> = [];
   return {
-    container: { addEventListener: (_type: "controllerchange", listener: () => void) => { listeners.push(listener); } },
+    container: {
+      controller: controlling as FakeWorker | null,
+      addEventListener: (_type: "controllerchange", listener: () => void) => { listeners.push(listener); }
+    },
     change: () => listeners.forEach((listener) => listener())
   };
 }
@@ -175,6 +180,59 @@ describe("replaceInterface", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("given a newer worker still installing when the time runs out, when the interface is replaced, then the older one is not confirmed", async () => {
+    // given
+    vi.useFakeTimers();
+    try {
+      const older = new FakeWorker("installed");
+      const registration = registrationWith(older, new FakeWorker("installing"));
+      const reload = vi.fn();
+
+      // when
+      const replaced = replaceInterface(registration, controllerChanges().container, reload, replacement);
+      const refused = expect(replaced).rejects.toThrow("still installing");
+      await vi.advanceTimersByTimeAsync(30_000);
+      await refused;
+
+      // then
+      expect(older.postMessage, "confirming it would reload into the older build").not.toHaveBeenCalled();
+      expect(reload).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("given a confirmed worker that never takes control of this window, when the time runs out, then the page reloads anyway", async () => {
+    // given
+    vi.useFakeTimers();
+    try {
+      const reload = vi.fn();
+      await replaceInterface(registrationWith(new FakeWorker("installed")), controllerChanges().container, reload, replacement);
+
+      // when
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      // then
+      expect(reload, "an uncontrolled window gets no controllerchange").toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("given another window already activated a newer worker, when nothing waits here, then the page reloads without unregistering", async () => {
+    // given
+    const registration = registrationWith(null);
+    registration.active = new FakeWorker("activated");
+    const reload = vi.fn();
+
+    // when
+    await replaceInterface(registration, controllerChanges().container, reload, replacement);
+
+    // then
+    expect(registration.unregister, "the newer worker is healthy and serves the next navigation").not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it("given a confirmed worker, when it takes control, then the page reloads and not before", async () => {

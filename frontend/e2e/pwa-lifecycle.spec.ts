@@ -325,8 +325,12 @@ test("confirming the update notice runs the build the server ships, not an older
   await expect(later.getByTestId("admin-shell")).toBeVisible();
   await expect.poll(() => loaded).toContain(shipped.adminRoutes);
   expect(new Set(loaded), "no bundle of an older build is loaded").toEqual(new Set([shipped.index, shipped.adminRoutes]));
-  await requestUpdate(later);
-  await expect(later.getByTestId("pwa-update-prompt"), "nothing newer waits").not.toBeVisible();
+  expect(await later.evaluate(async () => {
+    const registration = await navigator.serviceWorker.getRegistration();
+    await registration?.update();
+    return Boolean(registration?.installing ?? registration?.waiting);
+  }), "nothing newer waits").toBe(false);
+  await expect(later.getByTestId("pwa-update-prompt")).not.toBeVisible();
 });
 
 test("an interface of another version than the server reports both and ends on the server's interface", async ({ page, journeyService }) => {

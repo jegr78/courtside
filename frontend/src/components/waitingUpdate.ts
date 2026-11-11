@@ -10,6 +10,7 @@ type UpdatableWorker = Pick<ServiceWorker, "state" | "postMessage"> & {
 };
 
 export interface UpdatableRegistration {
+  readonly active: object | null;
   readonly installing: UpdatableWorker | null;
   readonly waiting: UpdatableWorker | null;
   update(): Promise<unknown>;
@@ -17,6 +18,7 @@ export interface UpdatableRegistration {
 }
 
 interface ControllerChanges {
+  readonly controller: object | null;
   addEventListener(type: "controllerchange", listener: () => void, options?: AddEventListenerOptions): void;
 }
 
@@ -52,12 +54,16 @@ export async function replaceInterface(registration: UpdatableRegistration | und
   } finally {
     clearTimeout(timer);
   }
+  if (installing?.state === "installing") throw new Error("The newest build is still installing");
   const waiting = registration.waiting ?? (installing?.state === "installed" ? installing : null);
   if (!waiting) {
-    if (unregisterWithoutWaiting) await registration.unregister().catch(() => false);
+    const controlledByActive = registration.active === container.controller;
+    if (unregisterWithoutWaiting && controlledByActive) await registration.unregister().catch(() => false);
     reload();
     return;
   }
   container.addEventListener("controllerchange", reload, { once: true });
+  // A window the worker does not control yet gets no controllerchange.
+  setTimeout(reload, 10_000);
   waiting.postMessage({ type: "SKIP_WAITING" });
 }

@@ -5,6 +5,6 @@ import { replaceInterface, type Replacement } from "../components/waitingUpdate"
 export async function recoverStaleDocument(replacement: Replacement = { unregisterWithoutWaiting: false }): Promise<void> {
   const container = "serviceWorker" in navigator ? navigator.serviceWorker : undefined;
   const registration = await container?.getRegistration().catch(() => undefined);
-  await replaceInterface(registration, container ?? { addEventListener: () => undefined },
+  await replaceInterface(registration, container ?? { controller: null, addEventListener: () => undefined },
     () => window.location.reload(), replacement);
 }
