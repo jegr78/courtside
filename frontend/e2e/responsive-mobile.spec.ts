@@ -5,6 +5,8 @@ import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeri
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
 import { expectNoWcagViolations } from "./accessibility-checks";
 
+test.describe.configure({ mode: "parallel" });
+
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
     const viewportWidth = document.documentElement.clientWidth;

@@ -655,11 +655,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { label: functional-1, group: functional, shard: 1/3 }
-          - { label: functional-2, group: functional, shard: 2/3 }
-          - { label: functional-3, group: functional, shard: 3/3 }
-          - { label: phone-iphone, group: phone-iphone, shard: "" }
-          - { label: phone-android, group: phone-android, shard: "" }
+          - { label: functional-1, group: functional, shard: 1/4 }
+          - { label: functional-2, group: functional, shard: 2/4 }
+          - { label: functional-3, group: functional, shard: 3/4 }
+          - { label: functional-4, group: functional, shard: 4/4 }
+          - { label: phone-iphone-1, group: phone-iphone, shard: 1/2 }
+          - { label: phone-iphone-2, group: phone-iphone, shard: 2/2 }
+          - { label: phone-android-1, group: phone-android, shard: 1/2 }
+          - { label: phone-android-2, group: phone-android, shard: 2/2 }
           - { label: chromium-accessibility-1, group: chromium-accessibility, shard: 1/2 }
           - { label: chromium-accessibility-2, group: chromium-accessibility, shard: 2/2 }
           - { label: webkit-accessibility-1, group: webkit-accessibility, shard: 1/2 }

@@ -7,9 +7,11 @@ export const regularBrowserProjectGroups = {
   "webkit-accessibility": ["webkit-accessibility"]
 } as const;
 
-// Playwright shards by file while fullyParallel is off, so a count needs files to divide.
+// Playwright shards by file while fullyParallel is off, and by test in a parallel-mode file.
 export const browserGroupShards = {
-  functional: 3,
+  functional: 4,
+  "phone-iphone": 2,
+  "phone-android": 2,
   "chromium-accessibility": 2,
   "webkit-accessibility": 2
 } as const;
