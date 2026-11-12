@@ -1,15 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
+import { useLaidOpen } from "./laidOpen";
 import { ScrollContinuation } from "./ScrollContinuation";
 import { useScrollContinuation } from "./useScrollContinuation";
 
-const laidOpenFrom = window.matchMedia("(width >= 1024px)");
-
-function subscribe(changed: () => void) {
-  laidOpenFrom.addEventListener("change", changed);
-  return () => laidOpenFrom.removeEventListener("change", changed);
-}
 
 interface Destination {
   to: string;
@@ -98,7 +93,7 @@ export function AdminNavigation({ administrator = true, treasurer = false, appoi
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const current = currentLabel(pathname);
-  const laidOpen = useSyncExternalStore(subscribe, () => laidOpenFrom.matches, () => false);
+  const laidOpen = useLaidOpen();
   const [unfolded, setUnfolded] = useState(false);
   const disclosure = useRef<HTMLDetailsElement>(null);
   const folding = unfolded && !laidOpen;

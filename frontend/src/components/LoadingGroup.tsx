@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type Pending = (change: 1 | -1) => void;
@@ -63,9 +63,14 @@ export function LoadingTracker({ quiet, children }: { quiet: (isQuiet: boolean) 
  * Shows its content once no {@link LoadingStatus} inside it is mounted, and never hides it again,
  * so sections that load separately appear together instead of pushing each other down.
  */
-export function LoadingGroup({ testId, className, children }: { testId: string; className?: string; children: ReactNode }) {
+export function LoadingGroup({ testId, className, revealed, children }: {
+  testId: string; className?: string; revealed?: () => void; children: ReactNode;
+}) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (shown) revealed?.();
+  }, [shown, revealed]);
   const reveal = useCallback((isQuiet: boolean) => {
     if (isQuiet) setShown(true);
   }, []);

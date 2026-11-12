@@ -1150,6 +1150,10 @@ when that period or its value is missing. Each links to `/admin/utilisation` wit
 `from` and `to`. The overview sends one read per statistics section, the two member figures share
 theirs, and a failed read takes down only the figures built on it.
 
+The setup checklist and the key figures appear together once their reads have answered. The four
+parts below them read nothing until those have appeared and the parts are within one screen of the
+window, so on a phone the first view does not wait for reads it does not show.
+
 Statistics answer four reads under `/api/admin/statistics`: utilisation, bookings, members and
 messages. Each takes a period of club-local dates in the years 0001 to 9999 spanning at most
 36,525 days, defaults to the last full calendar month, answers aggregates only and repeats its figures for the

@@ -44,7 +44,8 @@ test("a board whose log could not be read tries again and reads it without reloa
   // given
   await signInAsAdministrator(page);
   let reads = 0;
-  await page.route("**/api/admin/messages?**", async (route) => {
+  // Only the log's own read: the overview behind the sign-in reads the same endpoint for its card.
+  await page.route((url) => url.pathname === "/api/admin/messages" && url.searchParams.get("limit") === "50", async (route) => {
     reads += 1;
     if (reads > 1) return route.continue();
     await route.fulfill({

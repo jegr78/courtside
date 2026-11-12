@@ -13,6 +13,7 @@ import { useReportedFailure } from "../failures/useReportedFailure";
 import { addDays, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange, formatDate, formatDateTime,
   startOfWeek } from "../time/clubZone";
 import { SetupProgress, SetupSteps } from "./setup/SetupChecklist";
+import { WhenNear } from "../components/WhenNear";
 import { REQUIRED_STEPS, useSetupSteps } from "./setup/useSetupSteps";
 
 const SHOWN = 5;
@@ -312,20 +313,25 @@ function ChangesCard() {
 
 export function AdminOverviewView({ clock = systemClock }: { clock?: () => Date }) {
   const { t } = useTranslation();
+  // The cards wait for the sections above, which would otherwise push them down as they appear.
+  const [shown, setShown] = useState(false);
+  const reveal = useCallback(() => setShown(true), []);
   return <section data-testid="admin-overview-view" className="surface-panel grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="grid gap-2">
       <h1 className="text-3xl font-bold">{t("admin.overview.title")}</h1>
       <p className="text-muted">{t("admin.overview.description")}</p>
     </div>
-    <LoadingGroup testId="admin-overview" className="grid gap-6">
+    <LoadingGroup testId="admin-overview" className="grid gap-6" revealed={reveal}>
       <SetupSection />
       <KeyFigures clock={clock} />
-      <div className="grid gap-4 md:grid-cols-2">
-        <TodayCard clock={clock} />
-        <CredentialsCard />
-        <MessagesCard />
-        <ChangesCard />
-      </div>
+      {shown && <WhenNear testId="admin-overview-cards">
+        <LoadingGroup testId="admin-overview-cards" className="grid gap-4 md:grid-cols-2">
+          <TodayCard clock={clock} />
+          <CredentialsCard />
+          <MessagesCard />
+          <ChangesCard />
+        </LoadingGroup>
+      </WhenNear>}
     </LoadingGroup>
   </section>;
 }
