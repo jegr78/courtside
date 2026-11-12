@@ -157,9 +157,10 @@ export function releasePullRequestOf(pull, mergeCommitIsAncestor, branch = "main
     mergeCommitIsAncestor: commitPattern.test(mergeCommit ?? "") && mergeCommitIsAncestor === true };
 }
 
-export function greenExactBuild(pages, repository, branch = "main") {
+/** A push build plans by its diff, so it proves every job only on a release commit, which plans full. */
+export function greenExactBuild(pages, repository, branch = "main", { releaseCommit = false } = {}) {
   const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === branch
-    && (candidate.event === "push" || candidate.event === "workflow_dispatch")
+    && ((candidate.event === "push" && releaseCommit === true) || candidate.event === "workflow_dispatch")
     && candidate.conclusion === "success"
     && candidate.head_repository?.full_name === repository)
     .toSorted((left, right) => right.id - left.id)[0];
@@ -240,7 +241,7 @@ export function gatherFacts(options, environment = process.env) {
   if (event === "workflow_dispatch") {
     facts.exactBuild = greenExactBuild(
       api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),
-      repository, branch);
+      repository, branch, { releaseCommit: facts.manifest !== facts.parentManifest });
   }
   facts.newestLine = newestLineVerdict(facts.manifest, JSON.parse(command(process.execPath,
     [fileURLToPath(new URL("./published-release-tags.mjs", import.meta.url))])));

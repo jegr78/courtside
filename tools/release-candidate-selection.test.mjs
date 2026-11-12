@@ -269,13 +269,29 @@ test("given build runs of a commit, when the exact build is read, then only a gr
     head_repository: { full_name: "jegr78/courtside" }, path: ".github/workflows/build.yml" };
 
   // when / then
-  assert.deepEqual(greenExactBuild([{ workflow_runs: [green] }], "jegr78/courtside"),
+  assert.deepEqual(greenExactBuild([{ workflow_runs: [green] }], "jegr78/courtside", "main", { releaseCommit: true }),
     { runId: 37211926309, runAttempt: 1 });
   for (const other of [{ head_branch: "feature" }, { event: "pull_request" }, { conclusion: "failure" },
     { head_repository: { full_name: "someone/courtside" } }]) {
-    assert.equal(greenExactBuild([{ workflow_runs: [{ ...green, ...other }] }], "jegr78/courtside"), null,
+    assert.equal(greenExactBuild([{ workflow_runs: [{ ...green, ...other }] }], "jegr78/courtside", "main",
+      { releaseCommit: true }), null,
       `${JSON.stringify(other)} is not the exact-sha build on main`);
   }
+});
+
+test("given a later commit whose push build planned only part of the jobs, when a candidate is dispatched, then only a release commit's push build counts", () => {
+  // given
+  const push = { id: 37211926309, run_attempt: 1, event: "push", head_branch: "main", conclusion: "success",
+    head_repository: { full_name: "jegr78/courtside" } };
+  const dispatched = { ...push, id: 37211926310, event: "workflow_dispatch" };
+
+  // when / then
+  assert.equal(greenExactBuild([{ workflow_runs: [push] }], "jegr78/courtside", "main", { releaseCommit: false }), null,
+    "a push build plans by its diff, so only a release commit's push build ran every job");
+  assert.deepEqual(greenExactBuild([{ workflow_runs: [push, dispatched] }], "jegr78/courtside", "main",
+    { releaseCommit: false }), { runId: 37211926310, runAttempt: 1 }, "a dispatched build always runs every job");
+  assert.equal(greenExactBuild([{ workflow_runs: [push] }], "jegr78/courtside"), null,
+    "without the commit's kind a push build does not count");
 });
 
 test("given a push build that turned green on its second attempt, when a candidate is selected, then that attempt is recorded",
@@ -285,7 +301,7 @@ test("given a push build that turned green on its second attempt, when a candida
       head_repository: { full_name: "jegr78/courtside" } };
 
     // when
-    const exactBuild = greenExactBuild([{ workflow_runs: [rerun] }], "jegr78/courtside");
+    const exactBuild = greenExactBuild([{ workflow_runs: [rerun] }], "jegr78/courtside", "main", { releaseCommit: true });
     const dispatched = selectReleaseCandidate(dispatch({ exactBuild }));
     const finished = selectReleaseCandidate(workflowRun({ build: { ...workflowRun().build, runAttempt: 2 } }));
 

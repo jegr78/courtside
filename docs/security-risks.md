@@ -373,9 +373,9 @@ or an organization the project controls.
 
 ## Reduced pull-request profiles depend on correct classification
 
-Pull requests run checks selected from closed path inventories. Unknown files, deletions, renames,
-classifier failures and policy changes select the full build. Main and scheduled builds run every
-check. A wrong mapping can therefore surface after merge. Reconsider shadow comparison only when it
+Pull requests and pushes to `main` run checks selected from closed path inventories. Unknown files,
+deletions, renames, classifier failures and policy changes select the full build. Scheduled and
+dispatched builds run every check, so a wrong mapping can stay hidden until the next nightly. Reconsider shadow comparison only when it
 can measure misses without paying full-build cost on every pull request.
 
 ## Some security controls rely on documented reasoning

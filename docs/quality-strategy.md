@@ -82,7 +82,11 @@ paths. Pull requests record those commands and results against the committed hea
 a complete local verification or repeat the CI profile plan before pushing. Full integration,
 browser, deployment and security verification belongs to CI.
 
-The pull-request workflow uses a conservative test-profile plan to select its required jobs. One
+The pull-request workflow uses a conservative test-profile plan to select its required jobs. A push
+to `main` plans the same way, from the diff to the previous `main` head, and still skips the release
+gates and the shifted clock; the scheduled and dispatched builds always run everything. A pull
+request has already proved its change against its base, so a merge spends runners only on what the
+merged diff touches, and they stay free for the next pull request. One
 closed contract defines each profile's CI jobs and local tasks. CI reads it from the pull request's
 base commit and the local runner from its merge base with `origin/main`, so a branch cannot classify
 itself with rules it brings, and every file that decides a selection is itself classified `full`.
@@ -141,8 +145,8 @@ the version into, and only when each of those files equals its base once the man
 is replaced by the new one. Both versions must be release versions, and each file must hold the old
 version exactly as often as the configuration names version fields in it, so a dependency that
 happens to share the version cannot ride along. Any other change or byte keeps the plan `full`. Merging the release
-commit changes those files on `main`, where the push build is not reduced and verifies it whole
-before the candidate starts.
+commit changes those files on `main`, where the push build plans without the pull request event,
+so it runs full before the candidate starts.
 
 The `security-tooling` profile covers the tools that start, observe and clean up the disposable
 security environment. Nothing else in a full run executes them: Maven, the browser journeys and the
@@ -177,7 +181,7 @@ The selection has no separate admission step. What keeps it honest is that both 
 closed and everything unrecognised fails closed: an unclassified path, a structural change such as a
 rename or a deletion, a manifest entry whose file no longer exists and a classifier that throws all
 select `full`. The repository variable `COURTSIDE_TEST_PROFILES` forces the complete job set for every
-pull request unless it is empty or reads `admitted`, so a typo escalates rather than silently
+pull request and push to `main` unless it is empty or reads `admitted`, so a typo escalates rather than silently
 reducing, and the run summary says when it did. That is the immediate rollback. The retained local
 profile runner is diagnostic tooling, not an agent finalisation requirement. Local pre-push evidence
 comes from the focused checks for the change; CI enforces the selected complete job set.

@@ -50,7 +50,7 @@ test("given a complete build, when it finishes, then it calls the image workflow
   const image = buildWorkflow.jobs["nightly-image"];
 
   // when / then
-  assert.equal(image.needs, "build");
+  assert.deepEqual(image.needs, ["test-profile-plan", "build"]);
   assert.match(String(image.if), /github\.event_name == 'schedule'/);
   assert.match(String(image.if), /github\.event_name == 'workflow_dispatch'/);
   assert.match(String(image.if), /github\.ref == 'refs\/heads\/main'/);
