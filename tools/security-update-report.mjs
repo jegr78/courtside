@@ -7,20 +7,56 @@ import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const securityFiles = readdirSync(new URL("../security", import.meta.url))
   .map((name) => `security/${name}`);
-const securityToolFiles = readdirSync(new URL("../tools", import.meta.url))
-  .filter((name) => name.startsWith("security-") && !name.includes(".test.") && /\.(?:mjs|py)$/.test(name))
-  .map((name) => `tools/${name}`);
-// Paired assessments vary tool and deployment inputs, not the application's build descriptor.
-export const securityRuntimeFiles = [
-  ".github/workflows/build.yml",
-  ".github/actions/trivy-databases/action.yml",
-  "deploy/compose.security.yaml",
-  "deploy/Caddyfile.security",
-  "frontend/package-lock.json",
-  ...securityFiles,
-  "tools/courtside.mjs",
-  ...securityToolFiles
-].toSorted();
+const comparisonWorkflow = ".github/workflows/build.yml";
+const securityDeployment = "deploy/compose.security.yaml";
+
+function securityToolFiles(listing) {
+  return listing.filter((path) => /^tools\/security-[^/]+\.(?:mjs|py)$/.test(path) && !path.includes(".test."));
+}
+
+// What a paired run varies: the tools, the deployment both legs start and the files those name.
+// The inventories under security/ describe the application both legs scan, so they stay out.
+function assessmentInputs(read, listing) {
+  const tools = securityToolFiles(listing);
+  const job = runtimeContent(comparisonWorkflow, read(comparisonWorkflow)) ?? "";
+  const deployment = read(securityDeployment) ?? "";
+  const sources = [...tools, securityDeployment, "deploy/Caddyfile.security"].map(read).filter(Boolean).concat(job);
+  const named = (path) => sources.some((source) => source.includes(path.slice(path.lastIndexOf("/") + 1)));
+  return [...new Set([
+    comparisonWorkflow,
+    ".github/actions/trivy-databases/action.yml",
+    securityDeployment,
+    "deploy/Caddyfile.security",
+    "frontend/package-lock.json",
+    "tools/courtside.mjs",
+    "tools/fixture-artifact.mjs",
+    ...tools,
+    ...listing.filter((path) => path.startsWith("security/") && named(path)),
+    ...listing.filter((path) => /^tools\/[^/]+\.(?:mjs|py)$/.test(path) && job.includes(path)),
+    ...[...job.matchAll(/uses: \.\/(\.github\/actions\/[\w-]+)/g)].map(([, action]) => `${action}/action.yml`),
+    ...listing.filter((path) => path.startsWith("deploy/")
+      && new RegExp(`\\./${path.slice("deploy/".length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w.-])`).test(deployment))
+  ])].toSorted();
+}
+
+function trackedFiles(revision) {
+  try {
+    return execFileSync("git", ["ls-tree", "-r", "--name-only", revision], {
+      cwd: repository, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+    }).trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function currentListing() {
+  const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+    cwd: repository, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+  }).trim().split("\n").filter(Boolean);
+  return tracked.filter((path) => existsSync(new URL(`../${path}`, import.meta.url)));
+}
+
+export const securityRuntimeFiles = assessmentInputs(currentFile, currentListing());
 const currentSchemaFiles = securityFiles.filter((path) => path.endsWith(".schema.json")).toSorted();
 
 function digest(bytes) {
@@ -53,13 +89,21 @@ function baseFiles(base, directory, predicate) {
 }
 
 function runtimeFiles(base) {
-  const baseSecurity = baseFiles(base, "security", () => true);
-  const baseTools = baseFiles(base, "tools", (path) => /\/security-[^/]+\.(?:mjs|py)$/.test(path)
-    && !path.includes(".test."));
-  return [...new Set([...securityRuntimeFiles, ...baseSecurity, ...baseTools])].toSorted();
+  const baseInputs = assessmentInputs((path) => baseFile(base, path), trackedFiles(base));
+  return [...new Set([...securityRuntimeFiles, ...baseInputs])].toSorted();
+}
+
+// Only the job that runs the paired assessment, so reshaping the rest of the build starts no paired run.
+export function comparisonJob(workflow) {
+  const lines = workflow.split("\n");
+  const start = lines.indexOf("  tool-update-comparison:");
+  if (start < 0) throw new Error(`${comparisonWorkflow} no longer declares the tool-update-comparison job`);
+  const end = lines.findIndex((line, index) => index > start && /^ {2}\S/.test(line));
+  return lines.slice(start, end < 0 ? undefined : end).join("\n");
 }
 
 function runtimeContent(path, bytes) {
+  if (bytes !== null && path === comparisonWorkflow) return comparisonJob(bytes);
   if (bytes === null || path !== "frontend/package-lock.json") return bytes;
   const lock = JSON.parse(bytes);
   const root = lock.packages?.[""];

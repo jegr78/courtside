@@ -219,7 +219,12 @@ or lost that `security/tool-update-acknowledgement.json` does not name: the diff
 run exists to produce, so it is written to the job summary and has to be recorded in the pull
 request before the branch passes. The run itself is triggered by the digest of what a paired run
 varies, the assessment's code and contract, the deployment description each side reads, and the
-lockfile the tools resolve against. The lockfile comparison omits its two consistent root package version fields and JSON formatting. Resolved dependency versions, root dependency constraints and every other field remain part of the comparison. A dependency bump of the application is not a tool update. That
+lockfile the tools resolve against. Of `security/` and `deploy/` it counts only the files the
+`security-*` tools, the security deployment or the comparison job name, at the base or the candidate.
+The inventories that describe the application stay out, because both legs assess the same target
+image and an inventory changes neither toolchain. Of the build workflow it counts only the comparison
+job, and a build whose comparison job is gone or renamed stops the decision rather than counting the
+whole file. The lockfile comparison omits its two consistent root package version fields and JSON formatting. Resolved dependency versions, root dependency constraints and every other field remain part of the comparison. A dependency bump of the application is not a tool update. That
 decision is a job of its own, and the comparison is a second job started only by its answer, so a
 pull request that varies nothing shows the comparison as skipped rather than as a check that passed
 without assessing anything. The report naming what changed is retained either way. An incomplete result remains comparable

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
+import { comparisonJob, runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
   semanticJsonChanges, writeSecurityUpdateReport } from "./security-update-report.mjs";
 
 test("given the actual npm lockfile, when release metadata alone changes, then the CLI skips a paired assessment but still detects dependency changes", () => {
@@ -54,6 +54,64 @@ test("given the actual npm lockfile, when release metadata alone changes, then t
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("given application changes beside the assessment runtime, when the CLI compares them, then only a scanner input demands a paired run", () => {
+  // given
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "assessment-runtime-scope-")));
+  for (const child of ["tools", "security", ".github/workflows"]) mkdirSync(join(directory, child), { recursive: true });
+  copyFileSync(new URL("./security-update-report.mjs", import.meta.url), join(directory, "tools/security-update-report.mjs"));
+  copyFileSync(new URL("../security/run-contract.json", import.meta.url), join(directory, "security/run-contract.json"));
+  writeFileSync(join(directory, "tools/security-scanner.mjs"), "export const policy = \"security/scanner-policy.json\";\n");
+  const write = (path, content) => writeFileSync(join(directory, path), content);
+  write("security/scanner-policy.json", "{\"rules\":[1]}");
+  write("security/data-protection-inventory.json", "{\"columns\":[\"a\"]}");
+  const workflow = (backend, comparison) => `name: build\njobs:\n  backend:\n    runs-on: ${backend}\n`
+    + `  tool-update-comparison:\n    runs-on: ${comparison}\n  docs:\n    runs-on: ubuntu-latest\n`;
+  write(".github/workflows/build.yml", workflow("ubuntu-latest", "ubuntu-latest"));
+  const git = (...args) => execFileSync("git", args, { cwd: directory, stdio: "pipe" });
+  git("init");
+  git("add", ".");
+  git("-c", "user.name=Example Developer", "-c", "user.email=developer@example.org", "commit", "-m", "test: capture a runtime");
+  const compare = () => {
+    execFileSync(process.execPath, [join(directory, "tools/security-update-report.mjs"), "--base", "HEAD",
+      "--output", join(directory, "report.md"), "--identity-output", join(directory, "identity.json")], { stdio: "pipe" });
+    return JSON.parse(readFileSync(join(directory, "identity.json"), "utf8")).comparisonRequired;
+  };
+
+  // when / then
+  try {
+    write("security/data-protection-inventory.json", "{\"columns\":[\"a\",\"b\"]}");
+    assert.equal(compare(), false, "an inventory describes the application the gate scans anyway, not a scanner");
+    write(".github/workflows/build.yml", workflow("ubuntu-24.04", "ubuntu-latest"));
+    assert.equal(compare(), false, "another job of the build is not the paired assessment");
+    write(".github/workflows/build.yml", workflow("ubuntu-24.04", "ubuntu-24.04"));
+    assert.equal(compare(), true, "the paired assessment's own job is part of its runtime");
+    git("checkout", "--", ".github/workflows/build.yml");
+    write("security/scanner-policy.json", "{\"rules\":[2]}");
+    assert.equal(compare(), true, "a file an assessment tool reads is part of the runtime");
+    rmSync(join(directory, "security/scanner-policy.json"));
+    assert.equal(compare(), true, "a scanner file the base read and the candidate lost is a change");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given this repository's build workflow, when its other jobs change, then the paired assessment's job reads the same", () => {
+  // given
+  const workflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+  const job = comparisonJob(workflow);
+
+  // when
+  const reshaped = workflow.replace(/^ {2}backend:\n/m, "  backend:\n    # reshaped\n");
+
+  // then
+  assert.match(job, /^ {2}tool-update-comparison:\n/);
+  assert.doesNotMatch(job, /^ {2}backend:/m, "the block ends where the next job begins");
+  assert.notEqual(reshaped, workflow);
+  assert.equal(comparisonJob(reshaped), job);
+  assert.throws(() => comparisonJob(workflow.replace("  tool-update-comparison:", "  tool-comparison:")),
+    /no longer declares the tool-update-comparison job/, "a renamed job must not quietly make every build edit a paired run");
 });
 
 test("given a proposed security-tool update, when comparing it with the base, then versions policies and schemas are visible", () => {
@@ -129,8 +187,16 @@ test("given the assessment runtime, when identifying a candidate, then execution
     "tools/courtside.mjs", "tools/security-environment.mjs", "tools/security-triage.mjs",
     "tools/security-request-gateway.py", "deploy/compose.security.yaml",
     "deploy/Caddyfile.security", "frontend/package-lock.json",
-    "security/run-contract.json", "security/resource-abuse.js"
+    "security/run-contract.json", "security/resource-abuse.js", ".github/actions/npm-network/action.yml",
+    "deploy/Caddyfile.security-password-breach", "tools/courtside.uat-smoke.mjs", "tools/fixture-artifact.mjs"
   ]) assert.equal(files.has(path), true, path);
+  assert.equal(files.has("deploy/Caddyfile"), false, "the production proxy is not what the security deployment mounts");
+  for (const path of ["security/data-protection-inventory.json", "security/authorization-policy.json",
+    "security/published-web-resources.json", "security/resource-demand-inventory.json", "security/production-workflows.json"]) {
+    assert.equal(files.has(path), false, `${path} describes the application; the active gate assesses that on every run`);
+  }
+  for (const path of ["security/zap-authenticated-policy.json", "security/openapi-fuzz-policy.json",
+    "security/exceptions.json", "security/schemathesis_credentials.py"]) assert.equal(files.has(path), true, path);
   for (const path of ["pom.xml", "frontend/package.json"]) {
     assert.equal(files.has(path), false,
       `${path} describes the application, and each side of a paired run now builds its own. A `
