@@ -208,6 +208,11 @@ test("given plan schema 7, when the plan is read, then the release gates and the
     "selection, enforcement and summary all walk the ten jobs");
 });
 
+test("given the pull request plan, when the classifier runs, then it names the event that reduces a release bump", () => {
+  // when / then
+  assert.match(workflow, /--labels "\$LABELS" \\\n {14}--event pull_request \\\n/);
+});
+
 test("given the plan's security decision, when the gates run for a pull request, then only a surface change starts the active assessment", () => {
   // given
   const gates = readFileSync(new URL("../.github/workflows/release-gates.yml", import.meta.url), "utf8");

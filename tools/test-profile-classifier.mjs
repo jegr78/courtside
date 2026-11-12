@@ -10,6 +10,8 @@ const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
 const toolManifestUrl = new URL("../ci/tool-profile-manifest.json", import.meta.url);
 const githubManifestUrl = new URL("../ci/github-profile-manifest.json", import.meta.url);
 const toolManifestPath = "ci/tool-profile-manifest.json";
+const releaseManifestPath = ".release-please-manifest.json";
+const releaseConfig = JSON.parse(readFileSync(new URL("../release-please-config.json", import.meta.url), "utf8"));
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const toolManifest = JSON.parse(readFileSync(toolManifestUrl, "utf8"));
 const githubManifest = JSON.parse(readFileSync(githubManifestUrl, "utf8"));
@@ -193,8 +195,45 @@ function touchesSecuritySurface(path) {
   return ["exact", "specific", "prefix"].some((kind) => matchingRule(path, null, kind, rules.activeSecurity) !== null);
 }
 
+const releaseVersion = /^\d+\.\d+\.\d+(?:-rc\.\d+)?$/;
+
+/** How many version fields release-please writes into each file it bumps. */
+function releaseVersionFields() {
+  const fields = new Map([[releaseManifestPath, 1], ["pom.xml", 1]]);
+  for (const { path } of Object.values(releaseConfig.packages).flatMap((entry) => entry["extra-files"] ?? [])) {
+    fields.set(path, (fields.get(path) ?? 0) + 1);
+  }
+  return fields;
+}
+
+// A release pull request is verified whole once merged, by the push build the candidate waits for.
+function releaseVersionOverrides(changes, commits) {
+  if (commits.event !== "pull_request" || typeof commits.git !== "function") return new Map();
+  const versionFiles = releaseVersionFields();
+  const bumped = changes.filter((change) => versionFiles.has(change.path));
+  if (!bumped.some((change) => change.path === releaseManifestPath)
+      || changes.some((change) => change.status !== "M"
+        || !(versionFiles.has(change.path) || change.path === "CHANGELOG.md"))) return new Map();
+  try {
+    const read = (commit, path) => commits.git(["show", `${commit}:${path}`]);
+    const version = (commit) => JSON.parse(read(commit, releaseManifestPath))["."];
+    const from = version(commits.baseCommit);
+    const to = version(commits.headCommit);
+    if (!releaseVersion.test(from) || !releaseVersion.test(to) || from === to) return new Map();
+    if (bumped.some(({ path }) => {
+      const base = read(commits.baseCommit, path);
+      return base.split(from).length - 1 !== versionFiles.get(path)
+        || base.replaceAll(from, to) !== read(commits.headCommit, path);
+    })) return new Map();
+    return new Map(bumped.map(({ path }) => [path, { profiles: ["docs"], rule: `release-version:${path}` }]));
+  } catch {
+    return new Map();
+  }
+}
+
 export function classifyChangesAtCommits(changes, labels, commits) {
-  return classifyChanges(changes, labels, additiveToolManifestOverrides(changes, commits));
+  return classifyChanges(changes, labels, new Map([
+    ...additiveToolManifestOverrides(changes, commits), ...releaseVersionOverrides(changes, commits)]));
 }
 
 export function parseNameStatus(value) {
@@ -352,7 +391,8 @@ function main() {
     const evidence = runGit(["diff", "--name-status", "-z", "--find-renames", base, head, "--"]);
     const changes = parseNameStatus(evidence);
     const plan = bindPlanToRun(classifyChangesAtCommits(changes, labels, {
-      baseCommit: base, headCommit: head, git: runGit
+      baseCommit: base, headCommit: head, git: runGit,
+      event: process.argv.includes("--event") ? argument("--event") : undefined
     }), identity);
     writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
     writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });

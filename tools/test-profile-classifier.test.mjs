@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyChangesAtCommits, classifyPath, fallbackPlanToRun, parseNameStatus,
@@ -642,4 +644,141 @@ test("given the files release-please changed in a release commit, when they are 
   assert.ok(plan.ciJobs.includes("gates"), "a release pull request runs the release gates");
   assert.equal(plan.activeSecurity, true, "a release pull request runs the active assessment too");
   assert.equal(plan.schemaVersion, 7);
+});
+
+function realCommits(commit, event) {
+  const git = (arguments_) => execFileSync("git", arguments_, { cwd: repository, encoding: "utf8" });
+  return { baseCommit: git(["rev-parse", `${commit}^`]).trim(), headCommit: git(["rev-parse", commit]).trim(), git, event };
+}
+
+function releaseChanges(commit) {
+  return parseNameStatus(execFileSync("git",
+    ["diff", "--name-status", "-z", "--find-renames", `${commit}^`, commit], { cwd: repository, encoding: "utf8" }));
+}
+
+for (const commit of ["b1cd6c3a", "94640424", "df0ac0cb"]) {
+  test(`given release-please's own version bump ${commit} as a pull request, when it is classified, then only docs and tooling run`, () => {
+    // when
+    const plan = classifyChangesAtCommits(releaseChanges(commit), [], realCommits(commit, "pull_request"));
+
+    // then
+    assert.deepEqual(plan.profiles, ["docs"], JSON.stringify(plan.reasons));
+    assert.equal(plan.isFull, false);
+  });
+}
+
+test("given the same version bump pushed to main, when it is classified, then the plan stays full", () => {
+  // when
+  const plan = classifyChangesAtCommits(releaseChanges("94640424"), [], realCommits("94640424", "push"));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"], "the release commit on main feeds the candidate, so it is verified whole");
+});
+
+function syntheticRelease({ changes, files }) {
+  const baseCommit = "a".repeat(40);
+  const headCommit = "b".repeat(40);
+  return [changes, [], {
+    baseCommit, headCommit, event: "pull_request",
+    git: (arguments_) => {
+      const [, commit, path] = /^([ab]{40}):(.+)$/.exec(arguments_[1]) ?? [];
+      if (arguments_[0] !== "show" || !(path in files)) throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
+      return files[path][commit === baseCommit ? 0 : 1];
+    }
+  }];
+}
+
+const bumpFiles = {
+  ".release-please-manifest.json": ['{\n  ".": "1.2.0-rc.1"\n}\n', '{\n  ".": "1.2.0-rc.2"\n}\n'],
+  "pom.xml": ["<version>1.2.0-rc.1</version>\n<x>1</x>\n", "<version>1.2.0-rc.2</version>\n<x>1</x>\n"]
+};
+const bumpChanges = [
+  { status: "M", path: ".release-please-manifest.json" },
+  { status: "M", path: "CHANGELOG.md" },
+  { status: "M", path: "pom.xml" }
+];
+
+test("given a release file that changes more than its version, when the pull request is classified, then the plan is full", () => {
+  // given
+  const files = { ...bumpFiles, "pom.xml": [bumpFiles["pom.xml"][0], "<version>1.2.0-rc.2</version>\n<x>2</x>\n"] };
+
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({ changes: bumpChanges, files }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
+});
+
+test("given a version bump beside any other change, when the pull request is classified, then the plan is full", () => {
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({
+    changes: [...bumpChanges, { status: "M", path: "frontend/src/App.tsx" }], files: bumpFiles }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
+});
+
+test("given release files without a version change in the manifest, when the pull request is classified, then the plan is full", () => {
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({
+    changes: bumpChanges.filter(({ path }) => path !== ".release-please-manifest.json"), files: bumpFiles }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
+});
+
+test("given a version bump the reviewer can read, when the pull request is classified, then each version file names the rule", () => {
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({ changes: bumpChanges, files: bumpFiles }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["docs"]);
+  assert.deepEqual(plan.reasons.map(({ path, code }) => [path, code]), [
+    [".release-please-manifest.json", "release-version:.release-please-manifest.json"],
+    ["CHANGELOG.md", "exact:CHANGELOG.md"],
+    ["pom.xml", "release-version:pom.xml"]
+  ]);
+});
+
+test("given the pull request event on the command line, when the classifier plans a release bump, then the written plan selects docs", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "profile-plan-"));
+  const commits = realCommits("94640424");
+  const run = (extra) => {
+    execFileSync(process.execPath, [fileURLToPath(new URL("./test-profile-classifier.mjs", import.meta.url)),
+      "--base", commits.baseCommit, "--head", commits.headCommit, "--labels", "[]", "--run-id", "1", "--attempt", "1",
+      "--output", join(directory, "plan.json"), "--summary", join(directory, "summary.md"), ...extra], { cwd: repository });
+    return JSON.parse(readFileSync(join(directory, "plan.json"), "utf8"));
+  };
+
+  // when / then
+  assert.deepEqual(run(["--event", "pull_request"]).profiles, ["docs"]);
+  assert.deepEqual(run([]).profiles, ["full"], "without the event the bump is not reduced");
+});
+
+test("given a dependency that shares the release version, when the pull request bumps both, then the plan is full", () => {
+  // given
+  const files = { ...bumpFiles, "pom.xml": [
+    "<version>1.2.0-rc.1</version>\n<dependency><version>1.2.0-rc.1</version></dependency>\n",
+    "<version>1.2.0-rc.2</version>\n<dependency><version>1.2.0-rc.2</version></dependency>\n"] };
+
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({ changes: bumpChanges, files }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"], "only the version fields release-please writes may change");
+});
+
+test("given a manifest version that is not a release version, when the pull request is classified, then the plan is full", () => {
+  // given
+  const files = {
+    ".release-please-manifest.json": ['{\n  ".": "x"\n}\n', '{\n  ".": "y"\n}\n'],
+    "pom.xml": ["<version>x</version>\n", "<version>y</version>\n"]
+  };
+
+  // when
+  const plan = classifyChangesAtCommits(...syntheticRelease({ changes: bumpChanges, files }));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
 });
