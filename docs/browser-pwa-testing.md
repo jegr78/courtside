@@ -17,8 +17,10 @@ the same inventory; a cold cache no longer spends an individual test's fixture d
 
 The application shell is available offline after installation. Booking, account and administration
 operations require the network. The precache holds the member surface and every language bundle,
-but not the administration surface: its chunk loads when an administrator opens it, and the build
-policy refuses a build whose entry or precache says otherwise. Workbox uses `NetworkOnly` for every API request except the
+but not the administration surface. Each administration page is its own chunk under `assets/admin/`,
+loaded when an administrator opens it, together with the code only those pages use. The build policy
+refuses a build whose entry or precache holds administration code, or that leaves such code outside
+`assets/admin/`. Workbox uses `NetworkOnly` for every API request except the
 member-owned `GET /api/my/bookings` and `GET /api/my/participations`, which use a seven-day
 `StaleWhileRevalidate` cache for the first page only, of the bookings' `UPCOMING` view; the history
 and every later page stay `NetworkOnly`. Both keep the bookings' access codes, so a player can read

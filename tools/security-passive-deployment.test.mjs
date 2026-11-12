@@ -1116,6 +1116,20 @@ test("given a foreign origin or URL credential, when normalizing alerts, then ta
     /unclassified route/);
 });
 
+test("given an administration chunk below assets/admin/, when normalizing its alert, then it shares the asset route", () => {
+  // given
+  const alert = (path) => ({ site: [{ alerts: [{ pluginid: "10010", riskcode: "1", confidence: "2",
+    instances: [{ uri: `${passiveScannerOrigin}${path}`, method: "GET", param: "__Host-XSRF-TOKEN",
+      evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] });
+
+  // when
+  const [normalized] = normalizeZapAlerts(alert("/assets/admin/AdminOverviewView-a1b2c3.js"));
+
+  // then
+  assert.equal(normalized.routeTemplate, "/assets/{asset}");
+  assert.throws(() => normalizeZapAlerts(alert("/assets/other/AdminOverviewView-a1b2c3.js")), /unclassified route/);
+});
+
 test("given contradictory ratings for one candidate, when normalizing alerts, then one fingerprint cannot mean both", () => {
   // given
   const instance = { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "__Host-XSRF-TOKEN",

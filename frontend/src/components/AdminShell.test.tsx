@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { lazy } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminShell } from "./AdminShell";
@@ -21,6 +22,24 @@ describe("AdminShell", () => {
     // then
     expect(screen.getByTestId("admin-menu")).toBeInTheDocument();
     expect(screen.getByTestId("a-page")).toBeInTheDocument();
+  });
+
+  it("given a page whose code is still loading, when it is opened, then the navigation stays and only the content waits", () => {
+    // given
+    const Loading = lazy(() => new Promise<never>(() => undefined));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/facility"]}>
+      <Routes>
+        <Route path="/admin" element={<AdminShell />}>
+          <Route path="facility" element={<Loading />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-shell")).toContainElement(screen.getByRole("status"));
   });
 
   // The width belongs to the frame, so a page cannot forget to carry it and none can disagree.

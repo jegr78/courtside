@@ -28,6 +28,7 @@ const scriptType = /\stype\s*=\s*["']?([^"'>\s]+)/i;
 const moduleEntry = /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*\bsrc\s*=\s*["']?\/?([^"'>\s]+)/gi;
 const precacheEntry = /\{\s*url\s*:\s*"([^"]+)"/g;
 const administrationMarker = /^admin-/;
+const administrationDirectory = "assets/admin/";
 const localeBundleKey = "app.name";
 
 function filesBelow(directory) {
@@ -200,11 +201,14 @@ function chunkReading(resource, source) {
     .filter(({ type, source: from }) => ["ImportDeclaration", "ExportAllDeclaration", "ExportNamedDeclaration"]
       .includes(type) && from?.type === "Literal")
     .map(({ source: from }) => posix.join(posix.dirname(resource), from.value));
+  const dynamicImports = nodes
+    .filter(({ type, source: from }) => type === "ImportExpression" && from && stringValue(from) !== undefined)
+    .map(({ source: from }) => posix.join(posix.dirname(resource), stringValue(from)));
   const administration = nodes.map(stringValue)
     .filter((value) => value !== undefined && administrationMarker.test(value));
   const localeBundles = nodes.filter(({ type, properties }) => type === "ObjectExpression"
     && properties.some(({ key }) => key && stringValue(key) === localeBundleKey)).length;
-  return { staticImports, administration, localeBundles };
+  return { staticImports, dynamicImports, administration, localeBundles };
 }
 
 // The entry chunk and every chunk it imports statically are what a member downloads before the first paint.
@@ -238,8 +242,38 @@ export function verifyMemberSurface(directory) {
     throw new Error(`The member entry carries ${entryLocales} locale bundles instead of the default one`);
   }
   const deferred = [...chunks.keys()].filter((resource) => !memberSurface.has(resource));
-  const administration = deferred.filter((resource) => chunks.get(resource).administration.length > 0);
-  if (administration.length === 0) throw new Error("The browser build no longer identifies its administration surface");
+  const outside = deferred.find((resource) => !resource.startsWith(administrationDirectory)
+    && chunks.get(resource).administration.length > 0);
+  if (outside !== undefined) {
+    throw new Error(`The administration surface sits outside ${administrationDirectory}: `
+      + `${chunks.get(outside).administration[0]} in ${outside}`);
+  }
+  const closure = (starts, stop) => {
+    const found = new Set();
+    const walk = [...starts];
+    while (walk.length > 0) {
+      const resource = walk.pop();
+      if (found.has(resource) || stop(resource) || !chunks.has(resource)) continue;
+      found.add(resource);
+      walk.push(...chunks.get(resource).staticImports, ...chunks.get(resource).dynamicImports);
+    }
+    return found;
+  };
+  const member = closure([entries[0]], (resource) => resource.startsWith(administrationDirectory));
+  for (const resource of member) {
+    const needed = chunks.get(resource).staticImports.find((path) => path.startsWith(administrationDirectory));
+    if (needed !== undefined) throw new Error(`${resource} needs ${needed}, which the precache leaves out`);
+  }
+  const administrationReach = closure([...chunks.keys()].filter((resource) => resource.startsWith(administrationDirectory)),
+    (resource) => member.has(resource));
+  const stray = [...administrationReach].find((resource) => !resource.startsWith(administrationDirectory));
+  if (stray !== undefined) {
+    throw new Error(`${stray} is reached only through the administration but sits outside ${administrationDirectory}`);
+  }
+  const administration = deferred.filter((resource) => resource.startsWith(administrationDirectory));
+  if (!administration.some((resource) => chunks.get(resource).administration.length > 0)) {
+    throw new Error("The browser build no longer identifies its administration surface");
+  }
   const locales = deferred.filter((resource) => chunks.get(resource).localeBundles > 0);
   if (locales.length === 0) throw new Error("The browser build ships no locale bundle outside the member entry");
   const worker = resolve(root, "sw.js");

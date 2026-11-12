@@ -1,8 +1,43 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
 import { VitePWA, type VitePWAOptions } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 import packageJson from "./package.json" with { type: "json" };
+
+// Code reachable only through the administration router goes to assets/admin/, which the precache leaves out.
+function administrationChunks(): Plugin {
+  const administrationOnly = new Set<string>();
+  return {
+    name: "courtside-administration-chunks",
+    apply: "build",
+    buildEnd() {
+      const ids = Array.from(this.getModuleIds());
+      const isRoot = (id: string) => /\/src\/views\/AdminRoutes\.tsx$/.test(id)
+        || ids.some((parent) => /\/src\/views\/adminPages\.ts$/.test(parent)
+          && this.getModuleInfo(parent)?.dynamicallyImportedIds.includes(id));
+      const member = new Set<string>();
+      const pending = ids.filter((id) => this.getModuleInfo(id)?.isEntry);
+      while (pending.length > 0) {
+        const id = pending.pop();
+        if (id === undefined) break;
+        if (member.has(id) || isRoot(id)) continue;
+        member.add(id);
+        const info = this.getModuleInfo(id);
+        pending.push(...(info?.importedIds ?? []), ...(info?.dynamicallyImportedIds ?? []));
+      }
+      administrationOnly.clear();
+      for (const id of ids) if (!member.has(id)) administrationOnly.add(id);
+    },
+    outputOptions(options) {
+      return {
+        ...options,
+        chunkFileNames: (chunk) => chunk.moduleIds.length > 0 && chunk.moduleIds.every((id) => administrationOnly.has(id))
+          ? "assets/admin/[name]-[hash].js" : "assets/[name]-[hash].js"
+      };
+    }
+  };
+}
 
 type PersonalBookingsPlugins = NonNullable<NonNullable<NonNullable<NonNullable<
   VitePWAOptions["workbox"]>["runtimeCaching"]>[number]["options"]>["plugins"]>;
@@ -102,11 +137,12 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    administrationChunks(),
     VitePWA({
       manifest: false,
       registerType: "prompt",
       workbox: {
-        globIgnores: ["**/node_modules/**/*", "assets/AdminRoutes-*.js"],
+        globIgnores: ["**/node_modules/**/*", "assets/admin/**"],
         navigateFallback: "/index.html",
         runtimeCaching: [
           {

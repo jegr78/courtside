@@ -282,7 +282,7 @@ function recordedBundles(page: import("@playwright/test").Page) {
   const bundles: string[] = [];
   page.on("request", (request) => {
     const file = new URL(request.url()).pathname.split("/").pop() ?? "";
-    if (/^(index|AdminRoutes)-.*\.js$/.test(file)) bundles.push(file);
+    if (/^(index|AdminRoutes|AdminOverviewView)-.*\.js$/.test(file)) bundles.push(file);
   });
   return bundles;
 }
@@ -323,8 +323,9 @@ test("confirming the update notice runs the build the server ships, not an older
   await later.getByTestId("login-submit").click();
   await later.getByTestId("administration-link").click();
   await expect(later.getByTestId("admin-shell")).toBeVisible();
-  await expect.poll(() => loaded).toContain(shipped.adminRoutes);
-  expect(new Set(loaded), "no bundle of an older build is loaded").toEqual(new Set([shipped.index, shipped.adminRoutes]));
+  await expect(later.getByTestId("admin-overview-view")).toBeVisible();
+  expect(new Set(loaded), "no bundle of an older build is loaded")
+    .toEqual(new Set([shipped.index, shipped.adminRoutes, shipped.adminPage]));
   expect(await later.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();
     await registration?.update();

@@ -13,6 +13,11 @@ const NAMED_READ = /\b(localStorage|sessionStorage|useParams|useSearchParams|use
 const LOCATION_READ = /\b(?:window\.)?location\.(?:protocol|href|search|hash|pathname|origin|assign|reload)/g;
 
 const BOUNDARIES = {
+  "src/App.tsx location": {
+    value: "the path the browser is on when the administration router first loads",
+    classification: "only picks which administration page's code starts downloading early; the router still decides what is shown and to whom",
+    test: "src/views/adminPages.test.ts#given an address outside the administration's pages, when it is looked up, then nothing is loaded"
+  },
   "src/App.tsx useLocation": {
     value: "the address the browser is on, and the returnTo target in its query",
     classification: "sign-in follows the returnTo target only when returnTarget accepts it as a same-origin path, otherwise the start page; the rest of the address only picks the shell, never a right",
