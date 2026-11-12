@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "090cf407b95c47dce0f642e5d968ecc42b4c3603c7030ed43b0d82aa5553cfdb",
-  "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "c64ef3e148a1f8b89c9749a3b3f8b19a5877044778d2fd6d69d202e330f44211",
+  "openApiFieldInventorySha256": "1f901327926035aa52c814db6e8dcf4d7d20ac2171fa36bab1c3c4987a88886e",
+  "protectedFieldInventorySha256": "bba653fd32465525cc1239f5f745cac7e5eb7bb9f74685dd16ab7e75b5adacce",
+  "productionAuthorizationSha256": "d48a237839fe6b6771d97150b08019e317d21a5aef0c1cf523a033b44399fb2b",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -263,6 +263,7 @@
     "changeBookingCard:request:BookingCardRequest.grantsAccess",
     "changeBookingCard:request:BookingCardRequest.guestAllowed",
     "changeBookingCard:request:BookingCardRequest.guestFeeMinor",
+    "changeBookingCard:request:BookingCardRequest.holdsDoorsOpen",
     "changeBookingCard:request:BookingCardRequest.label",
     "changeBookingCard:request:BookingCardRequest.managingRoles",
     "changeBookingCard:request:BookingCardRequest.showGenericOccupancy",
@@ -278,6 +279,7 @@
     "changeBookingCard:response:BookingCard.grantsAccess",
     "changeBookingCard:response:BookingCard.guestAllowed",
     "changeBookingCard:response:BookingCard.guestFeeMinor",
+    "changeBookingCard:response:BookingCard.holdsDoorsOpen",
     "changeBookingCard:response:BookingCard.id",
     "changeBookingCard:response:BookingCard.label",
     "changeBookingCard:response:BookingCard.managingRoles",
@@ -787,6 +789,7 @@
     "createBookingCard:request:BookingCardRequest.grantsAccess",
     "createBookingCard:request:BookingCardRequest.guestAllowed",
     "createBookingCard:request:BookingCardRequest.guestFeeMinor",
+    "createBookingCard:request:BookingCardRequest.holdsDoorsOpen",
     "createBookingCard:request:BookingCardRequest.label",
     "createBookingCard:request:BookingCardRequest.managingRoles",
     "createBookingCard:request:BookingCardRequest.showGenericOccupancy",
@@ -803,6 +806,7 @@
     "createBookingCard:response:BookingCard.grantsAccess",
     "createBookingCard:response:BookingCard.guestAllowed",
     "createBookingCard:response:BookingCard.guestFeeMinor",
+    "createBookingCard:response:BookingCard.holdsDoorsOpen",
     "createBookingCard:response:BookingCard.id",
     "createBookingCard:response:BookingCard.label",
     "createBookingCard:response:BookingCard.managingRoles",
@@ -1184,6 +1188,15 @@
     "endAllSessions:response:Violation.code",
     "endAllSessions:response:Violation.params",
     "endAllSessions:response:Violation.params.*",
+    "endDoorHold:parameter:$parameter.path.bookingId",
+    "endDoorHold:response:$response.header.Retry-After",
+    "endDoorHold:response:FieldError.code",
+    "endDoorHold:response:FieldError.field",
+    "endDoorHold:response:FieldError.params",
+    "endDoorHold:response:FieldError.params.*",
+    "endDoorHold:response:Violation.code",
+    "endDoorHold:response:Violation.params",
+    "endDoorHold:response:Violation.params.*",
     "endGuardianRelationship:parameter:$parameter.path.personId",
     "endGuardianRelationship:parameter:$parameter.path.relationshipId",
     "endGuardianRelationship:response:$response.header.Retry-After",
@@ -1434,6 +1447,7 @@
     "getBookingCard:response:BookingCard.grantsAccess",
     "getBookingCard:response:BookingCard.guestAllowed",
     "getBookingCard:response:BookingCard.guestFeeMinor",
+    "getBookingCard:response:BookingCard.holdsDoorsOpen",
     "getBookingCard:response:BookingCard.id",
     "getBookingCard:response:BookingCard.label",
     "getBookingCard:response:BookingCard.managingRoles",
@@ -1743,6 +1757,19 @@
     "getWebManifest:response:WebManifestIcon.type",
     "getWebManifest:response:WebManifestShortcut.name",
     "getWebManifest:response:WebManifestShortcut.url",
+    "holdDoorsOpen:parameter:$parameter.path.bookingId",
+    "holdDoorsOpen:response:$response.header.Retry-After",
+    "holdDoorsOpen:response:DoorHold.closesAt",
+    "holdDoorsOpen:response:DoorHold.heldByMe",
+    "holdDoorsOpen:response:DoorHold.heldSince",
+    "holdDoorsOpen:response:DoorHold.opensAt",
+    "holdDoorsOpen:response:FieldError.code",
+    "holdDoorsOpen:response:FieldError.field",
+    "holdDoorsOpen:response:FieldError.params",
+    "holdDoorsOpen:response:FieldError.params.*",
+    "holdDoorsOpen:response:Violation.code",
+    "holdDoorsOpen:response:Violation.params",
+    "holdDoorsOpen:response:Violation.params.*",
     "initiateMfaRecovery:parameter:$parameter.path.accountId",
     "initiateMfaRecovery:response:$response.header.Accept",
     "initiateMfaRecovery:response:$response.header.Retry-After",
@@ -1914,6 +1941,7 @@
     "listBookingCards:response:BookingCard.grantsAccess",
     "listBookingCards:response:BookingCard.guestAllowed",
     "listBookingCards:response:BookingCard.guestFeeMinor",
+    "listBookingCards:response:BookingCard.holdsDoorsOpen",
     "listBookingCards:response:BookingCard.id",
     "listBookingCards:response:BookingCard.label",
     "listBookingCards:response:BookingCard.managingRoles",
@@ -2027,6 +2055,10 @@
     "listDependantBookings:response:CheckIn.checkedIn",
     "listDependantBookings:response:CheckIn.closesAt",
     "listDependantBookings:response:CheckIn.opensAt",
+    "listDependantBookings:response:DoorHold.closesAt",
+    "listDependantBookings:response:DoorHold.heldByMe",
+    "listDependantBookings:response:DoorHold.heldSince",
+    "listDependantBookings:response:DoorHold.opensAt",
     "listDependantBookings:response:FieldError.code",
     "listDependantBookings:response:FieldError.field",
     "listDependantBookings:response:FieldError.params",
@@ -2036,6 +2068,7 @@
     "listDependantBookings:response:PersonalBooking.cardLabel",
     "listDependantBookings:response:PersonalBooking.checkIn",
     "listDependantBookings:response:PersonalBooking.courtIds",
+    "listDependantBookings:response:PersonalBooking.doorHold",
     "listDependantBookings:response:PersonalBooking.endsAt",
     "listDependantBookings:response:PersonalBooking.partnerSearch",
     "listDependantBookings:response:PersonalBooking.paymentExpiresAt",
@@ -2498,6 +2531,10 @@
     "listPersonalBookings:response:CheckIn.checkedIn",
     "listPersonalBookings:response:CheckIn.closesAt",
     "listPersonalBookings:response:CheckIn.opensAt",
+    "listPersonalBookings:response:DoorHold.closesAt",
+    "listPersonalBookings:response:DoorHold.heldByMe",
+    "listPersonalBookings:response:DoorHold.heldSince",
+    "listPersonalBookings:response:DoorHold.opensAt",
     "listPersonalBookings:response:FieldError.code",
     "listPersonalBookings:response:FieldError.field",
     "listPersonalBookings:response:FieldError.params",
@@ -2507,6 +2544,7 @@
     "listPersonalBookings:response:PersonalBooking.cardLabel",
     "listPersonalBookings:response:PersonalBooking.checkIn",
     "listPersonalBookings:response:PersonalBooking.courtIds",
+    "listPersonalBookings:response:PersonalBooking.doorHold",
     "listPersonalBookings:response:PersonalBooking.endsAt",
     "listPersonalBookings:response:PersonalBooking.partnerSearch",
     "listPersonalBookings:response:PersonalBooking.paymentExpiresAt",
@@ -3625,6 +3663,7 @@
     "setBookingCardActive:response:BookingCard.grantsAccess",
     "setBookingCardActive:response:BookingCard.guestAllowed",
     "setBookingCardActive:response:BookingCard.guestFeeMinor",
+    "setBookingCardActive:response:BookingCard.holdsDoorsOpen",
     "setBookingCardActive:response:BookingCard.id",
     "setBookingCardActive:response:BookingCard.label",
     "setBookingCardActive:response:BookingCard.managingRoles",
@@ -4667,6 +4706,28 @@
       "decisions": [
         "permanent-account-gate",
         "managed-booking-scope"
+      ]
+    },
+    {
+      "id": "door-hold",
+      "description": "A permanent account holds a booking's doors open only on a booking it may manage, and only the person who started a hold or an administrator ends it.",
+      "operationIds": [
+        "holdDoorsOpen",
+        "endDoorHold"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "door-hold-scope"
       ]
     },
     {
@@ -5735,6 +5796,32 @@
       ]
     },
     {
+      "id": "door-hold-scope",
+      "title": "Door hold scope",
+      "rule": "Starting a door hold requires the booker, ADMIN or a role the booking card names as managing, on a card that offers a hold; a caller outside that set is answered as if the booking did not exist. Ending a running hold requires the person who started it or ADMIN. A listing marks a hold as the caller's own only when the current account started it.",
+      "attributes": [
+        "current-account",
+        "booking-owner",
+        "administrator-override"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#start",
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#end",
+        "src/main/java/org/courtside/booking/web/DoorHoldController.java#holdDoorsOpen",
+        "src/main/java/org/courtside/booking/web/DoorHoldController.java#endDoorHold",
+        "src/main/java/org/courtside/booking/web/PersonalBookingPages.java#doorHolds",
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#doorHoldsOf"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenATrainingStartingSoon_whenItsTrainerHoldsTheDoorsOpen_thenTheBookingShowsTheRunningHold",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnotherMember_whenTheyHoldTheTrainingsDoorsOpen_thenTheBookingIsNotFoundForThem",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt"
+      ]
+    },
+    {
       "id": "series-ownership",
       "title": "Series ownership and management",
       "rule": "Moving or cancelling a series requires its creator, a role that manages the series booking card, or ADMIN; the selected occurrence scope is preserved.",
@@ -6730,7 +6817,8 @@
         "ManagedAppointmentDetail.note",
         "ManagedAppointmentDetail.participants",
         "ManagedParticipant.displayName",
-        "ManagedAppointmentDetail.attendance"
+        "ManagedAppointmentDetail.attendance",
+        "ManagedAppointmentDetail.doorHold"
       ],
       "operationIds": [
         "getManagedAppointment"

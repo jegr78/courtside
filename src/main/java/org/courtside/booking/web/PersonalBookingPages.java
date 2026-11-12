@@ -19,9 +19,12 @@ import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.ParticipationPage;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.attendance.AttendanceService;
+import org.courtside.booking.doorhold.DoorHoldService;
 import org.courtside.booking.internal.AccessGrants;
 import org.courtside.booking.partner.PartnerSearchService;
 import org.courtside.booking.partner.PartnerSearchState;
+import org.courtside.identity.CurrentUser;
+import org.courtside.identity.UserAccount;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.config.ClubIdentity;
@@ -53,6 +56,8 @@ class PersonalBookingPages {
     private final ClubIdentity club;
     private final Clock clock;
     private final AccessGrants accessGrants;
+    private final DoorHoldService doorHoldService;
+    private final CurrentUser currentUser;
     private final IssuedAccessCodes issuedCodes;
 
     // A booking's own code goes only to its participants, so a page of somebody else's bookings carries none.
@@ -69,6 +74,8 @@ class PersonalBookingPages {
                                 booking.getAllocations().getFirst().getEndsAt()))
                         .toList())
                 : Map.of();
+        Map<UUID, DoorHoldService.DoorHold> doorHolds = view == ApiPersonalBookingView.UPCOMING && ownBookings
+                ? doorHolds(page.bookings()) : Map.of();
         Map<UUID, AnnouncedAccess> access = accessGrants.of(page.bookings());
         Map<UUID, DynamicAccess> dynamic = ownBookings ? accessGrants.dynamicOf(page.bookings()) : Map.of();
         Set<UUID> released = attendance.releasedAmong(page.bookings().stream()
@@ -93,6 +100,8 @@ class PersonalBookingPages {
                             .partnerSearch(searches.containsKey(booking.getId())
                                     ? ApiPartnerSearchState.fromValue(searches.get(booking.getId()).name()) : null)
                             .checkIn(toCheckIn(checkIns.get(booking.getId())))
+                            .doorHold(doorHolds.containsKey(booking.getId())
+                                    ? DoorHoldController.toResponse(doorHolds.get(booking.getId())) : null)
                             .released(released.contains(booking.getId()) ? Boolean.TRUE : null)
                             .access(toAccess(booking.getId(), access.get(booking.getId()),
                                     dynamic.get(booking.getId())))
@@ -155,6 +164,13 @@ class PersonalBookingPages {
                 WireTypes.toOffsetDateTime(fixed == null ? dynamic.validUntil() : fixed.validUntil()), codes)
                 .codePending(dynamic != null && issued == null ? Boolean.TRUE : null)
                 .emergencyCodeKept(dynamic != null && dynamic.emergencyCodeKept() ? Boolean.TRUE : null);
+    }
+
+    private Map<UUID, DoorHoldService.DoorHold> doorHolds(List<Booking> bookings) {
+        return currentUser.account().map(UserAccount::getId)
+                .map(viewer -> doorHoldService.doorHoldsOf(bookings.stream()
+                        .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList(), viewer))
+                .orElse(Map.of());
     }
 
     private static ApiCheckIn toCheckIn(AttendanceService.CheckIn checkIn) {

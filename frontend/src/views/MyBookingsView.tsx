@@ -207,6 +207,17 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       report(failure);
     }
   };
+  const doorHold = async (booking: PersonalBooking, hold: boolean) => {
+    setSuccess(undefined);
+    try {
+      await (hold ? api.holdDoorsOpen(booking.id) : api.endDoorHold(booking.id));
+      clear();
+      await load();
+      setSuccess(t(hold ? "myBookings.doorsHeldOpenSuccess" : "myBookings.doorHoldEndedSuccess"));
+    } catch (failure) {
+      report(failure);
+    }
+  };
   const payPal = {
     proceed: async (booking: PersonalBooking) => {
       setSuccess(undefined);
@@ -259,7 +270,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       <Alert tone={payPalOutcomeTone("cancel", "REJECTED")}>{t(payPalOutcomeKey("cancel", "REJECTED"))}</Alert>
     </div>}
     {loading && !loaded ? <LoadingStatus /> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} payPal={payPal} paymentClock={paymentClock} reference={reference} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} doorHold={doorHold} payPal={payPal} paymentClock={paymentClock} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -337,10 +348,11 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, re
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, busy = false, action, searchPartner, checkIn, payPal, paymentClock, reference, t }: {
+export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, busy = false, action, searchPartner, checkIn, doorHold, payPal, paymentClock, reference, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; movable?: boolean; busy?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
   searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
+  doorHold?: (booking: PersonalBooking, hold: boolean) => Promise<void>;
   payPal?: { proceed: (booking: PersonalBooking) => Promise<void>; abandon: (booking: PersonalBooking) => Promise<void> };
   paymentClock?: Date; reference?: Date; t: Translate;
 }) {
@@ -364,6 +376,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           {booking.status === "PENDING_PAYMENT" && <PaymentPending booking={booking} reference={paymentClock ?? reference} t={t} />}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
+          {booking.doorHold?.heldSince && <span data-testid="doors-held-open">{t("myBookings.doorsHeldOpen", { time: formatClockTime(formatTime(booking.doorHold.heldSince, timeZone), locale) })}</span>}
           {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
             emergency={actionable && booking.status === "CONFIRMED" ? () => api.emergencyCode(booking.id) : undefined} />}
           {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInWithinDay(booking.checkIn, reference)
@@ -376,6 +389,10 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
             {booking.status === "CONFIRMED" && <>
               {checkIn && reference && booking.checkIn && !booking.checkIn.checkedIn && checkInOpen(booking.checkIn, reference)
                 && <Button variant="primary" aria-label={bookingActionName("myBookings.checkInAccessible", booking, courtNames, locale, timeZone, t)} data-testid="check-in" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void checkIn(booking)}>{t("myBookings.checkIn")}</Button>}
+              {doorHold && reference && booking.doorHold && !booking.doorHold.heldSince && doorHoldOpen(booking.doorHold, reference)
+                && <Button variant="primary" aria-label={bookingActionName("myBookings.holdDoorsOpenAccessible", booking, courtNames, locale, timeZone, t)} data-testid="hold-doors-open" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, true)}>{t("myBookings.holdDoorsOpen")}</Button>}
+              {doorHold && booking.doorHold?.heldSince && booking.doorHold.heldByMe
+                && <Button variant="secondary" aria-label={bookingActionName("myBookings.endDoorHoldAccessible", booking, courtNames, locale, timeZone, t)} data-testid="end-door-hold" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, false)}>{t("myBookings.endDoorHold")}</Button>}
               <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
               {movable && booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
               {searchPartner && booking.partnerSearch && <Button variant="secondary"
@@ -444,6 +461,10 @@ function checkInWithinDay(checkIn: NonNullable<PersonalBooking["checkIn"]>, refe
 
 function checkInOpen(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {
   return Date.parse(checkIn.opensAt) <= reference.getTime() && reference.getTime() < Date.parse(checkIn.closesAt);
+}
+
+function doorHoldOpen(doorHold: NonNullable<PersonalBooking["doorHold"]>, reference: Date) {
+  return Date.parse(doorHold.opensAt) <= reference.getTime() && reference.getTime() < Date.parse(doorHold.closesAt);
 }
 
 function bookingActionName(key: string, booking: PersonalBooking, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate) {

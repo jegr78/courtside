@@ -1,0 +1,163 @@
+package org.courtside.booking.doorhold;
+
+import lombok.RequiredArgsConstructor;
+import org.courtside.booking.Booking;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingStatus;
+import org.courtside.booking.CourtAllocation;
+import org.courtside.booking.doorhold.DoorHoldRows.Hold;
+import org.courtside.booking.doorhold.DoorHoldRows.Window;
+import org.courtside.booking.internal.BookingAccessControl;
+import org.courtside.booking.internal.BookingNotFoundException;
+import org.courtside.card.BookingCard;
+import org.courtside.card.CardService;
+import org.courtside.config.AccessPolicy;
+import org.courtside.identity.Role;
+import org.courtside.shared.BookingCancelled;
+import org.courtside.shared.SeriesCancelled;
+import org.courtside.shared.SeriesMoved;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/** Holds a booking's doors open while a responsible person is checked in. */
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class DoorHoldService {
+
+    private final DoorHoldRows rows;
+    private final BookingRepository bookings;
+    private final BookingAccessControl accessControl;
+    private final CardService cards;
+    private final AccessPolicy accessPolicy;
+    private final ApplicationEventPublisher events;
+    private final Clock clock;
+
+    public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
+        Booking booking = lockedBooking(bookingId);
+        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
+            throw new DoorHoldNotOfferedException();
+        }
+        Window window = windowOf(booking);
+        Instant now = clock.instant();
+        if (booking.getStatus() != BookingStatus.CONFIRMED || now.isBefore(window.opensAt())
+                || !now.isBefore(window.closesAt())) {
+            throw new DoorHoldClosedException(lead().toMinutes());
+        }
+        Optional<Hold> running = rows.unendedSince(window);
+        if (running.isPresent()) {
+            if (running.get().heldBy() != null && running.get().heldBy().equals(actor)) {
+                return toDoorHold(window, running, actor);
+            }
+            throw new DoorHoldAlreadyRunningException();
+        }
+        UUID holdId = UUID.randomUUID();
+        rows.start(holdId, bookingId, actor, now);
+        events.publishEvent(new DoorHoldEvent.Started(bookingId, holdId));
+        return new DoorHold(window.opensAt(), window.closesAt(), now, true);
+    }
+
+    public void end(UUID bookingId, UUID actor, Set<Role> actorRoles) {
+        Booking booking = lockedBooking(bookingId);
+        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        Hold hold = running(booking).orElseThrow(DoorHoldNotRunningException::new);
+        if (!actorRoles.contains(Role.ADMIN) && !actor.equals(hold.heldBy())) {
+            throw new DoorHoldNotHolderException();
+        }
+        rows.end(hold.id(), actor, clock.instant());
+        events.publishEvent(new DoorHoldEvent.Ended(bookingId, hold.id()));
+    }
+
+    @EventListener
+    public void on(BookingCancelled cancelled) {
+        endAll(List.of(cancelled.bookingId()), cancelled.cancelledByAccountId());
+    }
+
+    @EventListener
+    public void on(SeriesCancelled cancelled) {
+        endAll(cancelled.bookingIds(), cancelled.cancelledByAccountId());
+    }
+
+    // A moved booking may keep a window the old hold began in, on doors that are no longer its own.
+    @EventListener
+    public void on(SeriesMoved moved) {
+        endAll(moved.bookingIds(), moved.movedByAccountId());
+    }
+
+    private void endAll(List<UUID> bookingIds, UUID endedBy) {
+        rows.endAll(bookingIds, endedBy, clock.instant())
+                .forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
+    }
+
+    /** The door hold state of each booking whose card offers one, as {@code viewer} sees it. */
+    @Transactional(readOnly = true)
+    public Map<UUID, DoorHold> doorHoldsOf(Collection<Booking> candidates, UUID viewer) {
+        Set<UUID> holdingCards = cards.allCards().stream().filter(BookingCard::isHoldsDoorsOpen)
+                .map(BookingCard::getId).collect(Collectors.toSet());
+        Map<UUID, Window> windows = candidates.stream()
+                .filter(booking -> !booking.getAllocations().isEmpty())
+                .filter(booking -> holdingCards.contains(booking.getCardId()))
+                .collect(Collectors.toMap(Booking::getId, this::windowOf));
+        Set<UUID> confirmed = candidates.stream().filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getId).collect(Collectors.toSet());
+        Instant now = clock.instant();
+        Map<UUID, Hold> held = rows.unendedSince(windows.values()).stream()
+                .filter(hold -> confirmed.contains(hold.bookingId()))
+                .filter(hold -> now.isBefore(windows.get(hold.bookingId()).closesAt()))
+                .collect(Collectors.toMap(Hold::bookingId, Function.identity()));
+        return windows.values().stream().collect(Collectors.toMap(Window::bookingId,
+                window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer)));
+    }
+
+    private Optional<Hold> running(Booking booking) {
+        Window window = windowOf(booking);
+        if (booking.getStatus() != BookingStatus.CONFIRMED || !clock.instant().isBefore(window.closesAt())) {
+            return Optional.empty();
+        }
+        return rows.unendedSince(window);
+    }
+
+    private Booking lockedBooking(UUID bookingId) {
+        bookings.lockById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        return bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+    }
+
+    private Window windowOf(Booking booking) {
+        Instant startsAt = booking.getAllocations().stream().map(CourtAllocation::getStartsAt)
+                .min(Comparator.naturalOrder())
+                .orElseThrow(() -> new IllegalStateException("A booking without allocations has no door window"));
+        Instant endsAt = booking.getAllocations().stream().map(CourtAllocation::getEndsAt)
+                .max(Comparator.naturalOrder()).orElseThrow();
+        return new Window(booking.getId(), startsAt.minus(lead()), endsAt);
+    }
+
+    private Duration lead() {
+        return accessPolicy.accessLead().toDuration();
+    }
+
+    private static DoorHold toDoorHold(Window window, Optional<Hold> hold, UUID viewer) {
+        return new DoorHold(window.opensAt(), window.closesAt(), hold.map(Hold::heldAt).orElse(null),
+                hold.map(Hold::heldBy).filter(heldBy -> heldBy.equals(viewer)).isPresent());
+    }
+
+    public record DoorHold(Instant opensAt, Instant closesAt, Instant heldSince, boolean heldByMe) {
+    }
+}

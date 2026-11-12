@@ -3,6 +3,7 @@ package org.courtside.card;
 import org.courtside.card.internal.BookingCardRepository;
 import org.courtside.card.internal.ClosureCardGrantsNoAccessException;
 import org.courtside.card.internal.ExternalManagesNoCardException;
+import org.courtside.card.internal.ClosureCardHoldsNoDoorsException;
 import org.courtside.card.internal.ClosureCardSignalsNoOccupancyException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
@@ -91,18 +92,19 @@ public class CardService {
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy,
-                                  int guestFeeMinor, int externalPriceMinor) {
+                                  boolean holdsDoorsOpen, int guestFeeMinor, int externalPriceMinor) {
         requireMemberManagers(managingRoles);
         BookingCard created = new BookingCard(label, color, allowedRoles, managingRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
                 signalsOccupancy);
+        created.holdDoorsOpen(holdsDoorsOpen);
         created.chargeGuests(guestFeeMinor);
         created.priceForExternals(externalPriceMinor);
         BookingCard card = saveOrRejectTakenLabel(created);
         events.publishEvent(new CardEvent.BookingCardAdded(card.getId(), List.copyOf(card.getAllowedRoles()),
                 List.copyOf(card.getManagingRoles()), boxed(card.getAllowedPlayerCounts()),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
-                card.isGrantsAccess(), card.isSignalsOccupancy(), card.getGuestFeeMinor(),
+                card.isGrantsAccess(), card.isSignalsOccupancy(), card.isHoldsDoorsOpen(), card.getGuestFeeMinor(),
                 card.getExternalPriceMinor()));
         return card;
     }
@@ -113,15 +115,18 @@ public class CardService {
         }
     }
 
-    /** A null {@code requestedSignalsOccupancy}, {@code requestedGuestFeeMinor} or {@code requestedExternalPriceMinor} keeps the stored value. */
+    /** A null {@code requestedSignalsOccupancy}, {@code requestedHoldsDoorsOpen}, {@code requestedGuestFeeMinor} or {@code requestedExternalPriceMinor} keeps the stored value. */
     @Transactional
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess,
-                                  Boolean requestedSignalsOccupancy, Integer requestedGuestFeeMinor,
-                                  Integer requestedExternalPriceMinor) {
+                                  Boolean requestedSignalsOccupancy, Boolean requestedHoldsDoorsOpen,
+                                  Integer requestedGuestFeeMinor, Integer requestedExternalPriceMinor) {
         requireMemberManagers(managingRoles);
+        if (Boolean.TRUE.equals(requestedHoldsDoorsOpen) && BookingCard.COURT_CLOSED.equals(cardId)) {
+            throw new ClosureCardHoldsNoDoorsException();
+        }
         if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardGrantsNoAccessException();
         }
@@ -131,6 +136,7 @@ public class CardService {
         if (signalsOccupancy && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardSignalsNoOccupancyException();
         }
+        boolean holdsDoorsOpen = requestedHoldsDoorsOpen == null ? card.isHoldsDoorsOpen() : requestedHoldsDoorsOpen;
         List<String> changedFields = new ArrayList<>();
         if (!Objects.equals(card.getLabel(), label)) {
             changedFields.add("label");
@@ -154,11 +160,13 @@ public class CardService {
                 || card.isGuestAllowed() != guestAllowed
                 || card.isShowGenericOccupancy() != showGenericOccupancy
                 || card.isGrantsAccess() != grantsAccess
-                || card.isSignalsOccupancy() != signalsOccupancy;
+                || card.isSignalsOccupancy() != signalsOccupancy
+                || card.isHoldsDoorsOpen() != holdsDoorsOpen;
         boolean startsGrantingAccess = grantsAccess && !card.isGrantsAccess();
         card.changeTo(label, color, allowedRoles, managingRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
                 signalsOccupancy);
+        card.holdDoorsOpen(holdsDoorsOpen);
         card.chargeGuests(guestFeeMinor);
         card.priceForExternals(externalPriceMinor);
         BookingCard saved = saveOrRejectTakenLabel(card);
@@ -167,7 +175,8 @@ public class CardService {
                     List.copyOf(saved.getAllowedRoles()), List.copyOf(saved.getManagingRoles()),
                     boxed(saved.getAllowedPlayerCounts()), saved.isCountsAgainstLimits(),
                     saved.isGuestAllowed(), saved.isShowGenericOccupancy(), saved.isGrantsAccess(),
-                    saved.isSignalsOccupancy(), saved.getGuestFeeMinor(), saved.getExternalPriceMinor(),
+                    saved.isSignalsOccupancy(), saved.isHoldsDoorsOpen(), saved.getGuestFeeMinor(),
+                    saved.getExternalPriceMinor(),
                     List.copyOf(changedFields)));
         }
         if (startsGrantingAccess) {

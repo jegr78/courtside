@@ -70,6 +70,9 @@ public class BookingCard {
     @Column(name = "signals_occupancy", nullable = false)
     private boolean signalsOccupancy;
 
+    @Column(name = "holds_doors_open", nullable = false)
+    private boolean holdsDoorsOpen;
+
     @Column(name = "guest_fee_minor", nullable = false)
     private int guestFeeMinor;
 
@@ -173,6 +176,13 @@ public class BookingCard {
         this.showGenericOccupancy = showGenericOccupancy;
         this.grantsAccess = grantsAccess;
         this.signalsOccupancy = signalsOccupancy;
+    }
+
+    public void holdDoorsOpen(boolean holdsDoorsOpen) {
+        if (holdsDoorsOpen && COURT_CLOSED.equals(id)) {
+            throw new IllegalStateException("The closure card never holds doors open; the service guard was skipped");
+        }
+        this.holdsDoorsOpen = holdsDoorsOpen;
     }
 
     public void activate() {

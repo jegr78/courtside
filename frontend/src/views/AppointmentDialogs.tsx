@@ -12,7 +12,7 @@ import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { useReportedFailure } from "../failures/useReportedFailure";
-import { formatBookingPeriod } from "../time/clubZone";
+import { formatBookingPeriod, formatClockTime, formatTime } from "../time/clubZone";
 import { CancellationReasonField } from "./CancellationReasonField";
 
 export type Appointment = PersonalBooking | ManagedAppointment;
@@ -140,6 +140,7 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
   const [detail, setDetail] = useState<ManagedAppointmentDetail>();
   const [tracked, setTracked] = useState(false);
   const [begun, setBegun] = useState(false);
+  const [doorWindowOpen, setDoorWindowOpen] = useState(false);
   const { message: error, report, clear } = useReportedFailure();
 
   useEffect(() => {
@@ -149,6 +150,7 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
         if (!active) return;
         setDetail(appointment);
         setBegun(Date.parse(appointment.startsAt) <= Date.now());
+        setDoorWindowOpen(withinDoorWindow(appointment));
       })
       .catch((failure) => { if (active) report(failure); });
     if (administrator) {
@@ -159,12 +161,30 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
     return () => { active = false; };
   }, [administrator, bookingId, report]);
 
+  useEffect(() => {
+    if (!detail?.doorHold) return;
+    const timer = window.setInterval(() => setDoorWindowOpen(withinDoorWindow(detail)), 30_000);
+    return () => window.clearInterval(timer);
+  }, [detail]);
+
   async function changeAttendance(outcome?: AttendanceOutcome) {
     clear();
     try {
       if (outcome) await api.recordAttendance(bookingId, outcome);
       else await api.clearAttendance(bookingId);
       setDetail(await api.managedAppointment(bookingId));
+    } catch (failure) {
+      report(failure);
+    }
+  }
+
+  async function changeDoorHold(hold: boolean) {
+    clear();
+    try {
+      await (hold ? api.holdDoorsOpen(bookingId) : api.endDoorHold(bookingId));
+      const appointment = await api.managedAppointment(bookingId);
+      setDetail(appointment);
+      setDoorWindowOpen(withinDoorWindow(appointment));
     } catch (failure) {
       report(failure);
     }
@@ -184,10 +204,31 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
       </section>
       {(detail.attendance || (tracked && begun)) && <AttendanceSection detail={detail} recordable={tracked && begun}
         changed={changeAttendance} t={t} />}
+      {detail.doorHold && <DoorHoldSection doorHold={detail.doorHold} open={doorWindowOpen} administrator={administrator} locale={locale} timeZone={timeZone}
+        changed={changeDoorHold} t={t} />}
     </>}
     </div></DialogBody>
     <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
   </Modal>;
+}
+
+function withinDoorWindow(appointment: ManagedAppointmentDetail) {
+  const now = Date.now();
+  const hold = appointment.doorHold;
+  return !!hold && Date.parse(hold.opensAt) <= now && now < Date.parse(hold.closesAt);
+}
+
+function DoorHoldSection({ doorHold, open, administrator, locale, timeZone, changed, t }: {
+  doorHold: NonNullable<ManagedAppointmentDetail["doorHold"]>; open: boolean; administrator: boolean; locale: string;
+  timeZone: string; changed: (hold: boolean) => Promise<void>; t: Translate;
+}) {
+  return <section data-testid="managed-door-hold" className="grid gap-2">
+    {doorHold.heldSince && <p data-testid="doors-held-open">{t("myBookings.doorsHeldOpen", { time: formatClockTime(formatTime(doorHold.heldSince, timeZone), locale) })}</p>}
+    <div className="flex flex-wrap gap-2">
+      {!doorHold.heldSince && open && <Button variant="primary" data-testid="hold-doors-open" onClick={() => void changed(true)}>{t("myBookings.holdDoorsOpen")}</Button>}
+      {doorHold.heldSince && (doorHold.heldByMe || administrator) && <Button variant="secondary" data-testid="end-door-hold" onClick={() => void changed(false)}>{t("myBookings.endDoorHold")}</Button>}
+    </div>
+  </section>;
 }
 
 function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {

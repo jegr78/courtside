@@ -12,7 +12,7 @@ import { AdminBookingCardView } from "./AdminBookingCardView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0, externalPriceMinor: 0
+  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, holdsDoorsOpen: false, active: true, guestFeeMinor: 0, externalPriceMinor: 0
 };
 
 function show(cardId = "card-1", counted = false, state?: unknown) {
@@ -153,7 +153,7 @@ describe("AdminBookingCardView", () => {
     expect(change).toHaveBeenCalledWith("card-1", {
       label: "Training", color: "#b85c38", allowedRoles: ["MEMBER", "TRAINER"],
       managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [2, 4],
-      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true,
+      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, holdsDoorsOpen: false,
       guestFeeMinor: 200, externalPriceMinor: 0
     });
   });
@@ -408,6 +408,33 @@ describe("AdminBookingCardView", () => {
     // then
     expect(screen.queryByTestId("card-signals-occupancy")).not.toBeInTheDocument();
     await waitFor(() => expect(change).toHaveBeenCalledWith(closure, expect.objectContaining({ signalsOccupancy: false })));
+  });
+
+  it("given an ordinary card, when the board lets its bookings hold doors open, then the save carries the flag", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, holdsDoorsOpen: true });
+    show();
+    expect(await screen.findByTestId("card-holds-doors-open")).not.toBeChecked();
+
+    // when
+    await userEvent.click(screen.getByTestId("card-holds-doors-open"));
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ holdsDoorsOpen: true })));
+  });
+
+  it("given the closure card, when the page loads, then it offers no door hold switch", async () => {
+    // given
+    const closure = "44444444-4444-4444-4444-444444444444";
+    vi.spyOn(api, "adminBookingCards").mockResolvedValue([{ ...memberCard, id: closure, label: "Court closed" }]);
+
+    // when
+    show(closure);
+
+    // then
+    expect(await screen.findByTestId("card-holds-doors-open-closure")).toBeInTheDocument();
+    expect(screen.queryByTestId("card-holds-doors-open")).not.toBeInTheDocument();
   });
 
   it("given a card, when its guest fee is typed with a decimal comma, then the fee is sent in cents", async () => {

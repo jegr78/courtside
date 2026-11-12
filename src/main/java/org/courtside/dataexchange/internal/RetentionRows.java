@@ -127,6 +127,8 @@ public class RetentionRows {
         jdbc.sql("UPDATE booking_attendance SET recorded_by = NULL, lifted_by = NULL WHERE booking_id IN ("
                         + DUE_BOOKINGS + ")")
                 .param("endedBefore", before).update();
+        jdbc.sql("UPDATE door_hold SET held_by = NULL, ended_by = NULL WHERE booking_id IN (" + DUE_BOOKINGS + ")")
+                .param("endedBefore", before).update();
         long bookings = jdbc.sql("""
                         UPDATE booking SET booked_by = NULL, cancelled_by = NULL, moved_by = NULL, acted_by = NULL,
                                            note = NULL, pseudonymised_at = :now

@@ -165,6 +165,9 @@ decides whether the card's bookings receive access codes; it defaults to false, 
 `booking_card_closure_grants_no_access` keeps it false on the closure card. `signals_occupancy`
 decides whether the card's bookings count as occupied in the occupancy signal; it defaults to true,
 and `booking_card_closure_signals_no_occupancy` keeps it false on the closure card.
+`holds_doors_open` decides whether a responsible person may hold the doors of the card's bookings
+open while checked in; it defaults to false, and `booking_card_closure_holds_no_doors` keeps it
+false on the closure card.
 `guest_fee_minor` is the price of one guest place in the minor unit of the club currency, 0 by
 default and never negative under `booking_card_guest_fee_not_negative`. `external_price_minor` is
 what an external booker pays for one court and hour in the same unit, 0 by default and never
@@ -242,6 +245,7 @@ cancelled or started, or whose place no longer holds the card.
 | `attendance_policy` | The one row saying whether the club records attendance and after how many minutes an unattended member booking is released | None |
 | `booking_attendance` | What was recorded for one started booking, `ATTENDED` or `NO_SHOW`, who recorded it and when, and when a no-show was lifted | `user_account` |
 | `booking_release` | When the release sweep cancelled a booking because nobody had checked in | None |
+| `door_hold` | One check-in that holds a booking's doors open: who started it and when, and who ended it and when | `user_account` |
 | `booking_rule_rejection` | One row per rule a refused booking, series or cancellation attempt broke: the rule code, the club-local hour it happened in and the card asked for | None |
 
 A booking without a `booking_attendance` row has nothing recorded and is never a no-show. A member's
@@ -250,6 +254,12 @@ no-show sets `lifted_at` and keeps the row, so the no-show stays visible but sto
 `NO_SHOW_LIMIT`, which counts the unlifted no-shows of the bookings an account holds. Like
 `waitlist_entry.booking_id`, neither `booking_id` carries a foreign key, so `court_allocation` and
 `booking_participant` stay the only rows a removed booking takes with it.
+
+A `door_hold` row is running while `ended_at` is null, its booking is confirmed, `held_at` lies in
+the booking's current window from `access_lead_minutes` before the start to the end, and the end has
+not passed. Cancelling or moving a booking ends its unended rows, and a booking that is over holds
+nothing open without any row being changed. `door_hold.booking_id` carries no foreign key either, and pseudonymisation clears
+`held_by` and `ended_by` with the booking's other actors.
 `attendance_policy_release_needs_attendance` refuses a release time while attendance is off.
 
 `booking_rule_rejection` feeds the usage report and names nobody: no person, no account and no

@@ -108,6 +108,8 @@ tags:
     description: Offering the open place of a booking to other members and taking one.
   - name: attendance
     description: Checking in for one's own booking where the club records attendance.
+  - name: door-hold
+    description: Holding a booking's doors open while a responsible person is checked in.
   - name: emergency-codes
     description: Asking for the emergency code of a booking's door when its own code is missing.
   - name: admin-courts
@@ -1910,7 +1912,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, guestFeeMinor, externalPriceMinor, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
+      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, guestFeeMinor, externalPriceMinor, showGenericOccupancy, grantsAccess, signalsOccupancy, holdsDoorsOpen, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1960,6 +1962,9 @@ components:
         signalsOccupancy:
           type: boolean
           description: Whether bookings made with this card count as occupied in the court occupancy signal. Never true for the closure card.
+        holdsDoorsOpen:
+          type: boolean
+          description: Whether the booker, an administrator or a managing role may hold the doors of a booking made with this card open while checked in. Never true for the closure card.
         active: { type: boolean }
 
     BookingCardRequest:
@@ -2025,6 +2030,11 @@ components:
           description: >-
             Absent means on when a card is created and unchanged when a card is changed. The closure
             card refuses `true`.
+        holdsDoorsOpen:
+          type: boolean
+          description: >-
+            Absent means off when a card is created and unchanged when a card is changed. The
+            closure card refuses `true`.
 
     ParticipantCard:
       type: object
@@ -3447,6 +3457,8 @@ components:
           $ref: "#/components/schemas/PartnerSearchState"
         checkIn:
           $ref: "#/components/schemas/CheckIn"
+        doorHold:
+          $ref: "#/components/schemas/DoorHold"
         released:
           type: boolean
           description: |
@@ -3545,6 +3557,23 @@ components:
         opensAt: { type: string, format: date-time }
         closesAt: { type: string, format: date-time }
         checkedIn: { type: boolean }
+
+    DoorHold:
+      type: object
+      description: |
+        Present on a booking whose card lets a responsible person hold its doors open. The booker, an
+        administrator or a role that manages the card checks in from `opensAt`, the access lead time
+        before the start, until `closesAt`, the booking's end. `heldSince` names when the running
+        hold began and is absent while nobody holds the doors open; a hold ends at check-out or at
+        the booking's end, and a moved or cancelled booking holds nothing open.
+      required: [opensAt, closesAt, heldByMe]
+      properties:
+        opensAt: { type: string, format: date-time }
+        closesAt: { type: string, format: date-time }
+        heldSince: { type: string, format: date-time }
+        heldByMe:
+          type: boolean
+          description: Whether the caller started the running hold and may therefore end it.
 
     AttendanceOutcome:
       type: string
@@ -3762,6 +3791,8 @@ components:
               items: { $ref: "#/components/schemas/ManagedParticipant" }
             attendance:
               $ref: "#/components/schemas/AttendanceOutcome"
+            doorHold:
+              $ref: "#/components/schemas/DoorHold"
 
     Allocation:
       type: object
@@ -8382,6 +8413,80 @@ paths:
       responses:
         "204":
           description: Checked in.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/bookings/{bookingId}/door-hold:
+    post:
+      tags: [door-hold]
+      operationId: holdDoorsOpen
+      summary: Hold a booking's doors open while checked in.
+      description: |
+        Starts a door hold on a booking whose card offers one. The booker, an administrator or a role
+        that manages the card may start it from the access lead time before the start until the end.
+        A card that offers no hold answers `409` with `urn:courtside:error:door-hold-not-offered`;
+        outside the window or on a booking that is not confirmed the answer is `409` with
+        `urn:courtside:error:door-hold-closed`; a hold somebody else runs answers `409` with
+        `urn:courtside:error:door-hold-already-running`. Starting again while one's own hold runs
+        changes nothing. A booking the caller may not act on answers `404` like one that does not
+        exist.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The running hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoorHold"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [door-hold]
+      operationId: endDoorHold
+      summary: End a booking's running door hold.
+      description: |
+        Checks out. Only the person who started the hold or an administrator may end it; anyone else
+        who may act on the booking gets `403` with `urn:courtside:error:door-hold-not-holder`. With
+        no running hold the answer is `409` with `urn:courtside:error:door-hold-not-running`. A
+        booking the caller may not act on answers `404` like one that does not exist.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The hold ended.
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

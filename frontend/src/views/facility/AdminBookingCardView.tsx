@@ -85,7 +85,7 @@ export function AdminBookingCardView() {
       managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
       countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
       showGenericOccupancy: card.showGenericOccupancy, grantsAccess: card.grantsAccess,
-      signalsOccupancy: card.signalsOccupancy, guestFeeMinor: card.guestFeeMinor,
+      signalsOccupancy: card.signalsOccupancy, holdsDoorsOpen: card.holdsDoorsOpen, guestFeeMinor: card.guestFeeMinor,
       externalPriceMinor: card.externalPriceMinor
     })));
   }
@@ -140,6 +140,9 @@ export function AdminBookingCardView() {
             {card.id === COURT_CLOSED
               ? <p data-testid="card-signals-occupancy-closure" className="text-muted text-sm">{t("admin.facility.signalsOccupancyClosure")}</p>
               : <Checkbox disabled={disabled} data-testid="card-signals-occupancy" label={t("admin.facility.signalsOccupancy")} hint={t("admin.facility.signalsOccupancyHint")} checked={card.signalsOccupancy} changed={(signalsOccupancy) => setCard({ ...card, signalsOccupancy })} />}
+            {card.id === COURT_CLOSED
+              ? <p data-testid="card-holds-doors-open-closure" className="text-muted text-sm">{t("admin.facility.holdsDoorsOpenClosure")}</p>
+              : <Checkbox disabled={disabled} data-testid="card-holds-doors-open" label={t("admin.facility.holdsDoorsOpen")} hint={t("admin.facility.holdsDoorsOpenHint")} checked={card.holdsDoorsOpen} changed={(holdsDoorsOpen) => setCard({ ...card, holdsDoorsOpen })} />}
           </BookingRules>
         </div>
       </div>

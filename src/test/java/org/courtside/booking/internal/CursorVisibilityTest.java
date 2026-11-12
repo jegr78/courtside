@@ -250,7 +250,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     void givenAnAdministrator_whenTheCursorNamesAnAppointmentNoRoleManages_thenPagingContinues() {
         // given
         BookingCard unmanaged = cards.createCard("Court maintenance", "#34584A",
-                Set.of(Role.TRAINER), Set.of(), new short[] { }, false, true, true, false, true, 0, 0);
+                Set.of(Role.TRAINER), Set.of(), new short[] { }, false, true, true, false, true, false, 0, 0);
         UUID cursor = bookedOnCard(unmanaged, firstCourt, TWO_PM, THREE_PM);
         UUID later = bookedOnCard(unmanaged, secondCourt, SIX_PM, SEVEN_PM);
 
@@ -397,7 +397,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
 
     private BookingCard trainerCard(String label) {
         return cards.createCard(label, "#34584A", Set.of(Role.TRAINER), Set.of(Role.TRAINER),
-                new short[] { }, false, true, true, false, true, 0, 0);
+                new short[] { }, false, true, true, false, true, false, 0, 0);
     }
 
     private void managedByNobody(BookingCard card) {
@@ -407,7 +407,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     private void changeManagingRoles(BookingCard card, Set<Role> managingRoles) {
         cards.changeCard(card.getId(), card.getLabel(), card.getColor(), card.getAllowedRoles(),
                 managingRoles, card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),
-                card.isGuestAllowed(), card.isShowGenericOccupancy(), false, true, null, null);
+                card.isGuestAllowed(), card.isShowGenericOccupancy(), false, true, null, null, null);
     }
 
     private UUID bookedOnCard(BookingCard card, UUID court, Instant from, Instant to) {

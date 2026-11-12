@@ -53,6 +53,7 @@ export function AdminBookingCardsView() {
         showGenericOccupancy: form.get("showGenericOccupancy") === "on",
         grantsAccess: form.get("grantsAccess") === "on",
         signalsOccupancy: form.get("signalsOccupancy") === "on",
+        holdsDoorsOpen: form.get("holdsDoorsOpen") === "on",
         guestFeeMinor,
         externalPriceMinor
       });
@@ -123,6 +124,7 @@ function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, fe
         {price && <AmountField kind="externalPrice" testId="new-card-external-price" disabled={disabled} {...price} />}
         <Checkbox disabled={disabled} name="grantsAccess" data-testid="new-card-grants-access" label={t("admin.facility.grantsAccess")} hint={t("admin.facility.grantsAccessHint")} />
         <Checkbox disabled={disabled} name="signalsOccupancy" data-testid="new-card-signals-occupancy" defaultChecked label={t("admin.facility.signalsOccupancy")} hint={t("admin.facility.signalsOccupancyHint")} />
+        <Checkbox disabled={disabled} name="holdsDoorsOpen" data-testid="new-card-holds-doors-open" label={t("admin.facility.holdsDoorsOpen")} hint={t("admin.facility.holdsDoorsOpenHint")} />
       </BookingRules>
     </div>
     <Button variant="primary" data-testid="create-card" disabled={disabled} className="justify-self-start" type="submit">{t("admin.create")}</Button>

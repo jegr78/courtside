@@ -21,49 +21,57 @@ public final class CardTestFixture {
     public UUID createBookingCard(String label, Set<Role> allowedRoles, Set<Role> managingRoles,
                                   short... allowedPlayerCounts) {
         return cards.createCard(label, "#34584A", allowedRoles, managingRoles, allowedPlayerCounts,
-                false, false, false, false, true, 0, 0).getId();
+                false, false, false, false, true, false, 0, 0).getId();
     }
 
     public UUID createCardCountingAgainstLimits(String label, Set<Role> allowedRoles) {
-        return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{}, true, false, false, false, true, 0, 0).getId();
+        return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{}, true, false, false, false, true, false, 0, 0).getId();
     }
 
     public UUID createDoublesCardForGuestsAllowing(String label, Set<Role> allowedRoles) {
         return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{2},
-                false, true, false, false, true, 0, 0).getId();
+                false, true, false, false, true, false, 0, 0).getId();
     }
 
     public UUID createDoublesCardForGuests(String label, Set<Role> managingRoles) {
         return cards.createCard(label, "#34584A", Set.of(), managingRoles, new short[]{2},
-                false, true, false, false, true, 0, 0).getId();
+                false, true, false, false, true, false, 0, 0).getId();
     }
 
     public void letBookingsReceiveAccessCodes(UUID cardId, boolean grantsAccess) {
         BookingCard card = cards.requireCard(cardId);
         cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
                 card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
-                card.isShowGenericOccupancy(), grantsAccess, card.isSignalsOccupancy(), null, null);
+                card.isShowGenericOccupancy(), grantsAccess, card.isSignalsOccupancy(), null, null, null);
     }
 
     public void letBookingsSignalOccupancy(UUID cardId, boolean signalsOccupancy) {
         BookingCard card = cards.requireCard(cardId);
         cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
                 card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
-                card.isShowGenericOccupancy(), card.isGrantsAccess(), signalsOccupancy, null, null);
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), signalsOccupancy, null, null, null);
+    }
+
+    public void letBookingsHoldDoorsOpen(UUID cardId, boolean holdsDoorsOpen) {
+        BookingCard card = cards.requireCard(cardId);
+        cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), holdsDoorsOpen,
+                null, null);
     }
 
     public void chargeGuests(UUID cardId, int guestFeeMinor) {
         BookingCard card = cards.requireCard(cardId);
         cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
                 card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
-                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), guestFeeMinor, null);
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), null, guestFeeMinor, null);
     }
 
     public void priceForExternals(UUID cardId, int externalPriceMinor) {
         BookingCard card = cards.requireCard(cardId);
         cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
                 card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
-                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), null,
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), null, null,
                 externalPriceMinor);
     }
 

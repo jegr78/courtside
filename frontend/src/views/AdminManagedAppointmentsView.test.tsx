@@ -331,6 +331,50 @@ describe("AdminManagedAppointmentsView", () => {
     expect(api.managedAppointment).toHaveBeenCalledWith(first.id);
   });
 
+  it("given a managed appointment whose doors may be held open, when a covering trainer holds them open, then the detail shows the running hold and its end", async () => {
+    // given
+    const window = { opensAt: "2000-01-01T00:00:00Z", closesAt: "2100-01-01T00:00:00Z" };
+    let held = false;
+    vi.spyOn(api, "managedAppointment").mockImplementation(() => Promise.resolve({
+      ...first, note: null, participants: [],
+      doorHold: held ? { ...window, heldSince: "2026-08-11T15:50:00Z", heldByMe: true } : { ...window, heldByMe: false }
+    }));
+    const hold = vi.spyOn(api, "holdDoorsOpen").mockImplementation(() => {
+      held = true;
+      return Promise.resolve({ ...window, heldSince: "2026-08-11T15:50:00Z", heldByMe: true });
+    });
+    show();
+    const series = await screen.findByTestId("managed-series-series-1");
+    await userEvent.click(within(series).getByTestId("managed-series-summary"));
+    await userEvent.click(within(series).getAllByTestId("managed-details")[0]);
+
+    // when
+    await userEvent.click(await screen.findByTestId("hold-doors-open"));
+
+    // then
+    expect(hold).toHaveBeenCalledWith(first.id);
+    expect(await within(screen.getByTestId("managed-door-hold")).findByTestId("end-door-hold")).toBeVisible();
+    expect(within(screen.getByTestId("managed-door-hold")).getByTestId("doors-held-open")).toBeVisible();
+  });
+
+  it("given a card that holds no doors, when the server answers the detail with a null door hold, then the detail opens without a failure", async () => {
+    // given
+    vi.spyOn(api, "managedAppointment").mockResolvedValue({
+      ...first, note: "Prepare score sheets", participants: [], doorHold: null
+    } as unknown as Awaited<ReturnType<typeof api.managedAppointment>>);
+    show();
+    const series = await screen.findByTestId("managed-series-series-1");
+    await userEvent.click(within(series).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(series).getAllByTestId("managed-details")[0]);
+
+    // then
+    expect(await screen.findByTestId("managed-note")).toHaveTextContent("Prepare score sheets");
+    expect(within(screen.getByRole("dialog")).queryByRole("alert"), "a missing hold is no failure").toBeNull();
+    expect(screen.queryByTestId("managed-door-hold")).toBeNull();
+  });
+
   it("given a past appointment whose guest names were pseudonymised, when details open, then the guest carries a neutral label", async () => {
     // given
     vi.spyOn(api, "managedAppointment").mockResolvedValue({
