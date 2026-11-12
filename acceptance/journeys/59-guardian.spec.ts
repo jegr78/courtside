@@ -138,6 +138,7 @@ test("given a member the board lets act for the disposable member, when the guar
       }, { message: "product: the guardian reads the dependant's booking confirmation", timeout: 20_000 }).toBeTruthy();
       await guardianPage.reload();
       await openDependant(guardianPage, dependantId);
+      await guardianPage.getByTestId("dependant-notifications-show-unread").click();
       await expect(guardianPage.getByTestId("dependant-notifications"), "product: the guardian's page lists the dependant's messages").toBeVisible();
       await capture(guardianPage, "dependant-messages");
       const own = (await (await dependant.get("/api/account/notifications?limit=100")).json()).items as Notice[];

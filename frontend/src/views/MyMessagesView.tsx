@@ -3,7 +3,7 @@ import { LoadingGroup, LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, type MessageChannel, type MessageChannelChoice, type MessageChoice, type MessageKind, type Notification } from "../api/client";
+import { api, type MessageChannel, type MessageChannelChoice, type MessageChoice, type MessageKind, type Notification, type NotificationPage } from "../api/client";
 import { warnAbout } from "../api/failureWarning";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
@@ -83,77 +83,177 @@ export function NotificationEntry({ notification, timeZone, marking = false, jus
   </li>;
 }
 
-function NotificationCentre() {
+type Listing = { items: Notification[]; next?: string };
+type Shown = "unread" | "read";
+
+export function NotificationLists({ testId, revision = 0, timeZone, fetchPage, markOne, markAll, failed, read: readAlong, emptyUnread, emptyRead }: {
+  testId: string;
+  revision?: number;
+  timeZone: string;
+  fetchPage: (read: boolean, cursor?: string) => Promise<NotificationPage>;
+  markOne?: (id: string) => Promise<void>;
+  markAll?: () => Promise<void>;
+  failed: (cause: unknown) => void;
+  read?: () => void;
+  emptyUnread: string;
+  emptyRead: string;
+}) {
   const { t, i18n } = useTranslation();
-  const { club, error: clubError, load: loadClub } = useClubConfiguration();
-  const [entries, setEntries] = useState<Notification[]>();
-  const [nextCursor, setNextCursor] = useState<string>();
+  const [shown, setShown] = useState<Shown>();
+  const shownNow = useRef<Shown>(undefined);
+  useLayoutEffect(() => { shownNow.current = shown; }, [shown]);
+  const [unread, setUnread] = useState<Listing>();
+  const [unreadCount, setUnreadCount] = useState<number>();
+  const [read, setRead] = useState<Listing>();
+  const [loading, setLoading] = useState<Shown | undefined>("unread");
   const [marking, setMarking] = useState<string>();
   const inFlight = useRef(new Set<string>());
   const [justRead, setJustRead] = useState<string>();
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [failure, setFailure] = useState<{ cause: unknown }>();
-  const error = failure && problemMessage(failure.cause, t);
+  const [allRead, setAllRead] = useState(false);
+  const unreadTab = useRef<HTMLButtonElement>(null);
+  const generation = useRef(0);
+  const ids = useId();
 
-  const load = useCallback(async (cursor?: string) => {
-    const page = await api.ownNotifications(cursor);
-    setEntries((current) => cursor ? [...(current ?? []), ...page.items] : page.items);
-    setNextCursor(page.nextCursor ?? undefined);
-  }, []);
-
-  useEffect(() => {
-    load().catch((cause: unknown) => setFailure({ cause }));
-  }, [load]);
-
-  async function loadMore() {
-    setLoadingMore(true);
+  const load = useCallback(async (state: Shown, cursor?: string) => {
+    const requested = generation.current;
+    setLoading(state);
     try {
-      await load(nextCursor);
-      setFailure(undefined);
+      const page = await fetchPage(state === "read", cursor);
+      if (requested !== generation.current) return;
+      const store = state === "read" ? setRead : setUnread;
+      store((current) => ({ items: cursor ? [...(current?.items ?? []), ...page.items] : page.items, next: page.nextCursor ?? undefined }));
+      setUnreadCount(page.unread);
     } catch (cause) {
-      setFailure({ cause });
+      if (requested === generation.current) failed(cause);
     } finally {
-      setLoadingMore(false);
+      if (requested === generation.current) setLoading(undefined);
     }
+  }, [fetchPage, failed]);
+
+  // A new revision reads both lists afresh and keeps the open one open.
+  useEffect(() => {
+    generation.current += 1;
+    setUnread(undefined); setRead(undefined);
+    void load("unread");
+    if (shownNow.current === "read") void load("read");
+    return () => { generation.current += 1; };
+  }, [load, revision]);
+
+  function toggle(state: Shown) {
+    const opening = shown !== state;
+    setShown(opening ? state : undefined);
+    setJustRead(undefined); setAllRead(false);
+    if (!opening) return;
+    // Reopening the unread list drops what was marked read meanwhile; it stayed in place to keep the focus.
+    if (state === "unread" && (!unread || unread.items.some((entry) => entry.readAt))) void load("unread");
+    if (state === "read" && !read) void load("read");
   }
 
   // Following a link leaves the page, so a refusal there is only logged rather than shown.
+  // A page still in flight was read before the mark, so it must not overwrite what the mark changed.
+  function dropPendingLoads() {
+    generation.current += 1;
+    setLoading(undefined);
+  }
+
   async function markRead(id: string, quietly = false) {
-    if (inFlight.current.has(id)) return;
+    if (!markOne || inFlight.current.has(id)) return;
     inFlight.current.add(id);
     setMarking(id);
-    if (!quietly) setJustRead(undefined);
+    if (!quietly) { setJustRead(undefined); setAllRead(false); }
     try {
-      await api.markNotificationRead(id);
+      await markOne(id);
+      dropPendingLoads();
       const readAt = new Date().toISOString();
-      setEntries((current) => current?.map((entry) => entry.id === id ? { ...entry, readAt } : entry));
+      setUnread((current) => current && { ...current, items: current.items.map((entry) => entry.id === id ? { ...entry, readAt } : entry) });
+      setUnreadCount((count) => count === undefined ? count : Math.max(0, count - 1));
+      setRead(undefined);
       if (!quietly) setJustRead(id);
-      setFailure(undefined);
-      announceNotificationsRead();
+      readAlong?.();
     } catch (cause) {
       if (quietly) warnAbout("Notification not marked read", cause);
-      else setFailure({ cause });
+      else failed(cause);
     } finally {
       inFlight.current.delete(id);
       setMarking(undefined);
     }
   }
 
+  async function markEveryRead() {
+    if (!markAll || inFlight.current.has("*")) return;
+    inFlight.current.add("*");
+    setMarking("*");
+    setJustRead(undefined);
+    try {
+      await markAll();
+      dropPendingLoads();
+      setUnread({ items: [] });
+      setUnreadCount(0);
+      setRead(undefined);
+      setAllRead(true);
+      unreadTab.current?.focus();
+      readAlong?.();
+    } catch (cause) {
+      failed(cause);
+    } finally {
+      inFlight.current.delete("*");
+      setMarking(undefined);
+    }
+  }
+
+  const listing = shown === "read" ? read : shown === "unread" ? unread : undefined;
+  return <div className="grid gap-3">
+    <p role="status" data-testid={`${testId}-status`} className="sr-only">
+      {justRead ? t("notifications.markedRead") : allRead ? t("notifications.markedAllRead") : ""}
+    </p>
+    {unreadCount === undefined && loading === "unread" && <LoadingStatus />}
+    <div role="group" aria-label={t("notifications.lists")} data-testid={`${testId}-lists`} className="flex flex-wrap gap-2">
+      {(["unread", "read"] as const).map((state) => <Button key={state} ref={state === "unread" ? unreadTab : undefined} type="button"
+        data-testid={`${testId}-show-${state}`} variant={shown === state ? "primary" : "secondary"}
+        aria-expanded={shown === state} aria-controls={`${ids}-${state}`} onClick={() => toggle(state)}>
+        {state === "read" ? t("notifications.readList")
+          : unreadCount === undefined ? t("notifications.unreadListUncounted") : t("notifications.unreadList", { count: unreadCount })}
+      </Button>)}
+    </div>
+    {shown && <div id={`${ids}-${shown}`} data-testid={`${testId}-${shown}`} className="grid gap-3">
+      {!listing && loading === shown && <LoadingStatus />}
+      {shown === "unread" && markAll && (unreadCount ?? 0) > 0 && <Button variant="secondary" data-testid={`${testId}-mark-all-read`}
+        className="justify-self-start" aria-disabled={marking === "*"} onClick={() => void markEveryRead()}>
+        {t("notifications.markAllRead")}
+      </Button>}
+      {listing && (listing.items.length === 0
+        ? <p data-testid={`${testId}-empty`} className="text-muted">{shown === "unread" ? emptyUnread : emptyRead}</p>
+        : <ul data-testid={testId} className="grid gap-3">
+          {listing.items.map((notification) => <NotificationEntry key={notification.id} notification={notification}
+            timeZone={timeZone} marking={marking === notification.id} justRead={justRead === notification.id}
+            markRead={markOne && ((id, quietly) => void markRead(id, quietly))} t={t} language={i18n.language} />)}
+        </ul>)}
+      {listing?.next && <Button variant="secondary" data-testid={`${testId}-load-more`} className="justify-self-start"
+        disabled={loading === shown} onClick={() => void load(shown, listing.next)}>{t("notifications.loadMore")}</Button>}
+    </div>}
+  </div>;
+}
+
+function NotificationCentre() {
+  const { t } = useTranslation();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
+  const [failure, setFailure] = useState<{ cause: unknown }>();
+  const error = failure && problemMessage(failure.cause, t);
+  const fetchPage = useCallback(async (read: boolean, cursor?: string) => {
+    const page = await api.ownNotifications(cursor, 50, read);
+    setFailure(undefined);
+    return page;
+  }, []);
+  const failed = useCallback((cause: unknown) => setFailure({ cause }), []);
+
   return <section className="grid gap-3" aria-labelledby="notifications-title">
     <h2 id="notifications-title" className="text-2xl font-bold">{t("notifications.title")}</h2>
     {error && <Alert>{error}</Alert>}
-    <p role="status" data-testid="notifications-status" className="sr-only">{justRead && t("notifications.markedRead")}</p>
     {clubError && <LoadFailure message={clubError} retry={loadClub} />}
-    {!error && !clubError && !(entries && club) && <LoadingStatus />}
-    {entries && club && (entries.length === 0
-      ? <p data-testid="notifications-empty" className="text-muted">{t("notifications.empty")}</p>
-      : <ul data-testid="notifications" className="grid gap-3">
-        {entries.map((notification) => <NotificationEntry key={notification.id} notification={notification}
-          timeZone={club.timeZone} marking={marking === notification.id} justRead={justRead === notification.id} markRead={(id, quietly) => void markRead(id, quietly)}
-          t={t} language={i18n.language} />)}
-      </ul>)}
-    {nextCursor && <Button variant="secondary" data-testid="notifications-load-more" className="justify-self-start"
-      disabled={loadingMore} onClick={() => void loadMore()}>{t("notifications.loadMore")}</Button>}
+    {!clubError && !club && <LoadingStatus />}
+    {club && <NotificationLists testId="notifications" timeZone={club.timeZone} fetchPage={fetchPage}
+      markOne={api.markNotificationRead} markAll={api.markAllNotificationsRead} failed={failed}
+      read={announceNotificationsRead} emptyUnread={t("notifications.noUnread")} emptyRead={t("notifications.noRead")} />}
   </section>;
 }
 

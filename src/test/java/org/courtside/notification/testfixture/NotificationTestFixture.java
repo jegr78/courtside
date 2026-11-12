@@ -26,6 +26,13 @@ public class NotificationTestFixture {
                 .update();
     }
 
+    public List<UUID> ids(UUID accountId) {
+        return jdbc.sql("SELECT id FROM notification WHERE account_id = :accountId ORDER BY created_seq")
+                .param("accountId", accountId)
+                .query(UUID.class)
+                .list();
+    }
+
     public List<MessageKind> notificationsFor(UUID accountId) {
         return jdbc.sql("SELECT kind FROM notification WHERE account_id = :accountId ORDER BY created_seq")
                 .param("accountId", accountId)

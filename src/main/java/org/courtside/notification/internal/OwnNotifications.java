@@ -44,18 +44,18 @@ public class OwnNotifications {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    public Page page(UUID cursor, int limit) {
-        return pageOf(currentUser.requireAccount(), cursor, limit);
+    public Page page(Boolean read, UUID cursor, int limit) {
+        return pageOf(currentUser.requireAccount(), read, cursor, limit);
     }
 
     // Read only: a guardian reading leaves the dependant's unread entries unread.
     @Transactional(readOnly = true)
-    public Page dependantPage(UUID dependantPersonId, UUID cursor, int limit) {
-        return pageOf(dependants.requireReadableAccount(dependantPersonId), cursor, limit);
+    public Page dependantPage(UUID dependantPersonId, Boolean read, UUID cursor, int limit) {
+        return pageOf(dependants.requireReadableAccount(dependantPersonId), read, cursor, limit);
     }
 
     // A cursor that is not one of this account's entries matches no sequence, so it reads as the end.
-    private Page pageOf(UserAccount account, UUID cursor, int limit) {
+    private Page pageOf(UserAccount account, Boolean read, UUID cursor, int limit) {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalStateException("Notification page size must be between 1 and " + MAX_PAGE_SIZE);
         }
@@ -63,6 +63,7 @@ public class OwnNotifications {
                         SELECT id, kind, parameters::text AS parameters, created_at, read_at
                         FROM notification
                         WHERE account_id = :accountId
+                          AND (CAST(:read AS boolean) IS NULL OR (read_at IS NOT NULL) = CAST(:read AS boolean))
                           AND (CAST(:cursor AS uuid) IS NULL OR created_seq < (
                               SELECT created_seq FROM notification
                               WHERE id = CAST(:cursor AS uuid) AND account_id = :accountId))
@@ -70,6 +71,7 @@ public class OwnNotifications {
                         LIMIT :probe
                         """)
                 .param("accountId", account.getId())
+                .param("read", read)
                 .param("cursor", cursor)
                 .param("probe", limit + 1)
                 .query((rows, number) -> new Stored(rows.getObject("id", UUID.class),
@@ -108,6 +110,14 @@ public class OwnNotifications {
         if (marked == 0) {
             throw new NotificationNotFoundException();
         }
+    }
+
+    @Transactional
+    public void markAllRead() {
+        jdbc.sql("UPDATE notification SET read_at = :now WHERE account_id = :accountId AND read_at IS NULL")
+                .param("now", Timestamp.from(clock.instant()))
+                .param("accountId", accountId())
+                .update();
     }
 
     // A booking the account may no longer see stays unnamed, so a player who left learns nothing more of it.

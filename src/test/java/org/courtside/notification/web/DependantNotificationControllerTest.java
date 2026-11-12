@@ -10,6 +10,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.notification.MessageKind;
+import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +58,9 @@ class DependantNotificationControllerTest extends AbstractIntegrationTest {
     @Autowired
     private MemberTestFixture members;
 
+    @Autowired
+    private NotificationTestFixture notifications;
+
     private MockMvc mockMvc;
     private UUID courtId;
     private UUID jane;
@@ -101,6 +106,29 @@ class DependantNotificationControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/account/notifications").with(as("doe.jane")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items", hasSize(0)));
+    }
+
+    @Test
+    void givenAGuardianGrantedToReadMessages_whenFilteringTheDependantsCentreByState_thenEachListHoldsOnlyItsState()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.READ_MESSAGES));
+        Instant earlier = Instant.parse("2026-05-12T09:00:00Z");
+        UUID read = notifications.notify(johnAccount, MessageKind.BOOKING_REMINDER, null, earlier);
+        notifications.markRead(read, earlier);
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/notifications", john).param("read", "true")
+                        .with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(read.toString()));
+        mockMvc.perform(get("/api/my/dependants/{personId}/notifications", john).param("read", "false")
+                        .with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_CONFIRMED"))
+                .andExpect(jsonPath("$.unread").value(1));
     }
 
     @Test

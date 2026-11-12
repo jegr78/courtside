@@ -80,6 +80,9 @@ public class ClubConfiguration {
     @Column(name = "waitlist_offer_minutes", nullable = false)
     private int waitlistOfferMinutes;
 
+    @Column(name = "read_notification_days", nullable = false)
+    private int readNotificationDays;
+
     @Column(name = "access_lead_minutes", nullable = false)
     private int accessLeadMinutes;
 
@@ -133,6 +136,10 @@ public class ClubConfiguration {
 
     public void holdWaitlistOffersFor(int minutes) {
         this.waitlistOfferMinutes = minutes;
+    }
+
+    public void keepReadNotificationsFor(int days) {
+        this.readNotificationDays = days;
     }
 
     public void openAccessPointsBefore(int minutes) {

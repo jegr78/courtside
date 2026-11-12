@@ -12,6 +12,7 @@
       "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
       "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java",
       "src/main/java/org/courtside/notification/internal/MailOutbox.java",
+      "src/main/java/org/courtside/notification/internal/ReadNotificationExpirySchedule.java",
       "src/main/java/org/courtside/payment/internal/PayPalReconciliation.java"
     ],
     "backgroundFiles": [
@@ -163,6 +164,7 @@
         "listSupportedEncodings",
         "logOut",
         "markOwnNotificationRead",
+        "markAllOwnNotificationsRead",
         "previewMessageTemplate",
         "readAccessControlCheck",
         "readAuditLog",
@@ -774,6 +776,7 @@
         "IdentityCleanupSchedule#deleteUnverifiedRegistrations",
         "PartnerSearchSweep#removeWhatNobodyCanTake",
         "PreviewExpirySchedule#sweepNow",
+        "ReadNotificationExpirySchedule#deleteExpired",
         "WaitlistSweep#passOnWhatIsDue"
       ],
       "growthDrivers": "Cleanup grows with expired rows, while reminder work grows with due bookings and the messages their participants receive.",
@@ -788,14 +791,16 @@
         "src/main/java/org/courtside/booking/waitlist/WaitlistSweep.java",
         "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
         "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
-        "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java"
+        "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java",
+        "src/main/java/org/courtside/notification/internal/ReadNotificationExpirySchedule.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/notification/BookingReminderTest.java#givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice",
         "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop",
         "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays",
         "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenWaitingEntries_whenTheSlotStartsAndEnds_thenTheSweepClosesAndThenForgetsThem",
-        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAStartedBooking_whenItsPlaceWasPublished_thenNobodySeesOrTakesItAndTheSweepRemovesIt"
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAStartedBooking_whenItsPlaceWasPublished_thenNobodySeesOrTakesItAndTheSweepRemovesIt",
+        "src/test/java/org/courtside/notification/internal/ReadNotificationExpiryTest.java#givenTheDefaultPeriod_whenTheJobRuns_thenOnlyAReadEntryReadLongerAgoIsGone"
       ]
     },
     {

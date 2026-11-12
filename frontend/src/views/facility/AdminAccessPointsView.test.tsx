@@ -29,7 +29,7 @@ const stored: AdminClubConfig = {
   newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24,
   passwordResetTokenMinutes: 60,
-  bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
+  bookingReminderHours: 24, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   noMembershipTypeRuleSetId: "rule-set",
   logoUploaded: false, externalBookings: false, currency: "EUR", currencyFractionDigits: 2
 };
@@ -258,7 +258,7 @@ describe("AdminAccessPointsView access settings", () => {
       logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: undefined,
       defaultLocale: "en", slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR", externalBookings: false,
       newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4,
       noMembershipTypeRuleSetId: "rule-set"
     });
     expect(configurationChanged).toHaveBeenCalled();

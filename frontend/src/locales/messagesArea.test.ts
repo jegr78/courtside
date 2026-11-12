@@ -9,7 +9,7 @@ const languages = [
     "guardianGrant.READ_MESSAGES": "Nachrichten",
     "notifications.title": "Deine Nachrichten",
     "notifications.loadMore": "Ältere Nachrichten",
-    "dependants.loadMoreMessages": "Weitere Nachrichten"
+    "dependants.noUnreadMessages": "ungelesenen Nachrichten"
   } },
   { bundle: en as Record<string, string>, area: "Messages", notice: "notification", pointers: {
     "myMessages.channelsReason": "beside Messages in the menu",
@@ -17,7 +17,7 @@ const languages = [
     "guardianGrant.READ_MESSAGES": "messages",
     "notifications.title": "Your messages",
     "notifications.loadMore": "older messages",
-    "dependants.loadMoreMessages": "more messages"
+    "dependants.noUnreadMessages": "unread messages"
   } }
 ];
 

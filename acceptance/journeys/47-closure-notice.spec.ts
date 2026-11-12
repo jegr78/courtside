@@ -93,6 +93,7 @@ test("given a disposable member's booking ten days after the lanes, when the adm
       const centre = await openAs(browser, "disposable");
       try {
         await centre.goto("/my-messages");
+        await centre.getByTestId("notifications-show-unread").click();
         const notice = centre.getByTestId(`notification-${noticeId}`);
         await expect(notice, "product: the notification centre shows it as a closed court").toHaveAttribute("data-closure", "COURT_CLOSED");
         await expect(notice.getByTestId("notification-summary"), "product: the notice keeps the admin's note to the board").not.toContainText(NOTE);

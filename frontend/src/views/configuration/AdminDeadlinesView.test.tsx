@@ -24,7 +24,7 @@ const stored: AdminClubConfig = {
   newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24,
   passwordResetTokenMinutes: 60,
-  bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
+  bookingReminderHours: 24, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   noMembershipTypeRuleSetId: "rule-set",
   logoUploaded: false, externalBookings: false, currency: "EUR", currencyFractionDigits: 2
 };
@@ -60,7 +60,7 @@ describe("AdminDeadlinesView", () => {
   it("given changed deadlines, when saving, then the request carries every other setting as it was stored", async () => {
     // given
     const changing = vi.spyOn(api, "changeAdminConfig")
-      .mockResolvedValue({ ...stored, newAccountCredentialHours: 72, bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
+      .mockResolvedValue({ ...stored, newAccountCredentialHours: 72, bookingReminderHours: 3, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
     const configurationChanged = vi.fn();
     show(configurationChanged);
     await screen.findByTestId("new-account-credential-hours");
@@ -79,7 +79,7 @@ describe("AdminDeadlinesView", () => {
       logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: undefined,
       defaultLocale: "en", slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR", externalBookings: false,
       newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, noMembershipTypeRuleSetId: "rule-set"
+      bookingReminderHours: 3, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, noMembershipTypeRuleSetId: "rule-set"
     });
     expect(configurationChanged).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
@@ -90,7 +90,7 @@ describe("AdminDeadlinesView", () => {
     vi.mocked(api.adminConfig)
       .mockResolvedValueOnce(stored)
       .mockResolvedValue({ ...stored, imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", accessCodeLength: 4 });
-    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, bookingReminderHours: 3, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
     show();
     await screen.findByTestId("booking-reminder-hours");
 
@@ -102,7 +102,7 @@ describe("AdminDeadlinesView", () => {
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
     expect(changing.mock.calls[0][0], "fields the page does not own are read again just before the write")
-      .toMatchObject({ imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", bookingReminderHours: 3, waitlistOfferMinutes: 15, accessCodeLength: 4 });
+      .toMatchObject({ imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", bookingReminderHours: 3, waitlistOfferMinutes: 15, readNotificationDays: 90, accessCodeLength: 4 });
   });
 
   it("given the configuration cannot be read again, when the deadlines are saved, then nothing is written and the failure is shown", async () => {
@@ -225,7 +225,7 @@ describe("AdminDeadlinesView waitlist offer window", () => {
 
   it("given a changed offer window, when saving, then the request carries the minutes the board chose", async () => {
     // given
-    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, waitlistOfferMinutes: 30, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, waitlistOfferMinutes: 30, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
     show();
     const field = await screen.findByTestId("waitlist-offer-minutes");
     expect(field).toHaveValue(15);
@@ -238,7 +238,25 @@ describe("AdminDeadlinesView waitlist offer window", () => {
     await userEvent.click(screen.getByTestId("save-deadlines"));
 
     // then
-    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ waitlistOfferMinutes: 30, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 })));
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ waitlistOfferMinutes: 30, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 })));
     expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The deadlines and reminders were saved.");
+  });
+  it("given a changed period for read messages, when saving, then the request carries the days the board chose", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, readNotificationDays: 30 });
+    show();
+    const field = await screen.findByTestId("read-notification-days");
+    expect(field).toHaveValue(90);
+    expect(field).toHaveAttribute("min", "1");
+    expect(field).toHaveAttribute("max", "3650");
+    expect(field).toHaveAccessibleName("Delete read messages after (days)");
+
+    // when
+    await userEvent.clear(field);
+    await userEvent.type(field, "30");
+    await userEvent.click(screen.getByTestId("save-deadlines"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ readNotificationDays: 30 })));
   });
 });

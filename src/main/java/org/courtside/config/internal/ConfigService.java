@@ -18,6 +18,8 @@ import org.courtside.config.CredentialLifetime;
 import org.courtside.config.PasswordResetTokenValidity;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ReadNotificationPeriod;
+import org.courtside.config.ReadNotificationPolicy;
 import org.courtside.config.WaitlistOfferPolicy;
 import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
@@ -49,7 +51,7 @@ import java.time.ZoneId;
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
         CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy,
-        WaitlistOfferPolicy, AccessPolicy, ClubCurrency, ExternalBookings {
+        WaitlistOfferPolicy, AccessPolicy, ClubCurrency, ExternalBookings, ReadNotificationPolicy {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -131,6 +133,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public WaitlistOfferWindow offerWindow() {
         return new WaitlistOfferWindow(current().waitlistOfferMinutes());
+    }
+
+    @Override
+    public ReadNotificationPeriod readNotificationPeriod() {
+        return new ReadNotificationPeriod(current().readNotificationDays());
     }
 
     @Override
@@ -279,6 +286,10 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
             addIfChanged(fields, "waitlistOfferMinutes",
                     configuration.getWaitlistOfferMinutes(), command.waitlistOffer().minutes());
         }
+        if (command.readNotifications() != null) {
+            addIfChanged(fields, "readNotificationDays",
+                    configuration.getReadNotificationDays(), command.readNotifications().days());
+        }
         if (command.accessLead() != null) {
             addIfChanged(fields, "accessLeadMinutes",
                     configuration.getAccessLeadMinutes(), command.accessLead().minutes());
@@ -325,6 +336,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         configuration.remindBookingsAfter(command.bookingReminder().hours());
         if (command.waitlistOffer() != null) {
             configuration.holdWaitlistOffersFor(command.waitlistOffer().minutes());
+        }
+        if (command.readNotifications() != null) {
+            configuration.keepReadNotificationsFor(command.readNotifications().days());
         }
         if (command.accessLead() != null) {
             configuration.openAccessPointsBefore(command.accessLead().minutes());

@@ -78,6 +78,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#deleteLogo",
             "ConfigService#leadTime",
             "ConfigService#offerWindow",
+            "ConfigService#readNotificationPeriod",
             "ConfigService#lock",
             "ConfigService#logo",
             "ConfigService#resetCodeLifetime",

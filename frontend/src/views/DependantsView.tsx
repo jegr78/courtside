@@ -3,10 +3,10 @@ import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
 import { securityKeyFailure } from "../security/webauthn";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, ApiError, type Dependant, type GuardianGrant, type Notification, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, ApiError, type Dependant, type GuardianGrant, type PersonalBooking, type PublicCourt } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -20,7 +20,7 @@ import { announceDependantsChanged } from "../navigation/dependants";
 import { formatCalendarDate } from "../time/clubZone";
 import { CancelDialog } from "./AppointmentDialogs";
 import { BookingSection } from "./MyBookingsView";
-import { NotificationEntry } from "./MyMessagesView";
+import { NotificationLists } from "./MyMessagesView";
 
 const GRANT_ORDER: GuardianGrant[] = ["VIEW_BOOKINGS", "BOOK", "CANCEL_BOOKINGS", "READ_MESSAGES", "ACCOUNT_TASKS"];
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
@@ -173,53 +173,28 @@ function DependantBookings({ dependant, cancels, refused, acted }: {
 }
 
 function DependantMessages({ dependant, refused, revision }: { dependant: Dependant; refused: (cause: unknown) => Promise<void>; revision: number }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { club } = useClubConfiguration();
   const name = nameOf(dependant);
-  const [entries, setEntries] = useState<Notification[]>();
-  const [nextCursor, setNextCursor] = useState<string>();
   const { message: error, report, clear } = useReportedFailure();
-  const generation = useRef(0);
-  const [loading, setLoading] = useState(false);
-
-  const load = useCallback(async (cursor?: string) => {
-    const requested = generation.current;
-    setLoading(true);
+  const [retry, setRetry] = useState(0);
+  const fetchPage = useCallback(async (read: boolean, cursor?: string) => {
     clear();
-    if (!cursor) { setEntries(undefined); setNextCursor(undefined); }
-    try {
-      const page = await api.dependantNotifications(dependant.personId, cursor);
-      if (requested !== generation.current) return;
-      setEntries((current) => cursor ? [...(current ?? []), ...page.items] : page.items);
-      setNextCursor(page.nextCursor ?? undefined);
-    } catch (failure) {
-      if (requested !== generation.current) return;
-      if (relationshipChanged(failure)) await refused(failure);
-      else report(failure);
-    } finally {
-      if (requested === generation.current) setLoading(false);
-    }
-  }, [dependant.personId, refused, report, clear]);
-
-  useEffect(() => {
-    generation.current += 1;
-    void load();
-    return () => { generation.current += 1; };
-  }, [load, revision]);
+    return api.dependantNotifications(dependant.personId, cursor, 50, read);
+  }, [dependant.personId, clear]);
+  const failed = useCallback((failure: unknown) => {
+    if (relationshipChanged(failure)) void refused(failure);
+    else report(failure);
+  }, [refused, report]);
 
   return <section data-testid="dependant-messages" aria-labelledby="dependant-messages-title" className="grid gap-3">
     <h3 id="dependant-messages-title" className="text-xl font-semibold">{t("dependants.messages")}</h3>
     <p className="text-muted text-sm">{t("dependants.messagesReadOnly", { name })}</p>
-    {error && <LoadFailure message={error} retry={() => void load()} />}
-    {loading && !entries && <LoadingStatus />}
-    {entries && club && (entries.length === 0
-      ? <p data-testid="dependant-messages-empty" className="text-muted">{t("dependants.noMessages", { name })}</p>
-      : <ul data-testid="dependant-notifications" className="grid gap-3">
-        {entries.map((notification) => <NotificationEntry key={notification.id} notification={notification}
-          timeZone={club.timeZone} t={t} language={i18n.language} />)}
-      </ul>)}
-    {nextCursor && <Button variant="secondary" data-testid="dependant-load-more-messages" className="justify-self-start" disabled={loading}
-      onClick={() => void load(nextCursor)}>{t("dependants.loadMoreMessages")}</Button>}
+    {error && <LoadFailure message={error} retry={() => setRetry((count) => count + 1)} />}
+    {!club && !error && <LoadingStatus />}
+    {club && <NotificationLists testId="dependant-notifications" revision={revision + retry} timeZone={club.timeZone}
+      fetchPage={fetchPage} failed={failed} emptyUnread={t("dependants.noUnreadMessages", { name })}
+      emptyRead={t("dependants.noReadMessages", { name })} />}
   </section>;
 }
 

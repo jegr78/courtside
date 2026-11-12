@@ -273,6 +273,7 @@ test("given a member, when the message choices are changed and changed back, the
     // when
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-view")).toBeVisible();
+    await page.getByTestId("notifications-show-unread").click();
     await capture(page, "my-messages", { subject: page.locator('[data-testid="notifications"] > li, [data-testid="notifications-empty"]').first() });
     const choice = page.getByTestId("message-choice-BOOKING_REMINDER");
     const checked = await choice.isChecked();

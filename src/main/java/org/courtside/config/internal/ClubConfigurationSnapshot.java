@@ -29,7 +29,8 @@ public record ClubConfigurationSnapshot(
         String currency,
         boolean externalBookings,
         String registrationTextDe,
-        String registrationTextEn) {
+        String registrationTextEn,
+        int readNotificationDays) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
         return new ClubConfigurationSnapshot(
@@ -59,7 +60,8 @@ public record ClubConfigurationSnapshot(
                 configuration.getCurrency(),
                 configuration.isExternalBookings(),
                 configuration.getRegistrationTextDe(),
-                configuration.getRegistrationTextEn());
+                configuration.getRegistrationTextEn(),
+                configuration.getReadNotificationDays());
     }
 
     public String effectiveShortName() {

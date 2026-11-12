@@ -77,6 +77,7 @@
         "chooseOwnMessageChannels",
         "listOwnNotifications",
         "markOwnNotificationRead",
+        "markAllOwnNotificationsRead",
         "listDependants",
         "listDependantNotifications",
         "requestDependantCredentials",
@@ -96,7 +97,8 @@
         "UsernameReminderMailer#on(UsernameReminderRequested)",
         "IdentityCleanupSchedule#deleteUnverifiedRegistrations",
         "RegistrationMailer#on(RegistrationNameTaken)",
-        "RegistrationMailer#on(RegistrationVerificationRequested)"
+        "RegistrationMailer#on(RegistrationVerificationRequested)",
+        "ReadNotificationExpirySchedule#deleteExpired"
       ],
       "stateTransitions": [
         "Password login creates an authenticated session only without MFA; enrolled accounts first receive a roleless pending session.",
@@ -104,7 +106,8 @@
         "Logout and session termination delete or invalidate sessions.",
         "Locale and message choices update account preferences.",
         "Ordinary recovery mails a single-use password-reset code while retaining enrolled factors; an address request only reminds the holder of usernames.",
-        "A guardian granted account tasks has new credentials issued to a dependant's account under the account's issuing limit."
+        "A guardian granted account tasks has new credentials issued to a dependant's account under the account's issuing limit.",
+        "An account marks its notifications read one by one or all at once, and an hourly job deletes a read notification once the club's period has passed since it was read."
       ],
       "alternatePaths": [
         "Initial credentials require a permanent password before ordinary use.",
@@ -124,14 +127,18 @@
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
         "src/main/java/org/courtside/notification/web/MessageChoiceController.java",
         "src/main/java/org/courtside/member/DependantService.java",
-        "src/main/java/org/courtside/notification/internal/OwnNotifications.java"
+        "src/main/java/org/courtside/notification/internal/OwnNotifications.java",
+        "src/main/java/org/courtside/notification/internal/ReadNotificationExpiry.java",
+        "src/main/java/org/courtside/notification/internal/ReadNotificationExpirySchedule.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/LoginTest.java#givenFiveDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart",
         "src/test/java/org/courtside/identity/SignOutTest.java#givenASignedInAccount_whenItSignsOut_thenTheSessionIsGone",
         "src/test/java/org/courtside/identity/AccountRecoveryTest.java#givenANameNobodyHolds_whenItIsAsked_thenTheAnswerCannotBeToldFromTheOne",
         "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued",
-        "src/test/java/org/courtside/notification/web/DependantNotificationControllerTest.java#givenAGuardianGrantedToReadMessages_whenReadingTheDependantsCentre_thenItIsTheirsAndStaysUnread"
+        "src/test/java/org/courtside/notification/web/DependantNotificationControllerTest.java#givenAGuardianGrantedToReadMessages_whenReadingTheDependantsCentre_thenItIsTheirsAndStaysUnread",
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenUnreadEntriesOfTwoMembers_whenOneMarksAllRead_thenOnlyTheirsAreReadAndAnEarlierReadKeepsItsTime",
+        "src/test/java/org/courtside/notification/internal/ReadNotificationExpiryTest.java#givenTheDefaultPeriod_whenTheJobRuns_thenOnlyAReadEntryReadLongerAgoIsGone"
       ]
     },
     {

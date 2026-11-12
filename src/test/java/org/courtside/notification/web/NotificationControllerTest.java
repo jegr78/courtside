@@ -280,6 +280,52 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenReadAndUnreadEntries_whenTheCentreIsFilteredByState_thenEachListHoldsOnlyItsStateNewestFirst()
+            throws Exception {
+        // given
+        UUID olderUnread = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        UUID read = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        notifications.markRead(read, EARLIER);
+        UUID newerUnread = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").param("read", "false").with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(2)))
+                .andExpect(jsonPath("$.items[0].id").value(newerUnread.toString()))
+                .andExpect(jsonPath("$.items[1].id").value(olderUnread.toString()))
+                .andExpect(jsonPath("$.unread").value(2));
+        mockMvc.perform(get("/api/account/notifications").param("read", "true").with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(read.toString()))
+                .andExpect(jsonPath("$.unread").value(2));
+        mockMvc.perform(get("/api/account/notifications").with(as("doe.jane")))
+                .andExpect(jsonPath("$.items", hasSize(3)));
+    }
+
+    @Test
+    void givenUnreadEntriesOfTwoMembers_whenOneMarksAllRead_thenOnlyTheirsAreReadAndAnEarlierReadKeepsItsTime()
+            throws Exception {
+        // given
+        UUID unread = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        UUID alreadyRead = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        notifications.markRead(alreadyRead, EARLIER);
+        UUID johns = notifications.notify(johnAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+
+        // when
+        mockMvc.perform(post("/api/account/notifications/read").with(as("doe.jane")).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(notifications.readAt(unread)).isEqualTo(NOW);
+        assertThat(notifications.readAt(alreadyRead)).isEqualTo(EARLIER);
+        assertThat(notifications.readAt(johns)).isNull();
+        mockMvc.perform(get("/api/account/notifications").with(as("doe.jane")))
+                .andExpect(jsonPath("$.unread").value(0));
+    }
+
+    @Test
     void givenUnreadEntriesBeyondThePage_whenAMemberReadsOnePage_thenTheUnreadCountCoversAllOfTheirsAndNoOneElses()
             throws Exception {
         // given
