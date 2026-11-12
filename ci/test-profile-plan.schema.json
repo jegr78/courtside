@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:ci:test-profile-plan:v6",
+  "$id": "urn:courtside:ci:test-profile-plan:v7",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,11 +14,12 @@
     "ciJobs",
     "localTasks",
     "isFull",
+    "activeSecurity",
     "reasons"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
     "runId": {
       "type": "integer",
@@ -65,6 +66,9 @@
       "items": {
         "$ref": "#/$defs/reason"
       }
+    },
+    "activeSecurity": {
+      "type": "boolean"
     }
   },
   "$defs": {

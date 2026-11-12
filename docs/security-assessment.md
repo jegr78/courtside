@@ -166,8 +166,9 @@ The safe deployment suite runs native TLS, HTTP, proxy and container checks plus
 
 ## Workflow gates
 
-The required pull-request build runs contract, schema, safety and secret checks without active
-assessment traffic. It retains a comparison of security contracts, policies, report schemas and
+The required pull-request build runs contract, schema, safety and secret checks. It runs the active
+assessment only when the change touches the API or security surface, as `docs/releasing.md`
+describes. It retains a comparison of security contracts, policies, report schemas and
 pinned tool versions against the pull-request base. The comparison includes the images and adapters
 that actually execute. When those bytes change, the required build runs the protected-base and
 candidate assessment runtimes against one target: the image the **candidate** revision builds and

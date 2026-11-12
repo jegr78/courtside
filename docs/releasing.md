@@ -55,6 +55,14 @@ carries. If retention deleted that nightly before the pull, `upgrade` chooses ag
 published origin the next release will support, so a migration that cannot run over a published
 database fails its own pull request rather than the next release. The jobs that run the image load it and refer to it by image ID; `mail` and
 `archive-reproducibility` only bind the archive and read the pinned name it records.
+`active-security` runs in a pull request only when the test-profile plan says the change touches the
+API or security surface: the `activeSecurity` paths in `ci/test-profiles.json` (the API document,
+web packages, the identity module's internals, the security-assessment seeder and its dataset, the
+application configuration, `security/`, `deploy/`, the security tools, `tools/courtside.mjs`, both
+Dockerfiles, `pom.xml`, this workflow and the actions its job uses), an unknown or structural change,
+the `ci:full` label or a failed classification. A migration alone does not start it, so a migration
+that breaks the assessment's seeder surfaces in the nightly. The nightly and every candidate call
+the gates without that input and always run it.
 `installed-upgrade` repeats the nightly qualification's installed update: the launcher of a 0.1.0
 nightly installs an instance on the candidate image, and the candidate's launcher updates it. The launcher pulls the official
 `ghcr.io/jegr78/courtside@sha256:…` name, so `tools/installed-upgrade-gate.mjs` serves the loaded

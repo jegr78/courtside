@@ -44,6 +44,10 @@ on:
         required: false
         type: string
         default: ''
+      active-security:
+        required: false
+        type: boolean
+        default: true
       upgrade-origins:
         required: false
         type: string
@@ -314,6 +318,7 @@ jobs:
           test "$TRANSITION_OUTCOME" = success
 
   active-security:
+    if: ${{ inputs.active-security != false || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:

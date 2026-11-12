@@ -92,5 +92,30 @@
       "exact": [],
       "prefixes": []
     }
+  },
+  "activeSecurity": {
+    "exact": [
+      ".github/actions/gate-image/action.yml",
+      ".github/actions/tool-dependencies/action.yml",
+      ".github/workflows/release-gates.yml",
+      "Dockerfile",
+      "Dockerfile.fixtures",
+      "pom.xml",
+      "src/main/resources/application-security.yaml",
+      "src/main/resources/application.yaml",
+      "src/main/resources/security-assessment-dataset.properties",
+      "tools/courtside.mjs"
+    ],
+    "prefixes": [
+      "deploy/",
+      "security/",
+      "src/main/java/org/courtside/identity/internal/",
+      "src/main/java/org/courtside/securityassessment/",
+      "src/main/resources/api/",
+      "tools/security-"
+    ],
+    "patterns": [
+      { "prefix": "src/main/java/", "contains": "/web/" }
+    ]
   }
 }

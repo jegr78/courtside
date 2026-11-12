@@ -34,6 +34,7 @@ jobs:
       security: ${{ steps.selection.outputs.security }}
       gates: ${{ steps.selection.outputs.gates }}
       clock_shift: ${{ steps.selection.outputs.clock_shift }}
+      active_security: ${{ steps.selection.outputs.active_security }}
       profiles: ${{ steps.selection.outputs.profiles }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -78,7 +79,7 @@ jobs:
             --argjson classifierExit "$CLASSIFIER_EXIT" \
             --arg base "$BASE_REF" \
             --arg head "$HEAD_REF" \
-            'type == "object" and .schemaVersion == 6 and .runId == $runId and
+            'type == "object" and .schemaVersion == 7 and .runId == $runId and
               .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
               (.profiles | type == "array" and length >= 1 and length <= 6 and
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or
@@ -88,14 +89,17 @@ jobs:
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "browser_visual" or
                   . == "browser" or . == "deployment" or . == "tooling" or . == "security" or . == "gates" or . == "clock_shift")) and
               (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
+              (.activeSecurity | type == "boolean") and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and
-              (if .plannerOutcome == "failed" then .isFull and .profiles == ["full"]
+              (if .plannerOutcome == "failed" then .isFull and .profiles == ["full"] and .activeSecurity
                 else $classifierExit == 0 end)' \
             build/test-profile/plan.json > /dev/null 2>&1; then
             PROFILES=$(jq -cer '.profiles' build/test-profile/plan.json)
             JOBS=$(jq -cer '.ciJobs' build/test-profile/plan.json)
+            ACTIVE_SECURITY=$(jq -r '.activeSecurity' build/test-profile/plan.json)
           else
+            ACTIVE_SECURITY=true
             PROFILES='["full"]'
             JOBS='["docs","backend","frontend","browser_visual","browser","deployment","tooling","security","gates","clock_shift"]'
             mkdir -p build/test-profile
@@ -112,6 +116,7 @@ jobs:
           fi
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
+          echo "active_security=$ACTIVE_SECURITY" >> "$GITHUB_OUTPUT"
           for job in docs backend frontend browser_visual browser deployment tooling security gates clock_shift; do
             SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
@@ -865,6 +870,7 @@ jobs:
     with:
       image-source: artifact
       upgrade-origins: ${{ startsWith(github.base_ref, 'release/') && 'line' || 'nightly' }}
+      active-security: ${{ needs.test-profile-plan.outputs.active_security == 'true' }}
       upgrade-base: ${{ github.event.pull_request.base.sha }}
       image-artifact: gate-image-${{ github.run_id }}
       image-digest: ${{ needs.gates-image.outputs.image-id }}
