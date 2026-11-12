@@ -65,6 +65,7 @@ jobs:
               --base "$BASE_REF" \
               --head "$HEAD_REF" \
               --labels "$LABELS" \
+              --event pull_request \
               --run-id "$RUN_ID" \
               --attempt "$ATTEMPT" \
               --fallback-on-error \

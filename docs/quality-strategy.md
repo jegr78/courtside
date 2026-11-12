@@ -134,6 +134,16 @@ select their declared profiles. Adding a runner or helper, removing an entry, ch
 assignment, registering a file that was not added in the same change, or adding an invalid inventory
 still selects `full`.
 
+A release pull request runs the documentation profile, so only `docs` and `tooling`, which carries
+the changelog and version guards. The classifier grants that only to a pull request whose every
+change modifies the release manifest, `CHANGELOG.md` or a file `release-please-config.json` writes
+the version into, and only when each of those files equals its base once the manifest's old version
+is replaced by the new one. Both versions must be release versions, and each file must hold the old
+version exactly as often as the configuration names version fields in it, so a dependency that
+happens to share the version cannot ride along. Any other change or byte keeps the plan `full`. Merging the release
+commit changes those files on `main`, where the push build is not reduced and verifies it whole
+before the candidate starts.
+
 The `security-tooling` profile covers the tools that start, observe and clean up the disposable
 security environment. Nothing else in a full run executes them: Maven, the browser journeys and the
 other release gates never load them, so the full run adds cost but no evidence for such a change.
