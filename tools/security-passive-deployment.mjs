@@ -278,7 +278,7 @@ function passiveRouteTemplate(uri) {
   if (path === "/index.html") return "/";
   if (["/", "/api/source", "/login", "/does-not-exist", "/icon.svg", "/manifest.webmanifest",
     "/registerSW.js", "/sw.js", "/font-licenses.txt", "/robots.txt", "/sitemap.xml"].includes(path)) return path;
-  if (/^\/assets\/[A-Za-z0-9._-]+\.(?:css|js|png|svg|woff2?)$/.test(path)) return "/assets/{asset}";
+  if (/^\/assets\/(?:admin\/)?[A-Za-z0-9._-]+\.(?:css|js|png|svg|woff2?)$/.test(path)) return "/assets/{asset}";
   if (/^\/workbox-[A-Za-z0-9._-]+\.js$/.test(path)) return "/workbox-{asset}.js";
   throw new Error("ZAP produced an unclassified route");
 }

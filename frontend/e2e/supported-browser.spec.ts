@@ -309,14 +309,14 @@ test("a member's pages load without the administration and without the language 
 
   // then
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
-  expect(scripts.filter((path) => /\/assets\/(?:AdminRoutes|en)-[^/]+\.js$/.test(path)),
+  expect(scripts.filter((path) => /\/assets\/(?:admin\/[^/]+|en-[^/]+)\.js$/.test(path)),
     "a member's first load carries the member surface and the active language only").toEqual([]);
 });
 
 test("an administration chunk a newer deployment replaced offers a reload rather than a blank page", async ({ page }) => {
   // given
   await signIn(page, "configuration-admin");
-  await page.route(/\/assets\/AdminRoutes-[^/]+\.js$/, (route) => route.fulfill({ status: 404 }));
+  await page.route(/\/assets\/admin\/AdminRoutes-[^/]+\.js$/, (route) => route.fulfill({ status: 404 }));
 
   // when
   await page.getByTestId("administration-link").click();
@@ -325,6 +325,46 @@ test("an administration chunk a newer deployment replaced offers a reload rather
   await expect(page.getByTestId("load-failure")).toBeVisible();
   await expect(page.getByTestId("retry-load")).toBeEnabled();
   await expect(page.getByTestId("admin-overview-view")).toHaveCount(0);
+});
+
+test("an administration page's chunk starts with the router's rather than after it", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  let releaseRouter: () => void = () => undefined;
+  const routerHeld = new Promise<void>((resolve) => { releaseRouter = resolve; });
+  await page.route(/\/assets\/admin\/AdminRoutes-[^/]+\.js$/, async (route) => {
+    await routerHeld;
+    await route.continue();
+  });
+  const pages: string[] = [];
+  page.on("request", (request) => {
+    if (/\/assets\/admin\/AdminOverviewView-[^/]+\.js$/.test(request.url())) pages.push(request.url());
+  });
+
+  // when
+  await page.getByTestId("administration-link").click();
+
+  // then
+  await expect.poll(() => pages.length, "the overview's chunk is requested while the router's is still held").toBe(1);
+  releaseRouter();
+  await expect(page.getByTestId("admin-overview-view")).toBeVisible();
+});
+
+test("an administration page whose chunk a newer deployment replaced offers a reload inside the kept navigation", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.getByTestId("administration-link").click();
+  await expect(page.getByTestId("admin-overview-view")).toBeVisible();
+  await page.route(/\/assets\/admin\/AdminDeadlinesView-[^/]+\.js$/, (route) => route.fulfill({ status: 404 }));
+
+  // when
+  await page.getByTestId("admin-deadlines-link").click();
+
+  // then
+  await expect(page.getByTestId("load-failure")).toBeVisible();
+  await expect(page.getByTestId("retry-load")).toBeEnabled();
+  await expect(page.getByTestId("admin-navigation-frame")).toBeVisible();
+  await expect(page.getByTestId("admin-deadlines-view")).toHaveCount(0);
 });
 
 test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }, testInfo) => {

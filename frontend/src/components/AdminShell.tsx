@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef } from "react";
+import { Suspense, useLayoutEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { LoadingStatus } from "./LoadingGroup";
 import { observeResize } from "./observeResize";
 import { AdminNavigation } from "./AdminNavigation";
 import { ScrollContinuation } from "./ScrollContinuation";
@@ -50,7 +51,7 @@ export function AdminShell({ administrator = true, treasurer = false, appointmen
       </div>
       <div className="hidden shrink-0 lg:block"><ScrollContinuation continues={continues} testId="admin-sidebar-continues" /></div>
     </div>
-    <Outlet />
+    <Suspense fallback={<LoadingStatus />}><Outlet /></Suspense>
   </div>;
 }
 

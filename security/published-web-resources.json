@@ -11,7 +11,13 @@
       "id": "application-script",
       "pattern": "^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\\.js$",
       "class": "script",
-      "purpose": "The bundled member surface, the chunks it loads on demand for administration and further languages, and the helper that registers the service worker."
+      "purpose": "The bundled member surface, the chunks it loads on demand for further languages, and the helper that registers the service worker."
+    },
+    {
+      "id": "administration-script",
+      "pattern": "^assets/admin/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\\.js$",
+      "class": "script",
+      "purpose": "The administration pages and the code only they use, loaded when an administrator opens a page and left out of the offline cache."
     },
     {
       "id": "application-stylesheet",

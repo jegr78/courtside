@@ -43,6 +43,19 @@ it("given the application's own router, when it is read, then every administrati
   expect(unmatched, "a destination the router does not declare").toEqual([]);
 });
 
+it("given the administration router, when its pages are read, then each one has a loader the shell can start early", () => {
+  // given
+  const read = (file: string) => readFileSync(resolve(import.meta.dirname, "../src", file), "utf8");
+  const pages = declaredRoutes(read("views/AdminRoutes.tsx"), "/admin").filter(({ redirect }) => !redirect).map(({ path }) => path);
+
+  // when
+  const loaders = [...read("views/adminPages.ts").matchAll(/^ {2}"(\/admin[^"]*)": page\(/gm)].map((match) => match[1]);
+
+  // then
+  expect(pages.length, "the router's pages are read").toBeGreaterThan(20);
+  expect(loaders.toSorted(), "a page whose chunk cannot start before the router's").toEqual(pages.toSorted());
+});
+
 it("given the application's sources, when they are searched for route declarations, then only the files the sweeps read declare any", () => {
   // given
   const sources = resolve(import.meta.dirname, "../src");

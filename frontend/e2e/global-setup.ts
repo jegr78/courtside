@@ -382,6 +382,7 @@ export interface PeerLoginAttempt {
 export interface ServedInterface {
   index: string;
   adminRoutes: string;
+  adminPage: string;
 }
 
 export interface JourneyService {
@@ -1062,7 +1063,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         const build = await pending;
         rmSync(staticDirectory!, { recursive: true, force: true });
         cpSync(build.directory, staticDirectory!, { recursive: true });
-        return { index: build.index, adminRoutes: build.adminRoutes };
+        return { index: build.index, adminRoutes: build.adminRoutes, adminPage: build.adminPage };
       },
       reset: async (start, language) => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));

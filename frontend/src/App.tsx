@@ -19,6 +19,7 @@ import {
 } from "./offlineBookings";
 import { reachesAdministration, readsGuestFees } from "./navigation/administrationAccess";
 import { lazySurface } from "./navigation/lazySurface";
+import { adminPageLoader } from "./views/adminPages";
 import { currentSignInPath, returnQuery, returnSearch, returnTargetIn, signInPath } from "./navigation/returnTarget";
 import { HomeView } from "./views/HomeView";
 import type { AccountView as AccountSurface } from "./views/AccountView";
@@ -33,7 +34,11 @@ import { warnAbout } from "./api/failureWarning";
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
 const IDENTITY_PATIENCE_MS = 3_000;
 
-const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
+// The page's own chunk starts with the router's rather than after it, which saves a round trip.
+const AdminRoutes = lazySurface(() => {
+  void adminPageLoader(window.location.pathname)?.().catch(() => undefined);
+  return import("./views/AdminRoutes");
+});
 const AccountRecoveryView = lazySurface<Record<string, never>>(() =>
   import("./views/AccountRecoveryView").then((loaded) => ({ default: loaded.AccountRecoveryView })));
 const RegisterView = lazySurface<Record<string, never>>(() =>

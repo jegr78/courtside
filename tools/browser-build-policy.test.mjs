@@ -74,9 +74,10 @@ function memberSurfaceBuild(context) {
   const surface = {
     "index.html": "<script type=\"module\" crossorigin src=\"/assets/index-A1a1A1a1.js\"></script>",
     "assets/index-A1a1A1a1.js": "import{s}from\"./shared-B2b2B2b2.js\";const de={\"app.name\":\"Courtside\"};"
-      + "s(()=>import(\"./AdminRoutes-C3c3C3c3.js\"),()=>import(\"./en-D4d4D4d4.js\"),\"administration-link\")",
+      + "s(()=>import(\"./admin/AdminRoutes-C3c3C3c3.js\"),()=>import(\"./en-D4d4D4d4.js\"),\"administration-link\")",
     "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a",
-    "assets/AdminRoutes-C3c3C3c3.js": "export default ()=>({\"data-testid\":\"admin-shell\"})",
+    "assets/admin/AdminRoutes-C3c3C3c3.js": "import{t}from\"./table-E5e5E5e5.js\";export default ()=>({\"data-testid\":\"admin-shell\"})",
+    "assets/admin/table-E5e5E5e5.js": "export const t=1",
     "assets/en-D4d4D4d4.js": "export default {\"app.name\":\"Courtside\"}",
     "sw.js": "precacheAndRoute([{url:\"index.html\",revision:\"1\"},{url:\"assets/index-A1a1A1a1.js\",revision:null},"
       + "{url:\"assets/shared-B2b2B2b2.js\",revision:null},{url:\"assets/en-D4d4D4d4.js\",revision:null}])"
@@ -99,7 +100,7 @@ test("given an administration view reached statically from the entry, when check
   // when / then
   assert.throws(() => verifyMemberSurface(build({
     "assets/index-A1a1A1a1.js": "const de={\"app.name\":\"Courtside\"};export const v=\"admin-setup-view\";"
-      + "import(\"./AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\")"
+      + "import(\"./admin/AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\")"
   })), /member entry carries the administration surface: admin-setup-view in assets\/index-A1a1A1a1\.js/);
   assert.throws(() => verifyMemberSurface(build({
     "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a;export const v={\"data-testid\":`admin-shell`}"
@@ -116,7 +117,7 @@ test("given a second locale bundle in the entry, when checking the build, then i
     "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a;export const en={\"app.name\":\"Courtside\"}"
   })), /member entry carries 2 locale bundles instead of the default one/);
   assert.throws(() => verifyMemberSurface(build({
-    "assets/index-A1a1A1a1.js": "import(\"./AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\");export const x={\"app\":1}",
+    "assets/index-A1a1A1a1.js": "import(\"./admin/AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\");export const x={\"app\":1}",
     "assets/shared-B2b2B2b2.js": "export const de={\"app.name\":\"Courtside\"}"
   })), /member entry carries 0 locale bundles instead of the default one/,
   "without the default bundle a failed fetch would leave keys on screen");
@@ -128,7 +129,7 @@ test("given a build whose markers no longer match anything, when checking it, th
 
   // when / then
   assert.throws(() => verifyMemberSurface(build({
-    "assets/AdminRoutes-C3c3C3c3.js": "export default ()=>({\"data-testid\":\"board-shell\"})"
+    "assets/admin/AdminRoutes-C3c3C3c3.js": "export default ()=>({\"data-testid\":\"board-shell\"})"
   })), /no longer identifies its administration surface/);
   assert.throws(() => verifyMemberSurface(build({
     "assets/en-D4d4D4d4.js": "export default {\"title\":\"Courtside\"}"
@@ -139,6 +140,29 @@ test("given a build whose markers no longer match anything, when checking it, th
   assert.throws(() => verifyMemberSurface(build({ "sw.js": "self.skipWaiting()" })), /no precache manifest/);
 });
 
+test("given administration code outside assets/admin/, when checking the build, then the precache rule could miss it and it is refused", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+
+  // when / then
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/admin/AdminRoutes-C3c3C3c3.js": "import{h}from\"../helper-F6f6F6f6.js\";export default ()=>({\"data-testid\":\"admin-shell\"})",
+    "assets/helper-F6f6F6f6.js": "export const h=1"
+  })), /assets\/helper-F6f6F6f6\.js is reached only through the administration but sits outside assets\/admin\//);
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/index-A1a1A1a1.js": "const de={\"app.name\":\"Courtside\"};"
+      + "import(\"./admin/AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\");import(\"./AdminSetupView-G7g7G7g7.js\")",
+    "assets/AdminSetupView-G7g7G7g7.js": "export const v=\"admin-setup-view\""
+  })), /administration surface sits outside assets\/admin\/: admin-setup-view in assets\/AdminSetupView-G7g7G7g7\.js/,
+  "a page the entry starts early is still administration");
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/index-A1a1A1a1.js": "import{s}from\"./shared-B2b2B2b2.js\";const de={\"app.name\":\"Courtside\"};"
+      + "s(()=>import(\"./admin/AdminRoutes-C3c3C3c3.js\"),()=>import(\"./en-D4d4D4d4.js\"),()=>import(\"./account-H8h8H8h8.js\"))",
+    "assets/account-H8h8H8h8.js": "import{t}from\"./admin/table-E5e5E5e5.js\";export default t"
+  })), /assets\/account-H8h8H8h8\.js needs assets\/admin\/table-E5e5E5e5\.js, which the precache leaves out/,
+  "a member page that imports administration code would fail offline");
+});
+
 test("given the precache, when it holds administration or misses the member surface, then the build is refused", (context) => {
   // given
   const build = memberSurfaceBuild(context);
@@ -147,8 +171,9 @@ test("given the precache, when it holds administration or misses the member surf
   // when / then
   assert.throws(() => verifyMemberSurface(build({
     "sw.js": precache(["index.html", "assets/index-A1a1A1a1.js", "assets/shared-B2b2B2b2.js", "assets/en-D4d4D4d4.js",
-      "assets/AdminRoutes-C3c3C3c3.js"])
-  })), /precache holds the administration surface in assets\/AdminRoutes-C3c3C3c3\.js/);
+      "assets/admin/table-E5e5E5e5.js"])
+  })), /precache holds the administration surface in assets\/admin\/table-E5e5E5e5\.js/,
+  "a helper only the administration uses carries no marker of its own");
   assert.throws(() => verifyMemberSurface(build({
     "sw.js": precache(["index.html", "assets/index-A1a1A1a1.js", "assets/en-D4d4D4d4.js"])
   })), /precache misses assets\/shared-B2b2B2b2\.js/);
