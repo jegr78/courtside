@@ -382,7 +382,8 @@ app's icon, the two brand colours, an uploaded logo, the imprint, privacy and do
 the default locale, the time zone, the booking slot length,
 how long issued credentials stay valid, how many minutes a mailed reset code stays redeemable,
 how many hours before a booking the reminder goes out, and how many minutes a freed court stays
-reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default. Three
+reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default, and how
+many days a read notification is kept, `read_notification_days`, 1 to 3650 and 90 by default. Three
 columns govern access codes: `access_lead_minutes` and `access_lag_minutes`, 0 to 240 and 15 by
 default, extend a booking's time on either side, and `access_code_length`, 4 to 8 and 6 by default,
 is the number of digits a new static code has. `currency` is an ISO 4217 code, `EUR` by default,
@@ -591,7 +592,9 @@ is queued because the account has no address or switched email off. Its `paramet
 booking id, the waitlist entry id, the closure kind and the cancellation reason code; the person who withdrew, the series
 id, the occurrence ids and the previous times stay in the outbox. `read_at` is empty until
 the account marks the entry read, and a partial index over each account's unread entries serves the
-unread count. `notification.kind` follows the same CHECK as `message_record.kind`, and
+unread count. An hourly job deletes a row whose `read_at` lies further back than
+`club_config.read_notification_days`; a partial index over `read_at` serves it, and an unread row
+is never deleted. `notification.kind` follows the same CHECK as `message_record.kind`, and
 `message_channel_optout.channel` accepts `EMAIL`. No row in `message_channel_optout` means the
 channel is on, which is how every account received mail before the choice existed.
 A subject-access answer lists each entry with its kind, both times and the booking id, waitlist entry

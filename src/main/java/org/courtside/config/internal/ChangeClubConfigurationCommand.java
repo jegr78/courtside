@@ -5,6 +5,7 @@ import org.courtside.config.AccessLagTime;
 import org.courtside.config.AccessLeadTime;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.ReadNotificationPeriod;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.WaitlistOfferWindow;
@@ -35,10 +36,11 @@ public record ChangeClubConfigurationCommand(
         AccessCodeLength accessCodeLength,
         Currency currency,
         Boolean externalBookings,
-        RegistrationTexts registrationTexts) {
+        RegistrationTexts registrationTexts,
+        ReadNotificationPeriod readNotifications) {
 
     // Links, logo, short name and the no-membership rule set may be unset, and an absent waitlist, access, currency,
-    // external booking or registration text setting keeps the stored one; any other absent value is a caller bug.
+    // external booking, registration text or read notification setting keeps the stored one; others are caller bugs.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");
@@ -78,6 +80,19 @@ public record ChangeClubConfigurationCommand(
                 defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
                 passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, waitlistOffer, accessLead, accessLag,
                 accessCodeLength, currency, externalBookings, null);
+    }
+
+    public ChangeClubConfigurationCommand(String clubName, String primaryColor, String accentColor, String logoUrl,
+            String imprintUrl, String privacyUrl, String documentationUrl, String shortName, String defaultLocale,
+            BookingSlotDuration slotDuration, String timeZone, CredentialLifetime newAccountCredential,
+            CredentialLifetime passwordResetCredential, ResetTokenLifetime passwordResetToken,
+            ReminderLeadTime bookingReminder, UUID noMembershipTypeRuleSetId, WaitlistOfferWindow waitlistOffer,
+            AccessLeadTime accessLead, AccessLagTime accessLag, AccessCodeLength accessCodeLength, Currency currency,
+            Boolean externalBookings, RegistrationTexts registrationTexts) {
+        this(clubName, primaryColor, accentColor, logoUrl, imprintUrl, privacyUrl, documentationUrl, shortName,
+                defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
+                passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, waitlistOffer, accessLead, accessLag,
+                accessCodeLength, currency, externalBookings, registrationTexts, null);
     }
 
     /** Blank removes a text; each text stays within what the column holds. */

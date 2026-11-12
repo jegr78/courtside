@@ -6,6 +6,7 @@ import org.courtside.config.AccessLagTime;
 import org.courtside.config.AccessLeadTime;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.ReadNotificationPeriod;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.WaitlistOfferWindow;
@@ -98,6 +99,20 @@ public class ConfigTestFixture {
                 unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
                 unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), unchanged.accessLead(),
                 unchanged.accessLag(), unchanged.accessCodeLength(), null, admitted));
+    }
+
+    public void keepReadNotificationsFor(int days) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId(), current.defaultLocale());
+        config.update(new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), unchanged.accessLead(),
+                unchanged.accessLag(), unchanged.accessCodeLength(), null, null, null,
+                new ReadNotificationPeriod(days)));
     }
 
     public void nameTheClub(String clubName) {

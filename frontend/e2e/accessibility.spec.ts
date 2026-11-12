@@ -74,10 +74,13 @@ for (const locale of ["de", "en"]) {
 
       // when
       await page.getByTestId("my-messages-link").click();
+      await page.getByTestId("notifications-show-unread").click();
       await expect(page.getByTestId(`notification-${unread}`)).toBeVisible();
-      await expect(page.getByTestId(`notification-${read}`)).toHaveAttribute("data-read", "true");
 
       // then
+      await expectNoWcagViolations(page);
+      await page.getByTestId("notifications-show-read").click();
+      await expect(page.getByTestId(`notification-${read}`)).toHaveAttribute("data-read", "true");
       await expectNoWcagViolations(page);
     } finally {
       await journeyService.executeSql(`DELETE FROM notification WHERE id IN ('${unread}', '${read}');`);

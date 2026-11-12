@@ -1605,9 +1605,15 @@ links that booking only while the account owns it or plays in it; an entry about
 account has left stays listed without either. A waitlist offer's entry names the offered slot, its
 deadline and whether it is still open while the account's own entry exists, and links to it in My
 bookings. An account reads
-and marks only its own entries; another account's id answers
+and marks only its own entries, one at a time or all unread ones at once; another account's id answers
 `urn:courtside:error:notification-not-found`. The entry has no channel of its own, so another
 channel can be added beside email without changing it.
+
+My messages lists unread and read entries separately behind a small bar, and both lists stay closed
+until the member opens one; a guardian granted to read a dependant's messages sees the same split
+without marking anything. A read entry is deleted by an hourly job once the club's period,
+`readNotificationDays`, 90 by default and at most ten years, has passed since it was read. An unread
+entry is never deleted, so nothing disappears that the member has not seen.
 
 Members choose optional message kinds and, separately, channels. No opt-out means enabled. A
 declined kind reaches the account on no channel, the centre included. A declined email channel
@@ -1720,7 +1726,9 @@ See [`security-assessment.md`](security-assessment.md),
 ## Data protection
 
 The operating club is controller for its members' data. Courtside supplies controls and guidance but
-does not choose lawful basis, retention periods or operating policy.
+does not choose lawful basis or operating policy, and the retention periods of personal records
+are the club's choice. Read notifications are the one exception with a built-in default, 90 days,
+which the club changes in its deadlines.
 
 The data-protection inventory classifies every database column and API path or query parameter as
 personal, pseudonymous, secret or operational. A migration or API change fails until new data has a
@@ -1761,8 +1769,8 @@ booking also reaches the records that would tie it back to a person: its change 
 their actor and the person and account fields of their payload but keep type, time and subject, and
 its notification entries and queued messages are deleted. Removing a person leaves their entries
 untouched, as described above. The change log records periods and run counts, never whom a run
-removed. Courtside ships no period and gives no legal advice: the club chooses the period its own
-lawful basis allows.
+removed. Courtside ships no period for these categories and gives no legal advice: the club chooses
+the period its own lawful basis allows.
 
 Session rows are deleted after inactivity or absolute expiry. Import previews retain their resolved
 change set only for the configured period and never store the uploaded file. Message records,

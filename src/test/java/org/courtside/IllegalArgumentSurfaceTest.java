@@ -32,6 +32,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/config/AccessLeadTime.java",
             "org/courtside/config/BookingSlotDuration.java",
             "org/courtside/config/CredentialLifetime.java",
+            "org/courtside/config/ReadNotificationPeriod.java",
             "org/courtside/config/ResetTokenLifetime.java",
             "org/courtside/config/ReminderLeadTime.java",
             "org/courtside/config/WaitlistOfferWindow.java",

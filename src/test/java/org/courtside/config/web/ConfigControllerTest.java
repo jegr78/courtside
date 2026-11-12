@@ -1066,6 +1066,53 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenChangingHowLongReadMessagesStay_thenItPersistsAndARequestWithoutItKeepsIt()
+            throws Exception {
+        // given
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(jsonPath("$.readNotificationDays").value(90));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(jsonPath("$.readNotificationDays").doesNotHaveJsonPath());
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"bookingReminderHours\": 24",
+                                "\"bookingReminderHours\": 24, \"readNotificationDays\": 3650"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.readNotificationDays").value(3650));
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(jsonPath("$.readNotificationDays").value(3650));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAReadMessagePeriodOutsideItsRange_whenChangingTheConfig_thenItIsRefusedByItsField() throws Exception {
+        for (String days : List.of("0", "3651")) {
+            // when / then
+            mockMvc.perform(put("/api/admin/config")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(configJson("Example Tennis Club").replace("\"bookingReminderHours\": 24",
+                                    "\"bookingReminderHours\": 24, \"readNotificationDays\": " + days))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("readNotificationDays"));
+        }
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(jsonPath("$.readNotificationDays").value(90));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPrivacyUrl_whenChangingTheConfig_thenThePublicConfigurationCarriesItBesideTheImprint()
             throws Exception {
         // given

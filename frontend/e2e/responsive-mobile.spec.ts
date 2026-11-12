@@ -741,12 +741,14 @@ test("a member reads a notification and marks it read on the phone", async ({ pa
 
     // when
     await page.getByTestId("my-messages-link").tap();
+    await page.getByTestId("notifications-show-unread").tap();
 
     // then
     const entry = page.getByTestId(`notification-${notification}`);
     await expect(entry).toHaveAttribute("data-read", "false");
     await expectNoHorizontalOverflow(page);
-    for (const target of [entry.getByRole("link"), entry.getByTestId("notification-mark-read")]) {
+    for (const target of [page.getByTestId("notifications-show-unread"), page.getByTestId("notifications-show-read"),
+      page.getByTestId("notifications-mark-all-read"), entry.getByRole("link"), entry.getByTestId("notification-mark-read")]) {
       const box = await target.boundingBox();
       expect(box!.height, "each action on an entry is a target a thumb can hit").toBeGreaterThanOrEqual(44);
     }

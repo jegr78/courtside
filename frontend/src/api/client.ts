@@ -491,12 +491,13 @@ export const api = {
   chooseOwnMessageChannels: (declined: MessageChannel[]) => request<void>("/api/account/messages/channels", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ declined })
   }),
-  ownNotifications: (cursor?: string, limit = 50) => request<NotificationPage>(
-    `/api/account/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ownNotifications: (cursor?: string, limit = 50, read?: boolean) => request<NotificationPage>(
+    `/api/account/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}), ...(read === undefined ? {} : { read: String(read) }) })}`
   ),
   markNotificationRead: (notificationId: string) => request<void>(
     `/api/account/notifications/${notificationId}/read`, { method: "POST" }
   ),
+  markAllNotificationsRead: () => request<void>("/api/account/notifications/read", { method: "POST" }),
   adminConfig: () => request<AdminClubConfig>("/api/admin/config"),
   changeAdminConfig: (config: ClubConfigRequest) => request<AdminClubConfig>("/api/admin/config", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
@@ -948,8 +949,8 @@ export const api = {
   cancelDependantBooking: (personId: string, bookingId: string) => request<void>(
     `/api/my/dependants/${personId}/bookings/${bookingId}`, { method: "DELETE" }
   ),
-  dependantNotifications: (personId: string, cursor?: string, limit = 50) => request<NotificationPage>(
-    `/api/my/dependants/${personId}/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  dependantNotifications: (personId: string, cursor?: string, limit = 50, read?: boolean) => request<NotificationPage>(
+    `/api/my/dependants/${personId}/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}), ...(read === undefined ? {} : { read: String(read) }) })}`
   ),
   requestDependantCredentials: (personId: string) => request<void>(
     `/api/my/dependants/${personId}/credentials`, { method: "POST" }

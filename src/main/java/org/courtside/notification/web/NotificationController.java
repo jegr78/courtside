@@ -26,12 +26,18 @@ class NotificationController implements AccountNotificationsApi {
     private final OwnNotifications notifications;
 
     @Override
-    public ResponseEntity<ApiNotificationPage> listOwnNotifications(UUID cursor, Integer limit) {
-        OwnNotifications.Page page = notifications.page(cursor, limit);
+    public ResponseEntity<ApiNotificationPage> listOwnNotifications(UUID cursor, Boolean read, Integer limit) {
+        OwnNotifications.Page page = notifications.page(read, cursor, limit);
         return ResponseEntity.ok(new ApiNotificationPage(page.items().stream()
                 .map(NotificationController::toResponse)
                 .toList(), page.unread())
                 .nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<Void> markAllOwnNotificationsRead() {
+        notifications.markAllRead();
+        return ResponseEntity.noContent().build();
     }
 
     @Override

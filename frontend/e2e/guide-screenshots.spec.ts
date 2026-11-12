@@ -135,6 +135,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "notification-choices": async (page) => {
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-save")).toBeVisible();
+    await expect(page.getByTestId("notifications-show-unread")).toBeVisible();
   },
   "account-profile": async (page) => {
     await page.getByTestId("preferences-menu").click();

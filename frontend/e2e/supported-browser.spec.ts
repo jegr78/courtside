@@ -224,6 +224,36 @@ test("a closed day shows its opening times as empty rather than as a ghost time"
   }
 });
 
+test("given two unread messages, when the member opens the unread list and marks all read, then both move to the read list and the badge clears", async ({ page, journeyService }) => {
+  // given
+  const first = "7c000000-0000-0000-0000-0000000000a4";
+  const second = "7c000000-0000-0000-0000-0000000000a5";
+  await journeyService.executeSql(`
+    INSERT INTO notification (id, account_id, kind, parameters, created_at) VALUES
+      ('${first}', '00000000-0000-0000-0000-000000000102', 'BOOKING_REMINDER', '{}', now()),
+      ('${second}', '00000000-0000-0000-0000-000000000102', 'BOOKING_REMINDER', '{}', now());`);
+  try {
+    await signIn(page, "doe.jane");
+    await page.getByTestId("my-messages-link").click();
+    await expect(page.getByTestId("notifications"), "both lists start closed").toHaveCount(0);
+    await page.getByTestId("notifications-show-unread").click();
+    await expect(page.getByTestId(`notification-${first}`)).toBeVisible();
+
+    // when
+    await page.getByTestId("notifications-mark-all-read").click();
+
+    // then
+    await expect(page.getByTestId("notifications-empty")).toBeVisible();
+    await expect(page.getByTestId("notifications-show-unread")).toBeFocused();
+    await expect(page.getByTestId("my-messages-unread"), "the navigation stops counting").toHaveCount(0);
+    await page.getByTestId("notifications-show-read").click();
+    await expect(page.getByTestId(`notification-${first}`)).toHaveAttribute("data-read", "true");
+    await expect(page.getByTestId(`notification-${second}`)).toHaveAttribute("data-read", "true");
+  } finally {
+    await journeyService.executeSql(`DELETE FROM notification WHERE id IN ('${first}', '${second}');`);
+  }
+});
+
 test("given a notification marked read from the keyboard, when the request runs, fails and succeeds, then the focus never falls to the page", async ({ page, journeyService }) => {
   // given
   const unread = "7c000000-0000-0000-0000-0000000000a3";
@@ -233,6 +263,7 @@ test("given a notification marked read from the keyboard, when the request runs,
   try {
     await signIn(page, "doe.jane");
     await page.getByTestId("my-messages-link").click();
+    await page.getByTestId("notifications-show-unread").click();
     const entry = page.getByTestId(`notification-${unread}`);
     const button = entry.getByTestId("notification-mark-read");
     let answer: (status: number) => void = () => undefined;

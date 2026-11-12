@@ -192,6 +192,11 @@
       "class": "neutral"
     },
     {
+      "name": "read",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
       "name": "scope",
       "in": "query",
       "class": "neutral"
@@ -1156,6 +1161,10 @@
         "lifecycle": "club-configuration"
       },
       "waitlist_offer_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "read_notification_days": {
         "level": "operational",
         "lifecycle": "club-configuration"
       },

@@ -45,6 +45,7 @@ test("given a member's booking on a court the club must close for a day, when th
     await signOut(page);
     await signIn(page, "doe.jane");
     await activate(page.getByTestId("my-messages-link"));
+    await activate(page.getByTestId("notifications-show-unread"));
 
     // then
     const notice = page.locator('[data-testid^="notification-"][data-closure="COURT_CLOSED"]');

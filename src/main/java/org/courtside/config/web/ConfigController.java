@@ -15,6 +15,7 @@ import org.courtside.config.AccessLeadTime;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ReadNotificationPeriod;
 import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.internal.AppIcon;
@@ -91,7 +92,9 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 request.getExternalBookings(),
                 request.getRegistrationTextDe() == null && request.getRegistrationTextEn() == null ? null
                         : new ChangeClubConfigurationCommand.RegistrationTexts(request.getRegistrationTextDe(),
-                        request.getRegistrationTextEn())))));
+                        request.getRegistrationTextEn()),
+                request.getReadNotificationDays() == null
+                        ? null : new ReadNotificationPeriod(request.getReadNotificationDays())))));
     }
 
     @Override
@@ -199,6 +202,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.passwordResetTokenMinutes(),
                 configuration.bookingReminderHours(),
                 configuration.waitlistOfferMinutes(),
+                configuration.readNotificationDays(),
                 configuration.accessLeadMinutes(),
                 configuration.accessLagMinutes(),
                 configuration.accessCodeLength())

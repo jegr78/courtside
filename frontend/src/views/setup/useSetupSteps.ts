@@ -37,6 +37,7 @@ const factoryConfiguration = {
   passwordResetTokenMinutes: 60,
   bookingReminderHours: 24,
   waitlistOfferMinutes: 15,
+  readNotificationDays: 90,
   accessLeadMinutes: 15,
   accessLagMinutes: 15,
   accessCodeLength: 6,

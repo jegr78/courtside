@@ -58,6 +58,7 @@ test("a member queues for a taken court, is offered it when it frees and books i
   // then — the waiting member finds the offer in the centre and books it without email
   await signIn(page, "roe.jane");
   await page.getByTestId("my-messages-link").click();
+  await page.getByTestId("notifications-show-unread").click();
   const offer = page.locator('[data-testid="notification-offer"][data-open="true"]');
   await expect(offer).toBeVisible({ timeout: 10_000 });
   await page.locator('a[href^="/my-bookings#waitlist-"]').first().click();

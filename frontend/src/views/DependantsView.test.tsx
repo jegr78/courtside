@@ -35,6 +35,10 @@ const refused = (type: string, status: number) => new ApiError(status, {
   ...(type === "guardian-action-not-granted" ? { violations: [{ code: "guardianship.actionNotGranted", params: { action: "VIEW_BOOKINGS" } }] } : {})
 });
 
+async function openMessages(state: "unread" | "read" = "unread") {
+  await userEvent.click(await screen.findByTestId(`dependant-notifications-show-${state}`));
+}
+
 function show(wrapper?: ComponentType<{ children: ReactNode }>) {
   return render(<MemoryRouter><WithClubConfiguration><DependantsView /></WithClubConfiguration></MemoryRouter>, { wrapper });
 }
@@ -98,6 +102,7 @@ describe("DependantsView", () => {
 
     // when
     show();
+    await openMessages();
 
     // then
     const entry = await screen.findByTestId(`notification-${unread.id}`);
@@ -106,6 +111,25 @@ describe("DependantsView", () => {
     expect(within(entry).queryByRole("link"), "the dependant's own pages are not the guardian's").toBeNull();
     expect(mark).not.toHaveBeenCalled();
     expect(api.dependantBookings).not.toHaveBeenCalled();
+  });
+
+  it("given reading messages is granted, when the guardian opens the read list, then it is fetched by state and stays read only", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["READ_MESSAGES"])]);
+    const read = { ...unread, id: "read-entry", readAt: "2026-05-11T09:00:00Z" };
+    vi.mocked(api.dependantNotifications).mockImplementation((_person, _cursor, _limit, onlyRead) =>
+      Promise.resolve(onlyRead ? { items: [read], unread: 1 } : { items: [unread], unread: 1 }));
+    show();
+    expect(await screen.findByTestId("dependant-notifications-show-unread")).toHaveAttribute("aria-expanded", "false");
+
+    // when
+    await openMessages("read");
+
+    // then
+    const entry = await screen.findByTestId("notification-read-entry");
+    expect(entry).toHaveAttribute("data-read", "true");
+    expect(api.dependantNotifications).toHaveBeenCalledWith("person-2", undefined, 50, true);
+    expect(screen.queryByTestId("dependant-notifications-mark-all-read"), "the guardian marks nothing read").toBeNull();
   });
 
   it("given booking is granted, when the page is shown, then it points to the court plan", async () => {
@@ -232,8 +256,9 @@ describe("DependantsView", () => {
       .mockReturnValueOnce(older)
       .mockResolvedValue({ items: [{ ...unread, booking: { ...unread.booking!, cancelled: true } }], unread: 1 });
     show();
+    await openMessages();
     await screen.findByTestId(`notification-${unread.id}`);
-    await userEvent.click(screen.getByTestId("dependant-load-more-messages"));
+    await userEvent.click(screen.getByTestId("dependant-notifications-load-more"));
 
     // when
     await userEvent.click(await screen.findByTestId("personal-cancel"));
@@ -243,14 +268,14 @@ describe("DependantsView", () => {
     await waitFor(() => expect(screen.getByTestId(`notification-${unread.id}`)).toHaveTextContent("Cancelled"));
     expect(screen.getByTestId("dependant-cancelled")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId("personal-cancel")).toBeNull());
-    expect(api.dependantNotifications).toHaveBeenLastCalledWith("person-2", undefined);
+    expect(api.dependantNotifications).toHaveBeenLastCalledWith("person-2", undefined, 50, false);
     await act(async () => {
       finishOlder({ items: [{ ...unread, id: "late-old-page" }], unread: 1 });
       await older;
     });
     expect(screen.queryByTestId("notification-late-old-page")).toBeNull();
     expect(screen.getByTestId(`notification-${unread.id}`)).toHaveTextContent("Cancelled");
-    expect(screen.queryByTestId("dependant-load-more-messages")).toBeNull();
+    expect(screen.queryByTestId("dependant-notifications-load-more")).toBeNull();
   });
 
   it("given a rejected cancellation, when the guardian confirms it, then messages are not reloaded", async () => {
@@ -258,6 +283,7 @@ describe("DependantsView", () => {
     vi.spyOn(api, "dependants").mockResolvedValue([john(["VIEW_BOOKINGS", "CANCEL_BOOKINGS", "READ_MESSAGES"])]);
     vi.spyOn(api, "cancelDependantBooking").mockRejectedValue(new Error("cancel unavailable"));
     show();
+    await openMessages();
     await screen.findByTestId(`notification-${unread.id}`);
 
     // when
@@ -279,6 +305,7 @@ describe("DependantsView", () => {
       .mockRejectedValueOnce(new Error("messages unavailable"))
       .mockResolvedValue({ items: [{ ...unread, booking: { ...unread.booking!, cancelled: true } }], unread: 1 });
     show();
+    await openMessages();
     await screen.findByTestId(`notification-${unread.id}`);
 
     // when

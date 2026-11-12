@@ -20,7 +20,7 @@ const configured: AdminClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b", logoUrl: null,
   imprintUrl: null, privacyUrl: null, documentationUrl: null, shortName: null, defaultLocale: "en",
   supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
-  passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
+  passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, readNotificationDays: 90, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   logoUploaded: false, externalBookings: false, logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR", currencyFractionDigits: 2
 };
 

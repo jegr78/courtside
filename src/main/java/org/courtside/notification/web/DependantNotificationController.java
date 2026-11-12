@@ -16,8 +16,9 @@ class DependantNotificationController implements DependantNotificationsApi {
     private final OwnNotifications notifications;
 
     @Override
-    public ResponseEntity<ApiNotificationPage> listDependantNotifications(UUID personId, UUID cursor, Integer limit) {
-        OwnNotifications.Page page = notifications.dependantPage(personId, cursor, limit);
+    public ResponseEntity<ApiNotificationPage> listDependantNotifications(UUID personId, UUID cursor, Boolean read,
+                                                                          Integer limit) {
+        OwnNotifications.Page page = notifications.dependantPage(personId, read, cursor, limit);
         return ResponseEntity.ok(new ApiNotificationPage(page.items().stream()
                 .map(NotificationController::toResponse)
                 .toList(), page.unread())

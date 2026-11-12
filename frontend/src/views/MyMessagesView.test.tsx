@@ -73,6 +73,11 @@ function show() {
   render(<MemoryRouter><WithClubConfiguration><MyMessagesView /></WithClubConfiguration></MemoryRouter>);
 }
 
+async function showList(state: "unread" | "read" = "unread") {
+  show();
+  await userEvent.click(await screen.findByTestId(`notifications-show-${state}`));
+}
+
 function entry(id: string) {
   return screen.getByTestId(`notification-${id}`);
 }
@@ -83,7 +88,9 @@ describe("MyMessagesView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "ownMessageChoices").mockResolvedValue(choices);
     vi.spyOn(api, "ownMessageChannels").mockResolvedValue([{ channel: "EMAIL", enabled: true }]);
-    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, reminderRead], nextCursor: null, unread: 1 });
+    vi.spyOn(api, "ownNotifications").mockImplementation((_cursor, _limit, read) => Promise.resolve(read
+      ? { items: [reminderRead], nextCursor: null, unread: 1 }
+      : { items: [confirmed], nextCursor: null, unread: 1 }));
   });
 
   it("given the club configuration failed, when the page opens, then it shows the failure and the settings instead of loading for good", async () => {
@@ -102,9 +109,39 @@ describe("MyMessagesView", () => {
     expect(screen.queryByTestId("my-messages-loading"), "nothing is left loading").toBeNull();
   });
 
-  it("given notifications addressed to the member, when the centre opens, then each shows its time, read state, content and link", async () => {
+  it("given notifications addressed to the member, when the centre opens, then both lists stay closed and the unread one counts its entries", async () => {
     // when
     show();
+
+    // then
+    const unreadTab = await screen.findByTestId("notifications-show-unread");
+    await waitFor(() => expect(unreadTab).toHaveTextContent("Unread (1)"));
+    expect(unreadTab).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("notifications-show-read")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("notifications"), "neither list takes room before it is asked for").toBeNull();
+    expect(api.ownNotifications, "the read list is only fetched when it is opened").not.toHaveBeenCalledWith(undefined, 50, true);
+  });
+
+  it("given both lists, when the member opens one and then the other, then only the opened one shows and choosing it again closes it", async () => {
+    // given
+    await showList("unread");
+    expect(await screen.findByTestId(`notification-${confirmed.id}`)).toBeInTheDocument();
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-show-read"));
+
+    // then
+    expect(await screen.findByTestId(`notification-${reminderRead.id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`notification-${confirmed.id}`), "opening one list closes the other").toBeNull();
+    expect(screen.getByTestId("notifications-show-read")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("notifications-show-unread")).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(screen.getByTestId("notifications-show-read"));
+    expect(screen.queryByTestId("notifications")).toBeNull();
+  });
+
+  it("given notifications addressed to the member, when each list is opened, then each entry shows its time, read state, content and link", async () => {
+    // when
+    await showList("unread");
 
     // then
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
@@ -114,7 +151,8 @@ describe("MyMessagesView", () => {
     expect(within(unread).getByTestId("notification-booking")).toHaveTextContent("Centre Court");
     expect(within(unread).getByTestId("notification-time")).toHaveAttribute("dateTime", confirmed.createdAt);
     expect(within(unread).getByRole("link")).toHaveAttribute("href", `/my-bookings#booking-${confirmed.link.bookingId}`);
-    expect(entry(reminderRead.id)).toHaveAttribute("data-read", "true");
+    await userEvent.click(screen.getByTestId("notifications-show-read"));
+    expect(await screen.findByTestId(`notification-${reminderRead.id}`)).toHaveAttribute("data-read", "true");
     expect(within(entry(reminderRead.id)).getByTestId("notification-state")).toHaveTextContent("Read");
     expect(within(entry(reminderRead.id)).queryByTestId("notification-mark-read")).toBeNull();
   });
@@ -124,7 +162,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [usernameReminder], nextCursor: null, unread: 1 });
 
     // when
-    show();
+    await showList();
 
     // then
     const help = await screen.findByTestId(`notification-${usernameReminder.id}`);
@@ -137,7 +175,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [displaced], nextCursor: null, unread: 1 });
 
     // when
-    show();
+    await showList();
 
     // then
     const closure = await screen.findByTestId(`notification-${displaced.id}`);
@@ -150,7 +188,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [cancelledByClub], nextCursor: null, unread: 1 });
 
     // when
-    show();
+    await showList();
 
     // then
     const cancellation = await screen.findByTestId(`notification-${cancelledByClub.id}`);
@@ -177,7 +215,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [offer, ended], nextCursor: null, unread: 2 });
 
     // when
-    show();
+    await showList();
 
     // then
     const open = await screen.findByTestId(`notification-${offer.id}`);
@@ -192,7 +230,7 @@ describe("MyMessagesView", () => {
   it("given an unread notification, when the member marks it read, then the instance is told and it shows as read", async () => {
     // given
     const marked = vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
-    show();
+    await showList();
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
 
     // when
@@ -207,7 +245,7 @@ describe("MyMessagesView", () => {
   it("given an unread notification, when the member marks it read, then the entry keeps the focus and the change is announced", async () => {
     // given
     vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
-    show();
+    await showList();
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
     const button = within(unread).getByTestId("notification-mark-read");
     button.focus();
@@ -229,7 +267,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "markNotificationRead")
       .mockResolvedValueOnce(undefined)
       .mockImplementationOnce(() => new Promise<void>((resolve) => { answerSecond = resolve; }));
-    show();
+    await showList();
     await userEvent.click(within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read"));
     await waitFor(() => expect(screen.getByTestId("notifications-status")).toHaveTextContent("Marked as read."));
 
@@ -249,7 +287,7 @@ describe("MyMessagesView", () => {
     let answer: () => void = () => undefined;
     const mark = vi.spyOn(api, "markNotificationRead")
       .mockImplementation(() => new Promise<void>((resolve) => { answer = resolve; }));
-    show();
+    await showList();
     const button = within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read");
     await userEvent.click(button);
 
@@ -269,7 +307,7 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
     const told = vi.fn();
     window.addEventListener("courtside:notifications-read", told);
-    show();
+    await showList();
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
 
     // when
@@ -286,7 +324,7 @@ describe("MyMessagesView", () => {
       type: "urn:courtside:error:notification-not-found", title: "Notification not found", status: 404,
       violations: [{ code: "notification.notFound", params: {} }]
     }));
-    show();
+    await showList();
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
 
     // when
@@ -300,7 +338,7 @@ describe("MyMessagesView", () => {
   it("given an unread notification, when the member follows its link, then it is marked read", async () => {
     // given
     const marked = vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
-    show();
+    await showList();
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);
 
     // when
@@ -315,10 +353,10 @@ describe("MyMessagesView", () => {
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 1 });
 
     // when
-    show();
+    await showList();
 
     // then
-    expect(await screen.findByTestId("notifications-empty")).toHaveTextContent("Nothing has been sent to you yet.");
+    expect(await screen.findByTestId("notifications-empty")).toHaveTextContent("You have no unread messages.");
   });
 
   it("given more entries than one page, when the member asks for more, then the next page follows the first", async () => {
@@ -326,7 +364,7 @@ describe("MyMessagesView", () => {
     const pages = vi.spyOn(api, "ownNotifications")
       .mockResolvedValueOnce({ items: [confirmed], nextCursor: confirmed.id, unread: 1 })
       .mockResolvedValueOnce({ items: [reminderRead], nextCursor: null, unread: 1 });
-    show();
+    await showList();
     await screen.findByTestId(`notification-${confirmed.id}`);
 
     // when
@@ -334,8 +372,118 @@ describe("MyMessagesView", () => {
 
     // then
     expect(await screen.findByTestId(`notification-${reminderRead.id}`)).toBeInTheDocument();
-    expect(pages).toHaveBeenLastCalledWith(confirmed.id);
+    expect(pages).toHaveBeenLastCalledWith(confirmed.id, 50, false);
     expect(screen.queryByTestId("notifications-load-more")).toBeNull();
+  });
+
+  it("given unread notifications, when the member marks all read, then the list empties, the count is zero and the focus moves to the unread tab", async () => {
+    // given
+    const marked = vi.spyOn(api, "markAllNotificationsRead").mockResolvedValue(undefined);
+    const told = vi.fn();
+    window.addEventListener("courtside:notifications-read", told);
+    await showList();
+    await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-mark-all-read"));
+
+    // then
+    expect(marked).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("notifications-empty")).toHaveTextContent("You have no unread messages.");
+    expect(screen.getByTestId("notifications-show-unread")).toHaveTextContent("Unread (0)");
+    expect(document.activeElement, "the pressed button is gone, so its tab takes the focus").toBe(screen.getByTestId("notifications-show-unread"));
+    expect(screen.getByTestId("notifications-status")).toHaveTextContent("All messages are marked as read.");
+    expect(screen.queryByTestId("notifications-mark-all-read")).toBeNull();
+    expect(told).toHaveBeenCalledTimes(1);
+    window.removeEventListener("courtside:notifications-read", told);
+  });
+
+  it("given marking all read is refused, when the member presses it, then the refusal is shown and the entries stay unread", async () => {
+    // given
+    vi.spyOn(api, "markAllNotificationsRead").mockRejectedValue(new ApiError(500, {
+      type: "urn:courtside:error:internal", title: "Internal error", status: 500
+    }));
+    await showList();
+    await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-mark-all-read"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(entry(confirmed.id)).toHaveAttribute("data-read", "false");
+    expect(screen.getByTestId("notifications-show-unread")).toHaveTextContent("Unread (1)");
+  });
+
+  it("given an entry marked read, when the unread list is opened again, then it is fetched afresh so the entry leaves it", async () => {
+    // given
+    vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    await showList();
+    await userEvent.click(within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read"));
+    await waitFor(() => expect(entry(confirmed.id)).toHaveAttribute("data-read", "true"));
+    expect(screen.getByTestId("notifications-show-unread"), "the count follows at once").toHaveTextContent("Unread (0)");
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 0 });
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-show-unread"));
+    await userEvent.click(screen.getByTestId("notifications-show-unread"));
+
+    // then
+    expect(await screen.findByTestId("notifications-empty")).toHaveTextContent("You have no unread messages.");
+    expect(screen.queryByTestId(`notification-${confirmed.id}`)).toBeNull();
+  });
+
+  it("given the unread list cannot be read, when the centre opens, then the tab names no count and nothing is left loading", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockRejectedValue(new ApiError(500, { type: "urn:courtside:error:internal", title: "Internal error", status: 500 }));
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByTestId("notifications-show-unread"), "an unknown count is not shown as zero").toHaveTextContent(/^Unread$/);
+    expect(screen.queryByTestId("notifications-mark-all-read")).toBeNull();
+  });
+
+  it("given the read list cannot be read, when the member opens it, then the failure shows without a loading notice beside it", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockImplementation((_cursor, _limit, read) => read
+      ? Promise.reject(new ApiError(500, { type: "urn:courtside:error:internal", title: "Internal error", status: 500 }))
+      : Promise.resolve({ items: [confirmed], nextCursor: null, unread: 1 }));
+
+    // when
+    await showList("read");
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(within(screen.getByTestId("notifications-read")).queryByRole("status"), "a failed load is not still loading").toBeNull();
+  });
+
+  it("given a reload of the unread list still running, when the member marks all read, then the late page does not bring the entries back", async () => {
+    // given
+    vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    vi.spyOn(api, "markAllNotificationsRead").mockResolvedValue(undefined);
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, displaced], nextCursor: null, unread: 2 });
+    await showList();
+    await userEvent.click(within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read"));
+    await waitFor(() => expect(entry(confirmed.id)).toHaveAttribute("data-read", "true"));
+    let answer: () => void = () => undefined;
+    vi.spyOn(api, "ownNotifications").mockImplementation(() => new Promise((resolve) => {
+      answer = () => resolve({ items: [{ ...displaced }], nextCursor: null, unread: 1 });
+    }));
+    await userEvent.click(screen.getByTestId("notifications-show-unread"));
+    await userEvent.click(screen.getByTestId("notifications-show-unread"));
+    await userEvent.click(screen.getByTestId("notifications-mark-all-read"));
+    expect(await screen.findByTestId("notifications-empty")).toBeInTheDocument();
+
+    // when
+    act(() => answer());
+    await waitFor(() => expect(screen.getByTestId("notifications-show-unread")).toHaveTextContent("Unread (0)"));
+
+    // then
+    expect(screen.queryByTestId(`notification-${displaced.id}`), "the page read before the mark is dropped").toBeNull();
+    expect(screen.getByTestId("notifications-show-unread")).toHaveTextContent("Unread (0)");
   });
 
   it("given German, when the centre opens, then the entry and its state speak German", async () => {
@@ -343,7 +491,7 @@ describe("MyMessagesView", () => {
     await i18n.changeLanguage("de");
 
     // when
-    show();
+    await showList();
 
     // then
     const unread = await screen.findByTestId(`notification-${confirmed.id}`);

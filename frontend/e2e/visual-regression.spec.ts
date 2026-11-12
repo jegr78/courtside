@@ -83,6 +83,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   // when
   await page.getByTestId("my-messages-link").click();
   await expect(page.getByTestId("my-messages-view")).toBeVisible();
+  await expect(page.getByTestId("notifications-show-unread")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("my-messages-view"), "my-messages.png");
@@ -183,6 +184,7 @@ test("given an open place and a waitlist offer, when another member reads their 
   await page.getByTestId("my-messages-link").click();
   await expect(async () => {
     await page.reload();
+    await page.getByTestId("notifications-show-unread").click({ timeout: 2_000 });
     await expect(page.locator('[data-testid="notifications"] > li').first()).toBeVisible({ timeout: 2_000 });
   }, "the booking confirmation reaches the notification list").toPass({ timeout: 30_000 });
 
@@ -214,7 +216,7 @@ test("given a guardian of a member, when the guardian and the board read the rel
   // when
   await page.goto("/my-dependants");
   await expect(page.getByTestId("dependant-booking-list")).toBeVisible();
-  await expect(page.getByTestId("dependant-messages-empty").or(page.getByTestId("dependant-notifications"))).toBeVisible();
+  await expect(page.getByTestId("dependant-notifications-show-unread")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("dependants-view"), "dependants.png");
