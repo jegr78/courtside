@@ -47,6 +47,28 @@ describe("LoadingGroup", () => {
     expect(screen.queryByTestId("group-loading"), "the group's status is gone").toBeNull();
   });
 
+  it("given two parts, when the last one answers, then the group says once that it shows", async () => {
+    // given
+    const revealed = vi.fn();
+    render(<LoadingGroup testId="group" revealed={revealed}>{["a", "b"].map((name) => <Part key={name} name={name} />)}</LoadingGroup>);
+
+    // when
+    finish.a("done");
+    await act(() => Promise.resolve());
+
+    // then
+    expect(revealed, "nothing shows while a part still loads").not.toHaveBeenCalled();
+
+    // when
+    finish.b("done");
+    await act(() => Promise.resolve());
+    finish.a("loading");
+    await act(() => Promise.resolve());
+
+    // then
+    expect(revealed).toHaveBeenCalledTimes(1);
+  });
+
   it("given two parts, when one fails and the other answers, then the content shows with the failure in place", async () => {
     // given
     const content = renderGroup(["a", "b"]);

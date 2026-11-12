@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import i18n from "../i18n";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
+import { FakeIntersectionObserver } from "../test/intersection";
 import { AdminOverviewView } from "./AdminOverviewView";
 
 const club: ClubConfig = {
@@ -100,6 +101,8 @@ function show(clock = middayInBerlin) {
 describe("AdminOverviewView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    FakeIntersectionObserver.latest = undefined;
     await i18n.changeLanguage("en");
     vi.spyOn(api, "adminConfig").mockResolvedValue(configured);
     vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);
@@ -119,6 +122,33 @@ describe("AdminOverviewView", () => {
     vi.spyOn(api, "utilisationStatistics").mockImplementation((period) => Promise.resolve(utilisationOf(0.5, 0.5, period!)));
     vi.spyOn(api, "bookingStatistics").mockImplementation((period) => Promise.resolve(bookingsOf(10, 10, period!)));
     vi.spyOn(api, "memberStatistics").mockImplementation((period) => Promise.resolve(membersOf(unchangedMembers, unchangedMembers, period!)));
+  });
+
+  it("given the cards below a phone's window, when the overview opens, then setup and figures show without waiting for the cards' reads", async () => {
+    // given
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+
+    // when
+    show();
+
+    // then
+    expect(screen.queryByTestId("admin-overview-cards-pending"), "the cards wait until the sections above them show").not.toBeInTheDocument();
+    expect(FakeIntersectionObserver.latest).toBeUndefined();
+    await loadedFigure("utilisation");
+    expect(screen.getByTestId("admin-overview-content")).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByTestId("overview-setup")).toBeInTheDocument();
+    expect(api.audit, "a card out of reach reads nothing yet").not.toHaveBeenCalled();
+    expect(api.messages).not.toHaveBeenCalled();
+    expect(api.allocations).not.toHaveBeenCalled();
+    expect(vi.mocked(api.roster).mock.calls.filter(([criteria]) => criteria?.credentialStates)).toEqual([]);
+
+    // when
+    await waitFor(() => expect(FakeIntersectionObserver.latest?.observed, "the cards watch their placeholder").toHaveLength(1));
+    act(() => FakeIntersectionObserver.latest!.intersect(true));
+
+    // then
+    expect(await screen.findByTestId("overview-changes-empty")).toBeInTheDocument();
+    expect(api.audit).toHaveBeenCalledTimes(1);
   });
 
   it("given the club's figures and the periods before, when the overview opens, then each shows its value and which way it moved", async () => {
@@ -226,7 +256,7 @@ describe("AdminOverviewView", () => {
     expect(within(screen.getByTestId("overview-figure-members")).getByTestId("load-failure")).toBeInTheDocument();
     expect(within(await loadedFigure("utilisation")).getByTestId("overview-figure-utilisation-value")).toHaveTextContent("50%");
     expect(within(await loadedFigure("bookings")).getByTestId("overview-figure-bookings-value")).toHaveTextContent("10");
-    expect(await within(screen.getByTestId("overview-changes")).findByTestId("overview-changes-entry"),
+    expect(await within((await screen.findByTestId("overview-changes"))).findByTestId("overview-changes-entry"),
       "a failed figure leaves the cards readable").toBeInTheDocument();
 
     // when
@@ -270,7 +300,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const today = screen.getByTestId("overview-today");
+    const today = (await screen.findByTestId("overview-today"));
     expect(await within(today).findByTestId("overview-today-count"), "a booking over two courts is one booking")
       .toHaveTextContent("3 bookings today");
     const upcoming = within(today).getAllByTestId("overview-today-entry");
@@ -295,7 +325,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const entry = await within(screen.getByTestId("overview-today")).findByTestId("overview-today-entry");
+    const entry = await within((await screen.findByTestId("overview-today"))).findByTestId("overview-today-entry");
     expect(entry).toHaveTextContent(i18n.t("court.number", { number: 3 }));
     expect(entry, "an identifier is never shown in place of a name").not.toHaveTextContent("court-3");
   });
@@ -312,7 +342,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const entry = await within(screen.getByTestId("overview-today")).findByTestId("overview-today-entry");
+    const entry = await within((await screen.findByTestId("overview-today"))).findByTestId("overview-today-entry");
     expect(entry).toHaveTextContent(i18n.t("booking.occupied"));
     expect(entry, "the placeholder the server sends is not a label").not.toHaveTextContent("?");
   });
@@ -322,7 +352,7 @@ describe("AdminOverviewView", () => {
     show(() => new Date("2026-09-25T22:30:00Z"));
 
     // then
-    expect(await within(screen.getByTestId("overview-today")).findByTestId("overview-today-empty"))
+    expect(await within((await screen.findByTestId("overview-today"))).findByTestId("overview-today-empty"))
       .toHaveTextContent("No court is booked today.");
     expect(api.allocations).toHaveBeenCalledWith("2026-09-26");
   });
@@ -337,7 +367,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const today = screen.getByTestId("overview-today");
+    const today = (await screen.findByTestId("overview-today"));
     expect(await within(today).findByTestId("overview-today-count")).toHaveTextContent("1 booking today");
     expect(within(today).getByTestId("overview-today-over")).toHaveTextContent("Nothing else is booked for the rest of the day.");
     expect(within(today).queryByTestId("overview-today-entry")).not.toBeInTheDocument();
@@ -353,7 +383,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const credentials = screen.getByTestId("overview-credentials");
+    const credentials = (await screen.findByTestId("overview-credentials"));
     expect(await within(credentials).findByTestId("overview-credentials-count"), "the count covers every page, not the first")
       .toHaveTextContent("7 people have not chosen a password yet.");
     const entries = within(credentials).getAllByTestId("overview-credentials-entry");
@@ -371,7 +401,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    expect(await within(screen.getByTestId("overview-credentials")).findByTestId("overview-credentials-empty"))
+    expect(await within((await screen.findByTestId("overview-credentials"))).findByTestId("overview-credentials-empty"))
       .toHaveTextContent("Everybody with an account has chosen a password.");
   });
 
@@ -386,7 +416,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const messages = screen.getByTestId("overview-messages");
+    const messages = (await screen.findByTestId("overview-messages"));
     expect(await within(messages).findByTestId("overview-messages-count")).toHaveTextContent("More than 5 messages were refused or failed.");
     expect(api.messages).toHaveBeenCalledWith(undefined, 5, { unsettled: true });
     expect(within(messages).getAllByTestId("overview-messages-entry")[0]).toHaveTextContent("John Roe");
@@ -402,7 +432,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    expect(await within(screen.getByTestId("overview-messages")).findByTestId("overview-messages-count"))
+    expect(await within((await screen.findByTestId("overview-messages"))).findByTestId("overview-messages-count"))
       .toHaveTextContent("1 message was refused or failed.");
   });
 
@@ -411,7 +441,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    expect(await within(screen.getByTestId("overview-messages")).findByTestId("overview-messages-empty"))
+    expect(await within((await screen.findByTestId("overview-messages"))).findByTestId("overview-messages-empty"))
       .toHaveTextContent("No message failed to go out.");
   });
 
@@ -423,7 +453,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    const changes = screen.getByTestId("overview-changes");
+    const changes = (await screen.findByTestId("overview-changes"));
     const entry = await within(changes).findByTestId("overview-changes-entry");
     expect(entry).toHaveTextContent(i18n.t("audit.event.facility.court.added", courtAdded.parameters));
     expect(entry).toHaveTextContent("mary.major");
@@ -436,7 +466,7 @@ describe("AdminOverviewView", () => {
     show();
 
     // then
-    expect(await within(screen.getByTestId("overview-changes")).findByTestId("overview-changes-empty"))
+    expect(await within((await screen.findByTestId("overview-changes"))).findByTestId("overview-changes-empty"))
       .toHaveTextContent("No change has been recorded yet.");
   });
 
@@ -445,9 +475,9 @@ describe("AdminOverviewView", () => {
     vi.mocked(api.messages).mockRejectedValueOnce(new Error("offline for a moment"));
     vi.mocked(api.audit).mockResolvedValue({ entries: [courtAdded] });
     show();
-    const messages = screen.getByTestId("overview-messages");
+    const messages = (await screen.findByTestId("overview-messages"));
     expect(await within(messages).findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
-    expect(await within(screen.getByTestId("overview-changes")).findByTestId("overview-changes-entry"),
+    expect(await within((await screen.findByTestId("overview-changes"))).findByTestId("overview-changes-entry"),
       "a failed card leaves the others readable").toBeInTheDocument();
     expect(screen.getAllByTestId("load-failure")).toHaveLength(1);
 
@@ -522,7 +552,7 @@ describe("AdminOverviewView", () => {
     // then
     const setup = await screen.findByTestId("overview-setup-failure");
     expect(within(setup).getByTestId("load-failure")).toBeInTheDocument();
-    expect(await within(screen.getByTestId("overview-changes")).findByTestId("overview-changes-empty")).toBeInTheDocument();
+    expect(await within((await screen.findByTestId("overview-changes"))).findByTestId("overview-changes-empty")).toBeInTheDocument();
 
     // when
     await userEvent.click(within(setup).getByTestId("retry-load"));

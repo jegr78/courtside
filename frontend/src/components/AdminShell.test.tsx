@@ -1,8 +1,12 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { lazy } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminShell } from "./AdminShell";
+
+afterEach(() => {
+  window.innerWidth = 1024;
+});
 
 function show(at: string) {
   render(<MemoryRouter initialEntries={[at]}>
@@ -333,4 +337,20 @@ it("given navigation following its active entry, when the window resizes before 
   // then
   expect(body.scrollTop, "a window resize must not undo scrolling before the scroll event is delivered").toBe(0);
   expect(screen.queryByTestId("admin-sidebar-precedes")).not.toBeInTheDocument();
+});
+
+it("given a phone, where the navigation is a closed menu, when the page changes size, then the shell measures nothing for a sidebar", async () => {
+  // given
+  window.innerWidth = 375;
+  window.innerHeight = 800;
+  show("/admin/facility");
+  const shell = screen.getByTestId("admin-shell");
+  const measured = vi.spyOn(shell, "getBoundingClientRect").mockReturnValue({ top: 150 } as DOMRect);
+
+  // when
+  await act(() => window.dispatchEvent(new Event("resize")));
+
+  // then
+  expect(measured, "a layout read on every change of a loading page costs a phone its main thread").not.toHaveBeenCalled();
+  expect(screen.getByTestId("admin-navigation-frame").style.getPropertyValue("--admin-navigation-room")).toBe("");
 });

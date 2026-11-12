@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { LoadingStatus } from "./LoadingGroup";
 import { observeResize } from "./observeResize";
 import { AdminNavigation } from "./AdminNavigation";
+import { useLaidOpen } from "./laidOpen";
 import { ScrollContinuation } from "./ScrollContinuation";
 import { useScrollContinuation } from "./useScrollContinuation";
 
@@ -10,11 +11,13 @@ export function AdminShell({ administrator = true, treasurer = false, appointmen
   administrator?: boolean; treasurer?: boolean; appointmentsShown?: boolean;
 }) {
   const { pathname } = useLocation();
-  const { body, content, continues, precedes, overflows, measure: measureContinuation, relayout } = useScrollContinuation(true, pathname);
+  const sidebar = useLaidOpen();
+  const { body, content, continues, precedes, overflows, measure: measureContinuation, relayout } = useScrollContinuation(sidebar, pathname);
   const shell = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
+    if (!sidebar) return;
     let below = 0;
     const follow = () => {
       if (!shell.current || !frame.current) return;
@@ -41,7 +44,7 @@ export function AdminShell({ administrator = true, treasurer = false, appointmen
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", follow);
     };
-  }, [relayout]);
+  }, [relayout, sidebar]);
 
   return <div ref={shell} data-testid="admin-shell" className="grid w-full max-w-7xl gap-6 self-start lg:grid-cols-[15rem_1fr] lg:items-start lg:gap-8">
     <div ref={frame} data-testid="admin-navigation-frame" className="lg:sticky lg:top-8 lg:max-h-[max(12rem,min(calc(100vh-4rem),var(--admin-navigation-room,100vh)))] lg:self-stretch lg:flex lg:min-h-0 lg:flex-col">

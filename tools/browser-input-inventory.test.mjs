@@ -38,9 +38,9 @@ const BOUNDARIES = {
     classification: "decides whether the booking dialog mentions dragging across slots, and never which durations it offers",
     test: "src/views/BookingDialog.test.tsx#given only touch, when the dialog opens, then it says nothing about dragging"
   },
-  "src/components/AdminNavigation.tsx matchMedia": {
+  "src/components/laidOpen.ts matchMedia": {
     value: "the width the browser reports",
-    classification: "decides whether the destinations start folded, and never which ones exist",
+    classification: "decides whether the destinations start folded and whether the shell measures a sidebar, and never which ones exist",
     test: "src/components/AdminNavigation.test.tsx#given a window narrower than the breakpoint, when the navigation is shown, then it stays folded"
   },
   "src/components/AdminNavigation.tsx useLocation": {
