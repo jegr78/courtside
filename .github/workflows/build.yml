@@ -18,7 +18,7 @@ permissions: {}
 jobs:
   test-profile-plan:
     name: test-profile-plan
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -41,13 +41,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - id: selection
         name: Select conservative test profiles
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha }}
-          HEAD_REF: ${{ github.event.pull_request.head.sha }}
-          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          LABELS_JSON: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+          EVENT_NAME: ${{ github.event_name }}
           RUN_ID: ${{ github.run_id }}
           ATTEMPT: ${{ github.run_attempt }}
           FORCE_FULL: ${{ vars.COURTSIDE_TEST_PROFILES != '' && vars.COURTSIDE_TEST_PROFILES != 'admitted' }}
@@ -65,7 +66,7 @@ jobs:
               --base "$BASE_REF" \
               --head "$HEAD_REF" \
               --labels "$LABELS" \
-              --event pull_request \
+              --event "$EVENT_NAME" \
               --run-id "$RUN_ID" \
               --attempt "$ATTEMPT" \
               --fallback-on-error \
@@ -132,7 +133,7 @@ jobs:
 
   docs:
     needs: test-profile-plan
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.docs == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -157,7 +158,7 @@ jobs:
 
   tooling:
     needs: test-profile-plan
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.tooling == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.tooling == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -431,7 +432,7 @@ jobs:
   backend:
     name: backend-${{ strategy.job-index }}
     needs: test-profile-plan
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.backend == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -511,7 +512,7 @@ jobs:
 
   backend-coverage:
     needs: [test-profile-plan, backend]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') && needs.backend.result == 'success' }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.backend == 'true') && needs.backend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -551,7 +552,7 @@ jobs:
 
   frontend:
     needs: test-profile-plan
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.frontend == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.frontend == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -607,7 +608,7 @@ jobs:
   browser_visual:
     name: browser-visual
     needs: [test-profile-plan, frontend]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser_visual == 'true') && needs.frontend.result == 'success' }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.browser_visual == 'true') && needs.frontend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -650,7 +651,7 @@ jobs:
   browser:
     name: browser-${{ matrix.label }}
     needs: [test-profile-plan, frontend]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success' }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -744,7 +745,7 @@ jobs:
 
   deployment:
     needs: [test-profile-plan, frontend]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.deployment == 'true') && needs.frontend.result == 'success' }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.deployment == 'true') && needs.frontend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -935,7 +936,7 @@ jobs:
 
   security:
     needs: [test-profile-plan, dependency-graph]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.security == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.security == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1158,20 +1159,22 @@ jobs:
           [[ "$IDENTITY_RESULT" = success || "$IDENTITY_RESULT" = skipped ]]
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
           case "$EVENT_NAME" in
-            pull_request)
+            pull_request|push)
               test "$PROFILE_PLAN_RESULT" = success
               for job in docs backend frontend browser_visual browser deployment tooling security gates clock_shift; do
                 result_variable="${job^^}_RESULT"
                 selected_variable="${job^^}_SELECTED"
                 result="${!result_variable}"
                 selected="${!selected_variable}"
-                if [[ "$selected" = true ]]; then
+                if [[ "$EVENT_NAME" = push && ( "$job" = gates || "$job" = clock_shift ) ]]; then
+                  test "$result" = skipped
+                elif [[ "$selected" = true ]]; then
                   test "$result" = success
                 else
                   test "$result" = skipped
                 fi
               done
-              if [[ "$GATES_SELECTED" = true ]]; then
+              if [[ "$EVENT_NAME" = pull_request && "$GATES_SELECTED" = true ]]; then
                 test "$GATES_IMAGE_RESULT" = success
               else
                 test "$GATES_IMAGE_RESULT" = skipped
@@ -1182,7 +1185,7 @@ jobs:
                 test "$BACKEND_COVERAGE_RESULT" = skipped
               fi
               ;;
-            push|schedule|workflow_dispatch)
+            schedule|workflow_dispatch)
               test "$PROFILE_PLAN_RESULT" = skipped
               test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
@@ -1195,16 +1198,12 @@ jobs:
               test "$SECURITY_RESULT" = success
               test "$GATES_IMAGE_RESULT" = skipped
               test "$GATES_RESULT" = skipped
-              if [[ "$EVENT_NAME" = push ]]; then
-                test "$CLOCK_SHIFT_RESULT" = skipped
-              else
-                test "$CLOCK_SHIFT_RESULT" = success
-              fi
+              test "$CLOCK_SHIFT_RESULT" = success
               ;;
             *) exit 1 ;;
           esac
       - name: Summarize selected build results
-        if: always() && github.event_name == 'pull_request'
+        if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
         env:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
@@ -1303,8 +1302,8 @@ jobs:
           retention-days: 14
 
   nightly-image:
-    needs: build
-    if: ${{ always() && needs.build.result == 'success' && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/'))) }}
+    needs: [test-profile-plan, build]
+    if: ${{ always() && needs.build.result == 'success' && (github.event_name != 'push' || needs.test-profile-plan.outputs.profiles == '["full"]') && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/'))) }}
     permissions:
       actions: read
       attestations: write

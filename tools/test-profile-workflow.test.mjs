@@ -24,13 +24,13 @@ test("given profile classification, when the pull request runs, then selected qu
   assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
     /needs: \[docs, backend, backend-coverage, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
-  assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
-  assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
+  assert.match(workflow, /pull_request\|push\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
+  assert.match(workflow, /schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow,
     /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B --no-transfer-progress clean verify -Pjava-only/);
   assert.match(workflow, /docs:[\s\S]+name: Verify documentation[\s\S]+node tools\/docs-check\.mjs --check/);
   assert.match(workflow,
-    /docs:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
+    /docs:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test:frontend[\s\S]+npm-cli\.js run build/);
   assert.doesNotMatch(workflow, /frontend:[\s\S]+name: Run browser journeys/);
@@ -66,17 +66,17 @@ test("given a selected quality job, when it does not succeed, then the aggregate
   // when / then
   assert.match(workflow, /build:\n\s+if: always\(\)/);
   assert.match(workflow,
-    /selected="\$\{!selected_variable\}"\s+if \[\[ "\$selected" = true \]\]; then\s+test "\$result" = success\s+else\s+test "\$result" = skipped/);
+    /selected="\$\{!selected_variable\}"[\s\S]+?elif \[\[ "\$selected" = true \]\]; then\s+test "\$result" = success\s+else\s+test "\$result" = skipped/);
 });
 
 test("given reduced profiles, when jobs are scheduled, then only their conservative job set runs", () => {
   // when / then
   assert.match(workflow,
-    /backend:\n\s+name: backend-\$\{\{ strategy\.job-index \}\}\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
+    /backend:\n\s+name: backend-\$\{\{ strategy\.job-index \}\}\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
   assert.match(workflow,
-    /frontend:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
+    /frontend:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,
-    /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
+    /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
   assert.match(workflow,
     /dependency-graph:\n\s+if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(workflow, /dependency-graph:[\s\S]+contents: write[\s\S]+dependency-snapshot\.mjs/);
@@ -210,7 +210,7 @@ test("given plan schema 7, when the plan is read, then the release gates and the
 
 test("given the pull request plan, when the classifier runs, then it names the event that reduces a release bump", () => {
   // when / then
-  assert.match(workflow, /--labels "\$LABELS" \\\n {14}--event pull_request \\\n/);
+  assert.match(workflow, /--labels "\$LABELS" \\\n {14}--event "\$EVENT_NAME" \\\n/);
 });
 
 test("given the plan's security decision, when the gates run for a pull request, then only a surface change starts the active assessment", () => {
@@ -234,10 +234,10 @@ test("given the gates and the shifted clock, when the aggregate decides, then ea
   assert.match(workflow, /GATES_IMAGE_RESULT: \$\{\{ needs\.gates-image\.result \}\}/);
   assert.match(workflow, /CLOCK_SHIFT_RESULT: \$\{\{ needs\.clock-shift\.result \}\}/);
   assert.match(workflow,
-    /if \[\[ "\$GATES_SELECTED" = true \]\]; then\s+test "\$GATES_IMAGE_RESULT" = success\s+else\s+test "\$GATES_IMAGE_RESULT" = skipped\s+fi/,
+    /if \[\[ "\$EVENT_NAME" = pull_request && "\$GATES_SELECTED" = true \]\]; then\s+test "\$GATES_IMAGE_RESULT" = success\s+else\s+test "\$GATES_IMAGE_RESULT" = skipped\s+fi/,
     "a selected gate cannot pass on an image that was never built");
   assert.match(workflow,
-    /push\|schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+if \[\[ "\$EVENT_NAME" = push \]\]; then\s+test "\$CLOCK_SHIFT_RESULT" = skipped\s+else\s+test "\$CLOCK_SHIFT_RESULT" = success\s+fi/,
+    /schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+test "\$CLOCK_SHIFT_RESULT" = success/,
     "the nightly path keeps its own registry gates and runs the shifted clock");
   assert.match(workflow,
     /clock-shift:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.clock_shift == 'true'\)\)/);
@@ -258,4 +258,40 @@ test("given a pull request's build, when a newer push cancels it, then every job
     assert.doesNotMatch(condition, /always\(\)/,
       `${job} uses always(), which GitHub keeps running after a cancellation; use !cancelled()`);
   }
+});
+
+test("given a merge to main, when its push build plans, then it diffs against the previous main head like a pull request", () => {
+  // given
+  const plan = workflow.match(/\n  test-profile-plan:\n[\s\S]*?(?=\n  [a-z_-]+:\n)/)?.[0] ?? "";
+
+  // when / then
+  assert.match(plan, /\n    if: github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\n/);
+  assert.match(plan, /BASE_REF: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+    "a push names the previous head; an all-zero or unknown one fails the worktree and falls back to full");
+  assert.match(plan, /HEAD_REF: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(plan, /LABELS_JSON: \$\{\{ github\.event_name == 'pull_request' && toJSON\(github\.event\.pull_request\.labels\.\*\.name\) \|\| '\[\]' \}\}/);
+  assert.match(plan, /EVENT_NAME: \$\{\{ github\.event_name \}\}/);
+});
+
+test("given a push build that ran only part of the jobs, when the image would publish, then only a full plan publishes it", () => {
+  // given
+  const image = workflow.match(/\n  nightly-image:\n[\s\S]*?(?=\n  [a-z_-]+:\n)/)?.[0] ?? "";
+
+  // when / then
+  assert.match(image, /\n    needs: \[test-profile-plan, build\]\n/);
+  assert.match(image, /github\.event_name != 'push' \|\| needs\.test-profile-plan\.outputs\.profiles == '\["full"\]'/,
+    "the nightly image publishes only a commit whose every job ran");
+});
+
+test("given a push build, when the aggregate decides, then each planned job passed and the pull-request-only jobs stayed out", () => {
+  // given
+  const enforce = workflow.match(/name: Enforce required build results[\s\S]*?\n {6}- name:/)?.[0] ?? "";
+
+  // when / then
+  assert.match(enforce, /pull_request\|push\)\s+test "\$PROFILE_PLAN_RESULT" = success/,
+    "a push whose plan failed to run has no selection and must fail closed");
+  assert.match(enforce,
+    /if \[\[ "\$EVENT_NAME" = push && \( "\$job" = gates \|\| "\$job" = clock_shift \) \]\]; then\n\s+test "\$result" = skipped/,
+    "a push build runs neither the release gates nor the shifted clock");
+  assert.match(enforce, /if \[\[ "\$EVENT_NAME" = pull_request && "\$GATES_SELECTED" = true \]\]; then\n\s+test "\$GATES_IMAGE_RESULT" = success/);
 });

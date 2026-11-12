@@ -32,6 +32,7 @@ test("given a build dispatched on a release branch, when it finishes, then it ru
 
     // when / then
     assert.equal(jobs["nightly-image"].if, "${{ always() && needs.build.result == 'success' && "
+      + "(github.event_name != 'push' || needs.test-profile-plan.outputs.profiles == '[\"full\"]') && "
       + "(github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') "
       + `&& github.ref == 'refs/heads/main') || ${releaseDispatch}) }}`);
     assert.equal(jobs["nightly-image"].with.publish, "${{ github.ref == 'refs/heads/main' }}",

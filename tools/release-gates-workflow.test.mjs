@@ -362,13 +362,15 @@ test("given the browser matrix, when WebKit accessibility runs, then only its sh
 const enforce = build.jobs.build.steps.find((step) => step.name === "Enforce required build results").run;
 const qualityJobs = ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"];
 
+const planned = (event) => event === "pull_request" || event === "push";
+
 function aggregate(event, results, selected = {}) {
   const environment = { PATH: process.env.PATH, EVENT_NAME: event, IDENTITY_RESULT: "skipped",
-    COMPARISON_RESULT: "skipped", PROFILE_PLAN_RESULT: event === "pull_request" ? "success" : "skipped" };
+    COMPARISON_RESULT: "skipped", PROFILE_PLAN_RESULT: planned(event) ? "success" : "skipped" };
   for (const job of [...qualityJobs, "gates", "clock_shift"]) {
     const isSelected = selected[job] ?? true;
     environment[`${job.toUpperCase()}_SELECTED`] = String(isSelected);
-    environment[`${job.toUpperCase()}_RESULT`] = isSelected || event !== "pull_request" ? "success" : "skipped";
+    environment[`${job.toUpperCase()}_RESULT`] = isSelected || !planned(event) ? "success" : "skipped";
   }
   environment.GATES_IMAGE_RESULT = environment.GATES_RESULT;
   environment.BACKEND_COVERAGE_RESULT = environment.BACKEND_RESULT;
@@ -416,10 +418,24 @@ test("given the push and nightly paths, when the aggregate decides, then the gat
   // when / then
   assert.equal(aggregate("push", { ...skippedGates, CLOCK_SHIFT_RESULT: "skipped" }), 0);
   assert.notEqual(aggregate("push", { ...skippedGates, CLOCK_SHIFT_RESULT: "success" }), 0, "a push runs no clock shift");
+  assert.notEqual(aggregate("push", { ...skippedGates, CLOCK_SHIFT_RESULT: "skipped", GATES_IMAGE_RESULT: "success" }), 0,
+    "a push builds no pull-request gate image");
   assert.equal(aggregate("schedule", skippedGates), 0);
   assert.notEqual(aggregate("schedule", { ...skippedGates, CLOCK_SHIFT_RESULT: "failure" }), 0,
     "a failed shifted clock blocks the nightly image");
   assert.notEqual(aggregate("workflow_dispatch", { ...skippedGates, CLOCK_SHIFT_RESULT: "skipped" }), 0);
   assert.notEqual(aggregate("schedule", { GATES_RESULT: "success", GATES_IMAGE_RESULT: "skipped" }), 0,
     "the nightly runs its gates in registry mode, never the pull-request ones");
+});
+
+test("given a push build planned by its diff, when the aggregate decides, then the plan's selection binds it", () => {
+  // given
+  const pushOnly = { GATES_RESULT: "skipped", GATES_IMAGE_RESULT: "skipped", CLOCK_SHIFT_RESULT: "skipped" };
+  const docsOnly = Object.fromEntries(qualityJobs.map((job) => [job, job === "docs" || job === "tooling"]));
+
+  // when / then
+  assert.equal(aggregate("push", pushOnly, docsOnly), 0, "unselected jobs stay out of a documentation merge");
+  assert.notEqual(aggregate("push", { ...pushOnly, BROWSER_RESULT: "skipped" }), 0, "a selected browser job that never ran");
+  assert.notEqual(aggregate("push", { ...pushOnly, FRONTEND_RESULT: "success" }, docsOnly), 0, "a job outside the plan ran");
+  assert.notEqual(aggregate("push", { ...pushOnly, PROFILE_PLAN_RESULT: "failure" }), 0, "a push without a plan fails closed");
 });

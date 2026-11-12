@@ -31,7 +31,9 @@ pull request changes it.
 ## What the nightly image proves
 
 Every complete first-attempt scheduled `build` calls the reusable `nightly image` workflow with its
-own commit and verification run. A manually dispatched full build follows the same path. The image
+own commit and verification run. A manually dispatched full build follows the same path, and so
+does a push to `main` whose test-profile plan is full. A merge whose plan selected fewer jobs
+publishes no image; the next scheduled build does. The image
 workflow validates that exact evidence, packages that revision and builds one amd64/arm64 image. It
 runs the same reference deployment smoke, Trivy scan and `release-image-amd64` or
 `release-image-arm64` policy that the release uses. A red image job predicts a release failure while
@@ -353,7 +355,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | `select` | The green push `build` that finished belongs to a release commit, or for a patch the build dispatched on its release branch, recorded as `patch-release`: the manifest changed, exactly one merged `autorelease: pending` pull request is titled for that version, the commit is on the branch the version belongs to, carries the tools the release workflows call, is no patch of a retired line and, for a patch, has every fix ported to `main`, and the version is not tagged yet |
 | `anchor` | A branch `release-anchor/v<version>/<sha>` names the release commit. Release Please writes it on the push of the release commit; a dispatched release writes it here, which succeeds only while the commit still heads its branch |
 | `preconditions` | A first-attempt build on the release's branch, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the release commit, and, for a release from `main`, no tracker-written nightly failure remains open |
-| `release-build` | Dependency-remediation deadlines hold, CodeQL analyses the sources, npm audit evidence is captured, the release-build security policy holds, and the release notes and upgrade origins are collected. The test suite and the complete browser matrix already ran in the commit's own green push `build`, which `select` requires |
+| `release-build` | Dependency-remediation deadlines hold, CodeQL analyses the sources, npm audit evidence is captured, the release-build security policy holds, and the release notes and upgrade origins are collected. The test suite and the complete browser matrix already ran in the commit's own green `build`, which `select` requires: a push build counts only on a release commit, whose plan is full, and any other commit needs a dispatched build |
 | `image` | One multi-architecture image and its booking-seed image, pushed as `release-candidate-<sha>-<run id>` |
 | `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip`, under the identity `release.yml` will attest it with |
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
@@ -453,7 +455,8 @@ gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=tr
 `commit` is the full 40-character sha to qualify. `rehearsal` defaults to `true`. A rehearsal may
 qualify any commit, a branch head included, and skips the release preconditions: a pending release
 pull request, a commit on the branch its version belongs to (`main`, or `release/<major>.<minor>`
-for a patch), an unused tag and a green push build of that commit. With
+for a patch), an unused tag and a green build of that commit, which for any commit but the release
+commit itself has to be a dispatched full `build`. With
 `rehearsal=false` the workflow refuses to run from anything but `main`, demands all four and writes
 the tag like a run the push build started.
 GitHub dispatches a workflow only once its file exists on the default branch.
