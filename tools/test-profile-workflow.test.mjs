@@ -94,9 +94,9 @@ test("given the classifier fails, when the plan runs, then full selection still 
   // when / then
   assert.match(workflow, /git worktree add[\s\S]+\|\| CLASSIFIER_EXIT=\$\?/);
   assert.match(workflow,
-    /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\]\s+else \$classifierExit == 0 end/);
+    /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\] and \.activeSecurity\s+else \$classifierExit == 0 end/);
   assert.match(workflow,
-    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security","gates","clock_shift"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
+    /else\s+ACTIVE_SECURITY=true\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security","gates","clock_shift"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
 test("given an unrecognised repository variable, when selecting coverage, then anything but the classified default escalates", () => {
@@ -198,14 +198,30 @@ test("given the aggregate only evaluates coverage, when node is prepared, then i
   assert.match(workflow, /node tools\/coverage-diff\.mjs/);
 });
 
-test("given plan schema 6, when the plan is read, then the release gates and the shifted clock are selectable jobs", () => {
+test("given plan schema 7, when the plan is read, then the release gates and the shifted clock are selectable jobs", () => {
   // when / then
-  assert.match(workflow, /'type == "object" and \.schemaVersion == 6 and/);
+  assert.match(workflow, /'type == "object" and \.schemaVersion == 7 and/);
   assert.match(workflow, /\. == "tooling" or \. == "security" or \. == "gates" or \. == "clock_shift"\)\)/);
   assert.match(workflow, /gates: \$\{\{ steps\.selection\.outputs\.gates \}\}/);
   assert.match(workflow, /clock_shift: \$\{\{ steps\.selection\.outputs\.clock_shift \}\}/);
   assert.equal(workflow.match(/for job in docs backend frontend browser_visual browser deployment tooling security gates clock_shift; do/g)?.length, 3,
     "selection, enforcement and summary all walk the ten jobs");
+});
+
+test("given the plan's security decision, when the gates run for a pull request, then only a surface change starts the active assessment", () => {
+  // given
+  const gates = readFileSync(new URL("../.github/workflows/release-gates.yml", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(workflow, /\(\.activeSecurity \| type == "boolean"\) and/);
+  assert.match(workflow, /ACTIVE_SECURITY=\$\(jq -r '\.activeSecurity' build\/test-profile\/plan\.json\)/);
+  assert.match(workflow, /echo "active_security=\$ACTIVE_SECURITY" >> "\$GITHUB_OUTPUT"/);
+  assert.match(workflow, /active_security: \$\{\{ steps\.selection\.outputs\.active_security \}\}/);
+  assert.match(workflow, /active-security: \$\{\{ needs\.test-profile-plan\.outputs\.active_security == 'true' \}\}/);
+  assert.match(gates, /active-security:\n {8}required: false\n {8}type: boolean\n {8}default: true/,
+    "the nightly and every candidate call the gates without the input, so they keep the assessment");
+  assert.match(gates, /\n {2}active-security:\n {4}if: \$\{\{ inputs\.active-security != false \|\| github\.event_name == 'workflow_dispatch' \}\}/,
+    "a dispatch has no such input, and an absent input compares equal to false");
 });
 
 test("given the gates and the shifted clock, when the aggregate decides, then each event demands its own outcome", () => {

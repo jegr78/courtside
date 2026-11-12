@@ -502,6 +502,56 @@ test("given an additive manifest reason contains markdown, when rendering it, th
   assert.ok(visibleCodes.some((code) => code.includes("\\u{202e}")));
 });
 
+test("given changes beside the API and security surface, when classifying, then the pull request skips the active assessment", () => {
+  // when / then
+  for (const path of [
+    "frontend/src/views/AdminOverviewView.tsx",
+    "src/main/java/org/courtside/booking/internal/BookingService.java",
+    "docs/design.md",
+    "frontend/e2e/message-log.spec.ts",
+    "ci/test-profiles.json",
+    "src/main/resources/db/migration/V98__example.sql"
+  ]) {
+    assert.equal(classifyChanges([{ status: "M", path }], []).activeSecurity, false, path);
+  }
+});
+
+test("given a change to the API or security surface, when classifying, then the pull request runs the active assessment", () => {
+  // when / then
+  for (const path of [
+    "src/main/resources/api/openapi.yaml",
+    "src/main/java/org/courtside/booking/web/BookingController.java",
+    "src/main/java/org/courtside/shared/web/AdmissionControl.java",
+    "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+    "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
+    "src/main/resources/application.yaml",
+    "src/main/resources/application-security.yaml",
+    "security/zap-authenticated-policy.json",
+    "deploy/Caddyfile",
+    "tools/security-passive-deployment.mjs",
+    "Dockerfile",
+    "Dockerfile.fixtures",
+    "pom.xml",
+    ".github/workflows/release-gates.yml",
+    ".github/actions/gate-image/action.yml",
+    ".github/actions/tool-dependencies/action.yml",
+    "src/main/java/org/courtside/securityassessment/SecurityAssessmentDataSeeder.java",
+    "src/main/resources/security-assessment-dataset.properties",
+    "tools/courtside.mjs"
+  ]) {
+    assert.equal(classifyChanges([{ status: "M", path }], []).activeSecurity, true, path);
+  }
+});
+
+test("given an unclassifiable, structural or forced change, when classifying, then the active assessment runs", () => {
+  // when / then
+  assert.equal(classifyChanges([{ status: "M", path: "unknown/place.txt" }], []).activeSecurity, true, "unknown path");
+  assert.equal(classifyChanges([{ status: "D", path: "frontend/src/App.tsx" }], []).activeSecurity, true, "deletion");
+  assert.equal(classifyChanges([{ status: "M", path: "docs/design.md" }], ["ci:full"]).activeSecurity, true, "ci:full");
+  assert.equal(fallbackPlanToRun({ runId: 1, attempt: 1, baseCommit: "a".repeat(40), headCommit: "b".repeat(40) })
+    .activeSecurity, true, "a failed classification");
+});
+
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
@@ -515,7 +565,8 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   });
 
   // then
-  assert.equal(bound.schemaVersion, 6);
+  assert.equal(bound.schemaVersion, 7);
+  assert.equal(bound.activeSecurity, false);
   assert.equal(bound.runId, 101);
   assert.equal(bound.attempt, 1);
   assert.equal(bound.baseCommit, "a".repeat(40));
@@ -589,5 +640,6 @@ test("given the files release-please changed in a release commit, when they are 
   // then
   assert.deepEqual(plan.profiles, ["full"], "a release pull request must run every gate");
   assert.ok(plan.ciJobs.includes("gates"), "a release pull request runs the release gates");
-  assert.equal(plan.schemaVersion, 6);
+  assert.equal(plan.activeSecurity, true, "a release pull request runs the active assessment too");
+  assert.equal(plan.schemaVersion, 7);
 });

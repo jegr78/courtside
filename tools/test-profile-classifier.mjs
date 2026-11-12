@@ -28,13 +28,12 @@ export function executedTests(tools) {
 export function validateRules(candidate) {
   const profileNames = ["full", ...reducedProfiles];
   if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
-      || Object.keys(candidate).sort().join() !== ["profiles", "schemaVersion"].sort().join()
+      || Object.keys(candidate).sort().join() !== ["activeSecurity", "profiles", "schemaVersion"].sort().join()
       || candidate.schemaVersion !== 1
       || Object.keys(candidate.profiles ?? {}).sort().join() !== [...profileNames].sort().join()) {
     throw new Error("Test profile path rules are invalid");
   }
-  for (const profile of profileNames) {
-    const configured = candidate.profiles[profile];
+  for (const configured of [...profileNames.map((profile) => candidate.profiles[profile]), candidate.activeSecurity]) {
     if (configured === null || typeof configured !== "object" || Array.isArray(configured)
         || Object.keys(configured).some((field) => !["exact", "prefixes", "patterns"].includes(field))
         || !Array.isArray(configured.exact) || !Array.isArray(configured.prefixes)
@@ -114,8 +113,7 @@ export function validateGitHubManifest(candidate, trackedPaths, validators, exec
   }
 }
 
-function matchingRule(path, profile, kind) {
-  const configured = rules.profiles[profile];
+function matchingRule(path, profile, kind, configured = rules.profiles[profile]) {
   if (kind === "exact" && configured.exact.includes(path)) return `exact:${path}`;
   if (kind === "specific") {
     const pattern = (configured.patterns ?? []).find((candidate) => path.startsWith(candidate.prefix)
@@ -190,6 +188,11 @@ function additiveToolManifestOverrides(changes, commits) {
   }
 }
 
+// The active assessment probes the API and the security layer, so only a change there needs it before merge.
+function touchesSecuritySurface(path) {
+  return ["exact", "specific", "prefix"].some((kind) => matchingRule(path, null, kind, rules.activeSecurity) !== null);
+}
+
 export function classifyChangesAtCommits(changes, labels, commits) {
   return classifyChanges(changes, labels, additiveToolManifestOverrides(changes, commits));
 }
@@ -219,6 +222,7 @@ export function classifyChanges(changes, labels, overrides = new Map()) {
   }
   const reasons = [];
   let requiresFull = labels.includes("ci:full");
+  let activeSecurity = requiresFull;
   if (requiresFull) reasons.push({ code: "manual-full", path: null, profile: "full", status: null });
   const selected = new Set();
   for (const change of changes) {
@@ -232,6 +236,7 @@ export function classifyChanges(changes, labels, overrides = new Map()) {
     const structural = change.status !== "M" && change.status !== "A";
     const classification = overrides.get(change.path) ?? classifyPath(change.path);
     const classifiedProfiles = structural || classification === null ? ["full"] : classification.profiles;
+    if (structural || classification === null || touchesSecuritySurface(change.path)) activeSecurity = true;
     if (classifiedProfiles.includes("full")) requiresFull = true;
     for (const profile of classifiedProfiles) if (profile !== "full") selected.add(profile);
     reasons.push({
@@ -243,7 +248,7 @@ export function classifyChanges(changes, labels, overrides = new Map()) {
   }
   const profiles = requiresFull ? ["full"] : reducedProfiles.filter((profile) => selected.has(profile));
   if (profiles.length === 0) throw new Error("Classification selected no test profile");
-  return { schemaVersion: 1, profiles, isFull: requiresFull, reasons };
+  return { schemaVersion: 1, profiles, isFull: requiresFull, activeSecurity, reasons };
 }
 
 export function bindPlanToRun(plan, identity) {
@@ -257,7 +262,7 @@ export function bindPlanToRun(plan, identity) {
   }
   const contract = loadProfileContract();
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,
@@ -267,6 +272,7 @@ export function bindPlanToRun(plan, identity) {
     ciJobs: ciJobsForProfiles(contract, plan.profiles),
     localTasks: localTasksForProfiles(contract, plan.profiles),
     isFull: plan.isFull,
+    activeSecurity: plan.activeSecurity,
     reasons: plan.reasons
   };
 }
@@ -274,7 +280,7 @@ export function bindPlanToRun(plan, identity) {
 export function fallbackPlanToRun(identity) {
   const contract = loadProfileContract();
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,
@@ -284,6 +290,7 @@ export function fallbackPlanToRun(identity) {
     ciJobs: ciJobsForProfiles(contract, ["full"]),
     localTasks: localTasksForProfiles(contract, ["full"]),
     isFull: true,
+    activeSecurity: true,
     reasons: [{ code: "classifier-error", path: null, profile: "full", status: null }]
   };
 }
@@ -314,6 +321,8 @@ export function profileSummary(plan) {
     "# Selected test profiles",
     "",
     `Selected: ${plan.profiles.map((profile) => `\`${profile}\``).join(", ")}`,
+    "",
+    `Active security assessment: ${plan.activeSecurity ? "runs" : "skipped, no API or security surface changed"}`,
     "",
     "The required build runs only the jobs assigned to these conservative profiles.",
     "",
