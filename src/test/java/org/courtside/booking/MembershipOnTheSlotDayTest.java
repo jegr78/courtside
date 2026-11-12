@@ -62,7 +62,7 @@ class MembershipOnTheSlotDayTest extends AbstractIntegrationTest {
     void setUp() {
         court = facility.createCourt(1, "Court 1");
         card = cards.createCard("Members only", "#B85C38", Set.of(Role.MEMBER), Set.of(), new short[]{},
-                false, false, false, false, true, 0, 0).getId();
+                false, false, false, false, true, false, 0, 0).getId();
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }

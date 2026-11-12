@@ -354,6 +354,28 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheClosureCardIsSetToHoldDoorsOpen_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        UPDATE booking_card SET holds_doors_open = true
+                        WHERE id = '44444444-4444-4444-4444-444444444444'
+                        """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("booking_card_closure_holds_no_doors");
+    }
+
+    @Test
+    void whenADoorHoldEndsBeforeItStarted_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO door_hold (id, booking_id, held_at, ended_at)
+                        VALUES (gen_random_uuid(), gen_random_uuid(), now(), now() - interval '1 minute')
+                        """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("door_hold_ends_after_start");
+    }
+
+    @Test
     void whenInsertingASecondOccupancyKeyRow_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("INSERT INTO occupancy_key (id, key_hash, created_at) VALUES (2, 'x', now())")

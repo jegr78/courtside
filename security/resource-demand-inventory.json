@@ -23,6 +23,7 @@
     "listenerFiles": [
       "src/main/java/org/courtside/access/internal/AccessSignals.java",
       "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
+      "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java",
       "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
       "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
       "src/main/java/org/courtside/config/internal/CoordinationPreparation.java",
@@ -107,6 +108,7 @@
         "deleteClubLogo",
         "deleteImportSource",
         "endAccountSessions",
+        "endDoorHold",
         "endGuardianRelationship",
         "endOwnSession",
         "endOwnSessions",
@@ -130,6 +132,7 @@
         "getSessionStatus",
         "getSourceOffer",
         "getWebManifest",
+        "holdDoorsOpen",
         "initiateMfaRecovery",
         "liftNoShows",
         "linkExternalReference",
@@ -859,6 +862,16 @@
         "AccessSignals#on(SeriesCancelled)",
         "AccessSignals#on(SeriesCreated)",
         "AccessSignals#on(SeriesMoved)"
+      ]
+    },
+    {
+      "id": "door-hold-ends",
+      "kind": "ordinary",
+      "rationale": "Each runs inside the cancelling or moving transaction and ends the unended door holds of the bookings it names with one indexed update, publishing one audit event per hold it ended; it calls nothing outside the process.",
+      "entryPoints": [
+        "DoorHoldService#on(BookingCancelled)",
+        "DoorHoldService#on(SeriesCancelled)",
+        "DoorHoldService#on(SeriesMoved)"
       ]
     },
     {

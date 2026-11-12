@@ -181,6 +181,7 @@ export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointment
 export type AttendanceOutcome = components["schemas"]["AttendanceOutcome"];
 export type AttendancePolicy = components["schemas"]["AttendancePolicy"];
 export type CheckIn = components["schemas"]["CheckIn"];
+export type DoorHold = components["schemas"]["DoorHold"];
 export type NoShow = components["schemas"]["NoShow"];
 export type NoShowsLifted = components["schemas"]["NoShowsLifted"];
 export type ManagedAppointmentView = components["schemas"]["ManagedAppointmentView"];
@@ -994,6 +995,8 @@ export const api = {
     `/api/managed/bookings/${bookingId}`
   ),
   checkIn: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/check-in`, { method: "POST" }),
+  holdDoorsOpen: (bookingId: string) => request<DoorHold>(`/api/my/bookings/${bookingId}/door-hold`, { method: "POST" }),
+  endDoorHold: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/door-hold`, { method: "DELETE" }),
   emergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/bookings/${bookingId}/emergency-code`, { method: "POST" }),
   participationEmergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/participations/${bookingId}/emergency-code`, { method: "POST" }),
   attendancePolicy: () => request<AttendancePolicy>("/api/admin/attendance-policy"),

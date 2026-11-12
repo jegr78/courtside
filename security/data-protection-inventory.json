@@ -904,6 +904,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "holds_doors_open": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "signals_occupancy": {
         "level": "operational",
         "lifecycle": "club-configuration"
@@ -1355,6 +1359,32 @@
       "subject_id": {
         "level": "pseudonymous",
         "lifecycle": "append-only-log"
+      }
+    },
+    "door_hold": {
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "ended_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "ended_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "held_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "held_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
       }
     },
     "event_publication": {

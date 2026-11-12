@@ -389,6 +389,53 @@
       ]
     },
     {
+      "id": "door-hold",
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "entryPoints": "Holding a booking's doors open and ending the hold, from My bookings and the managed appointment.",
+      "operationIds": [
+        "holdDoorsOpen",
+        "endDoorHold"
+      ],
+      "backgroundEntryPoints": [
+        "DoorHoldService#on(BookingCancelled)",
+        "DoorHoldService#on(SeriesCancelled)",
+        "DoorHoldService#on(SeriesMoved)"
+      ],
+      "stateTransitions": [
+        "The booker, an administrator or a role that manages the card starts a hold on a booking whose card offers one, from the access lead time before the start until the end.",
+        "The person who started the hold or an administrator ends it.",
+        "Cancelling or moving the booking ends its unended holds and records each end."
+      ],
+      "alternatePaths": [
+        "A hold nobody ends is over at the booking's end; cancelling or moving the booking ends it and records the end.",
+        "Starting again while one's own hold runs changes nothing."
+      ],
+      "failurePaths": [
+        "A booking the caller may not act on answers as absent.",
+        "A card that offers no hold, a closed window, a hold somebody else runs, no running hold and an end by anyone but the holder or an administrator are refused by their own codes."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java",
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldRows.java",
+        "src/main/java/org/courtside/booking/web/DoorHoldController.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenATrainingStartingSoon_whenItsTrainerHoldsTheDoorsOpen_thenTheBookingShowsTheRunningHold",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnotherMember_whenTheyHoldTheTrainingsDoorsOpen_thenTheBookingIsNotFoundForThem",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenARunningHold_whenTheTrainingMovesToTomorrow_thenItHoldsNothingOpen"
+      ]
+    },
+    {
       "id": "facility-card-and-membership-configuration",
       "actors": [
         "ADMIN"

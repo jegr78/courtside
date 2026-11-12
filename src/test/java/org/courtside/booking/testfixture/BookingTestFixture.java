@@ -234,6 +234,21 @@ public class BookingTestFixture {
                 .update();
     }
 
+    public void moveRecorded(UUID bookingId, Duration by) {
+        jdbc.sql("""
+                        UPDATE court_allocation SET starts_at = starts_at + make_interval(secs => :seconds),
+                            ends_at = ends_at + make_interval(secs => :seconds)
+                        WHERE booking_id = :id
+                        """)
+                .param("seconds", by.toSeconds()).param("id", bookingId).update();
+    }
+
+    public void holdDoorsOpenAt(UUID bookingId, UUID heldBy, Instant heldAt) {
+        jdbc.sql("INSERT INTO door_hold (id, booking_id, held_at, held_by) VALUES (:id, :booking, :at, :by)")
+                .param("id", UUID.randomUUID()).param("booking", bookingId)
+                .param("at", Timestamp.from(heldAt)).param("by", heldBy).update();
+    }
+
     public void cancelRecorded(UUID bookingId) {
         jdbc.sql("UPDATE court_allocation SET status = 'CANCELLED' WHERE booking_id = :id")
                 .param("id", bookingId).update();

@@ -651,6 +651,67 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].params.field").value("managingRoles"));
     }
 
+    @Test
+    void givenANewCard_whenItsDoorHoldIsTurnedOnAndOffAgain_thenTheFlagFollowsAndDefaultsToOff() throws Exception {
+        // given
+        String id = createCard("Holiday camp", "#c8a415");
+        mockMvc.perform(get("/api/admin/booking-cards/" + id))
+                .andExpect(jsonPath("$.holdsDoorsOpen").value(false));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(doorHoldJson("Holiday camp", true))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.holdsDoorsOpen").value(true));
+        assertThat(cardService.requireCard(UUID.fromString(id)).isHoldsDoorsOpen()).isTrue();
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("Holiday camp", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.holdsDoorsOpen").value(true));
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(doorHoldJson("Holiday camp", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.holdsDoorsOpen").value(false));
+    }
+
+    @Test
+    void givenTheClosureCard_whenABoardLetsItHoldDoorsOpen_thenTheCardRefusesItByCodeAndStaysShut() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + BookingCard.COURT_CLOSED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(doorHoldJson(cardService.requireCard(BookingCard.COURT_CLOSED).getLabel(), true))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:closure-card-holds-no-doors"))
+                .andExpect(jsonPath("$.violations[0].code").value("card.closure.holdsNoDoors"));
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isHoldsDoorsOpen()).isFalse();
+    }
+
+    @Test
+    void givenANewCard_whenItIsCreatedHoldingDoorsOpen_thenTheCardStoresIt() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(doorHoldJson("School cooperation", true))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.holdsDoorsOpen").value(true));
+    }
+
+    private static String doorHoldJson(String label, boolean holdsDoorsOpen) {
+        return """
+                {"label": "%s", "color": "#c8a415",
+                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                 "guestAllowed": false, "holdsDoorsOpen": %s}
+                """.formatted(label, holdsDoorsOpen);
+    }
+
     private static String signalJson(String label, boolean signalsOccupancy) {
         return """
                 {"label": "%s", "color": "#c8a415",

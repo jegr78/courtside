@@ -1492,3 +1492,55 @@ it("given a booking awaiting its PayPal payment, when the page stays open, then 
   expect(within(screen.getByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending"))
     .toHaveTextContent(i18n.t("myBookings.paymentExpiring"));
 });
+
+it("given a training whose doors may be held open, when its trainer holds them open and checks out again, then the list follows each step", async () => {
+  // given
+  await i18n.changeLanguage("en");
+  const training = {
+    id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-11T16:00:00Z", endsAt: "2026-08-11T17:00:00Z",
+    cardLabel: "Holiday camp", cardColor: "#34584a", status: "CONFIRMED" as const
+  };
+  const window = { opensAt: "2026-08-11T15:45:00Z", closesAt: "2026-08-11T17:00:00Z" };
+  let held = false;
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view ? { items: [] }
+    : { items: [{ ...training, doorHold: held ? { ...window, heldSince: "2026-08-11T15:50:00Z", heldByMe: true } : { ...window, heldByMe: false } }] }));
+  const hold = vi.spyOn(api, "holdDoorsOpen").mockImplementation(() => {
+    held = true;
+    return Promise.resolve({ ...window, heldSince: "2026-08-11T15:50:00Z", heldByMe: true });
+  });
+  const end = vi.spyOn(api, "endDoorHold").mockImplementation(() => {
+    held = false;
+    return Promise.resolve(undefined);
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T15:50:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("hold-doors-open"));
+
+  // then
+  expect(hold).toHaveBeenCalledWith(upcomingId);
+  expect(await screen.findByTestId("doors-held-open")).toBeVisible();
+  expect(screen.queryByTestId("hold-doors-open"), "a running hold offers only its end").not.toBeInTheDocument();
+  await userEvent.click(screen.getByTestId("end-door-hold"));
+  expect(end).toHaveBeenCalledWith(upcomingId);
+  await waitFor(() => expect(screen.queryByTestId("doors-held-open")).not.toBeInTheDocument());
+});
+
+it("given a hold somebody else runs, when the trainer reads the booking, then it shows the running hold without offering to end it", async () => {
+  // given
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view ? { items: [] } : { items: [{
+    id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-11T16:00:00Z", endsAt: "2026-08-11T17:00:00Z",
+    cardLabel: "Holiday camp", cardColor: "#34584a", status: "CONFIRMED",
+    doorHold: { opensAt: "2026-08-11T15:45:00Z", closesAt: "2026-08-11T17:00:00Z", heldSince: "2026-08-11T15:46:00Z", heldByMe: false }
+  }] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T15:50:00Z")} />);
+
+  // then
+  expect(await screen.findByTestId("doors-held-open")).toBeVisible();
+  expect(screen.queryByTestId("end-door-hold"), "only the person who checked in ends a hold here").not.toBeInTheDocument();
+  expect(screen.queryByTestId("hold-doors-open")).not.toBeInTheDocument();
+});

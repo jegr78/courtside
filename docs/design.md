@@ -316,11 +316,14 @@ reaches it.
 ### Cards and participant slots
 
 A booking card controls its name and colour, allowed player counts, guest use, whether it counts
-toward limits, booking roles, managing roles, whether its bookings receive access codes and whether
-they signal occupancy. The access attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
+toward limits, booking roles, managing roles, whether its bookings receive access codes, whether
+they signal occupancy and whether their doors may be held open. The access attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
 refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
 refuses it below the service. The last, `signalsOccupancy`, decides whether its bookings count as
 occupied for building automation; it is on by default and off for the closure card the same way.
+`holdsDoorsOpen` lets a responsible person hold a booking's doors open; it is off by default and
+never on for the closure card, refused with `card.closure.holdsNoDoors` and by the
+`booking_card_closure_holds_no_doors` CHECK.
 
 An empty booking-role set permits every account whose person holds a membership covering today; no
 role stands in for that membership, `MEMBER` included. An account without one books only cards that
@@ -691,6 +694,23 @@ A booking request authenticates and authorizes, validates the request, evaluates
 booking and allocations in one transaction, translates a collision to `409 Conflict`, publishes
 the committed event and returns the identifier. An `Idempotency-Key` identifies the attempt, so
 repeating it returns the same result.
+
+### Holding doors open
+
+On a booking whose card has `holdsDoorsOpen`, the booker, an administrator or a role the card names
+as managing checks in to hold its doors open, from `access_lead_minutes` before the start until the
+end. This check-in is separate from attendance and works whether the club records attendance or
+not. The booker acts from My bookings, a managing role from the managed appointment. A caller who
+may not manage the booking gets the same `404` as for a booking that does not exist; a card without
+the switch, a closed window and a hold somebody else runs are refused by their own codes.
+
+A hold ends at check-out by the person who started it or by an administrator, at a cancellation
+or move of its booking, and at the booking's end at the latest. A move ends it even when the new
+slot still covers the old window, because the doors may no longer be the booking's. A hold also
+runs only while its booking is confirmed and it began inside the booking's current window, so
+nothing has to run when a booking ends. Starting and ending are audited as `booking.doorHold.started` and
+`booking.doorHold.ended`. The court plan does not show a hold, because it answers without a session
+and would announce when doors stand open without a code.
 
 ### Errors
 

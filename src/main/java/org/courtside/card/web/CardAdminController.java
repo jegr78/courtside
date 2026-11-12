@@ -48,6 +48,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
                 Boolean.TRUE.equals(request.getGrantsAccess()), !Boolean.FALSE.equals(request.getSignalsOccupancy()),
+                Boolean.TRUE.equals(request.getHoldsDoorsOpen()),
                 request.getGuestFeeMinor() == null ? 0 : request.getGuestFeeMinor(),
                 request.getExternalPriceMinor() == null ? 0 : request.getExternalPriceMinor());
         return ResponseEntity
@@ -63,7 +64,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
                 Boolean.TRUE.equals(request.getGrantsAccess()), request.getSignalsOccupancy(),
-                request.getGuestFeeMinor(), request.getExternalPriceMinor())));
+                request.getHoldsDoorsOpen(), request.getGuestFeeMinor(), request.getExternalPriceMinor())));
     }
 
     @Override
@@ -152,7 +153,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roleNames(card.getAllowedRoles()), roleNames(card.getManagingRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.getGuestFeeMinor(),
-                card.getExternalPriceMinor(), card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), card.isActive());
+                card.getExternalPriceMinor(), card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(),
+                card.isHoldsDoorsOpen(), card.isActive());
     }
 
     private static ApiParticipantCard toResponse(ParticipantCard card) {

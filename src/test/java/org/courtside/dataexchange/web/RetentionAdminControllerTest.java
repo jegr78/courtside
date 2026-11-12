@@ -296,6 +296,36 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenADoorHoldOnAnOldBooking_whenTheRunApplies_thenItNoLongerNamesWhoHeldOrEndedIt() throws Exception {
+        // given
+        UUID janePerson = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
+        UUID jane = identity.accountIdOf(janePerson);
+        UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, admin, adminPerson,
+                Set.of(Role.ADMIN), null, "Mary Major");
+        jdbc.sql("""
+                        INSERT INTO door_hold (id, booking_id, held_at, held_by, ended_at, ended_by)
+                        VALUES (gen_random_uuid(), :booking, :at, :jane, :at, :jane)
+                        """)
+                .param("booking", old).param("jane", jane).param("at", java.sql.Timestamp.from(clock.instant()))
+                .update();
+        shiftBack(old, 500);
+        keep("BOOKINGS", 12);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsPseudonymised").value(1));
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM door_hold WHERE booking_id = :id AND held_by IS NULL AND ended_by IS NULL")
+                .param("id", old).query(Long.class).single()).as("the hold stays but names nobody").isEqualTo(1L);
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAFormerMemberWhoActedAsGuardianOnAKeptBooking_whenPreviewed_thenTheyAreBlockedAsNamedInBookings()
             throws Exception {
         // given

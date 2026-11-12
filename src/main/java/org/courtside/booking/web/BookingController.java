@@ -30,6 +30,7 @@ import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.PersonalBookingView;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingStatus;
+import org.courtside.booking.doorhold.DoorHoldService;
 import org.courtside.booking.attendance.AttendanceService;
 import org.courtside.booking.internal.AllocationVisibilityService;
 import org.courtside.booking.internal.BookingRuleGate;
@@ -53,6 +54,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -74,6 +76,7 @@ class BookingController implements BookingsApi {
     private final FacilityService facility;
     private final AttendanceService attendance;
     private final PersonalBookingPages personalBookingPages;
+    private final DoorHoldService doorHolds;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -86,7 +89,8 @@ class BookingController implements BookingsApi {
                       BookingRuleGate ruleGate,
                       FacilityService facility,
                       AttendanceService attendance,
-                      PersonalBookingPages personalBookingPages) {
+                      PersonalBookingPages personalBookingPages,
+                      DoorHoldService doorHolds) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -99,6 +103,7 @@ class BookingController implements BookingsApi {
         this.facility = facility;
         this.attendance = attendance;
         this.personalBookingPages = personalBookingPages;
+        this.doorHolds = doorHolds;
     }
 
     @Override
@@ -231,7 +236,11 @@ class BookingController implements BookingsApi {
                 .note(booking.getNote())
                 .attendance(attendance.outcomeOf(booking.getId())
                         .map(outcome -> ApiAttendanceOutcome.fromValue(outcome.name()))
-                        .orElse(null)));
+                        .orElse(null))
+                .doorHold(booking.getStatus() == BookingStatus.CONFIRMED
+                        ? Optional.ofNullable(doorHolds.doorHoldsOf(List.of(booking), account.getId()).get(booking.getId()))
+                                .map(DoorHoldController::toResponse).orElse(null)
+                        : null));
     }
 
     private ApiManagedAppointment toManagedAppointment(Booking booking,
