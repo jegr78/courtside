@@ -52,6 +52,17 @@ describe("browser project groups", () => {
     expect(browserProjectGroup(projects, "phone-android").map(({ name }) => name)).toEqual(["android"]);
   });
 
+  it("given the phone layouts in one file, when a phone group is sharded, then that file splits by test", () => {
+    // given
+    const spec = readFileSync(resolve(import.meta.dirname, "responsive-mobile.spec.ts"), "utf8");
+
+    // when / then
+    expect(browserGroupShards["phone-iphone"]).toBe(2);
+    expect(browserGroupShards["phone-android"]).toBe(2);
+    expect(spec, "Playwright shards a file whole unless it runs in parallel mode, which would leave a phone shard empty")
+      .toMatch(/^test\.describe\.configure\(\{ mode: "parallel" \}\);$/m);
+  });
+
   it("given the build workflow, when its browser matrix is read, then every shard of every group runs exactly once", () => {
     // given
     type MatrixEntry = { label: string; group: string; shard: string };
@@ -75,13 +86,14 @@ describe("browser project groups", () => {
 
   it("given a shard, when it is read for its group, then only one of that group's own shards is accepted", () => {
     // when / then
-    expect(browserShard("functional", "2/3")).toEqual({ current: 2, total: 3 });
+    expect(browserShard("functional", "2/4")).toEqual({ current: 2, total: 4 });
+    expect(browserShard("phone-iphone", "2/2")).toEqual({ current: 2, total: 2 });
     expect(browserShard("functional", undefined), "a local run without a shard runs the whole group").toBeUndefined();
     expect(browserShard("functional", ""), "an unsharded matrix entry passes an empty value").toBeUndefined();
     expect(() => browserShard("functional", "2/2"), "a total the group does not declare").toThrow(/does not have 2 shards/i);
-    expect(() => browserShard("functional", "4/3")).toThrow(/not a shard/i);
-    expect(() => browserShard("functional", "0/3")).toThrow(/not a shard/i);
+    expect(() => browserShard("functional", "5/4")).toThrow(/not a shard/i);
+    expect(() => browserShard("functional", "0/4")).toThrow(/not a shard/i);
     expect(() => browserShard("functional", "two")).toThrow(/not a shard/i);
-    expect(() => browserShard("phone-iphone", "1/2"), "a group without shards").toThrow(/does not have 2 shards/i);
+    expect(() => browserShard("visual", "1/2"), "a group without shards").toThrow(/does not have 2 shards/i);
   });
 });
