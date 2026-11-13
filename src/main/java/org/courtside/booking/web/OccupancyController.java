@@ -3,6 +3,7 @@ package org.courtside.booking.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.OccupancyApi;
 import org.courtside.booking.internal.OccupancyKeys;
+import org.courtside.booking.doorhold.DoorHoldService;
 import org.courtside.booking.internal.OccupancySignal;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ class OccupancyController implements OccupancyApi {
 
     private final OccupancyKeys keys;
     private final OccupancySignal signal;
+    private final DoorHoldService doorHolds;
 
     @Override
     public ResponseEntity<String> getCourtOccupancy(String key) {
@@ -27,6 +29,12 @@ class OccupancyController implements OccupancyApi {
                     .append('\n')
                     .append("court").append(court.courtNumber()).append(".minutes=").append(court.minutes())
                     .append('\n');
+        }
+        DoorHoldService.DoorSignals doors = doorHolds.doorSignals();
+        long expires = doors.expiresAt().getEpochSecond();
+        for (DoorHoldService.DoorSignal door : doors.doors()) {
+            body.append("door.").append(door.accessPointId()).append(".open=").append(door.open() ? 1 : 0).append('\n')
+                    .append("door.").append(door.accessPointId()).append(".expires=").append(expires).append('\n');
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body.toString());
     }

@@ -168,12 +168,27 @@ Courtside. Courtside itself masks the query value as `key=[REDACTED]` before its
 reads it, its operational log redacts any `key=` value it collects, the reference `deploy/Caddyfile`
 writes no access log and the UAT proxy strips the query from what it logs. Whoever holds the key
 learns, per active court, whether it is occupied and how many minutes remain until its next
-booking, nothing about who booked or which card, and can change nothing. The reference deployment
-accepts the request over HTTPS only; Courtside itself does not require it, so a club that serves this
-path over plain HTTP behind its own proxy also exposes the key on the network. A board revokes or replaces
-the key on the access points page and the old one is refused on the next poll. Reconsider if the
-answer grows to carry anything about a person or a booking, or if a supported poller can send a
-header.
+booking, and, per active access point named by its id, whether a running door hold keeps it open
+right now. It learns nothing about who booked or which card, and cannot change anything in Courtside.
+A court door reads open only while somebody who may manage one of its bookings has checked in on it
+in the app, which proves no presence at the court; a door open to members reads open while any such
+hold runs. External players cannot start a hold.
+
+Once a club's controller keeps a lock open from `door.*`, the answer stops being information and
+starts opening a door. Whoever can alter the answer on its way, on a club network or a router
+between the instance and the Miniserver, can then hold that door open without the key. The reference
+deployment accepts the request over HTTPS only; Courtside itself does not require it, and a club that
+serves this path over plain HTTP behind its own proxy exposes both the key and the door. The board
+guide therefore asks for HTTPS with certificate verification before a lock is wired to the signal,
+and for a new key before that, because an older key may already sit in a router log or an
+installer's project. Failing closed rests on the club's wiring as well: Loxone keeps the last value
+of a Virtual HTTP Input when an answer fails, including the `401` after a revoked key, so only a
+controller that also compares `expires` with its own clock closes the door when answers stop, and a
+controller clock that runs late extends the open time by that much. A board revokes or replaces the
+key on the access points page and the old one is refused on the next poll. Reconsider if the answer
+grows to carry anything about a person or a booking, if a door is reported open without a check-in,
+if a supported poller can send a header or verify a signed answer, or if a club reads the door lines
+over plain HTTP.
 
 ## A dynamic access code is stored in clear while a door may accept it
 

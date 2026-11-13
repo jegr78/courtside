@@ -16,6 +16,9 @@ import org.courtside.card.CardService;
 import org.courtside.config.AccessPolicy;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.BookingGridSettings;
+import org.courtside.facility.AccessPoint;
+import org.courtside.facility.FacilityService;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.SeriesCancelled;
@@ -45,6 +48,7 @@ import java.util.stream.Collectors;
 public class DoorHoldService {
 
     private static final int EXTENSION_MINUTES = 30;
+    private static final Duration SIGNAL_VALIDITY = Duration.ofMinutes(2);
 
     private final DoorHoldRows rows;
     private final BookingRepository bookings;
@@ -56,10 +60,13 @@ public class DoorHoldService {
     private final BookingExtension extension;
     private final BookingGridCoordination bookingGridCoordination;
     private final BookingGridSettings bookingGrid;
+    private final FacilityService facility;
+    private final Outsiders outsiders;
 
     public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
         accessControl.requireManagementAccess(booking, actor, actorRoles);
+        outsiders.refuse(actor, actorRoles);
         if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
             throw new DoorHoldNotOfferedException();
         }
@@ -154,6 +161,32 @@ public class DoorHoldService {
                 .collect(Collectors.toMap(Hold::bookingId, Function.identity()));
         return windows.values().stream().collect(Collectors.toMap(Window::bookingId,
                 window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer)));
+    }
+
+    /** Every active access point and whether a running hold keeps it open, valid until {@code expiresAt}. */
+    @Transactional(readOnly = true)
+    public DoorSignals doorSignals() {
+        Instant now = clock.instant();
+        List<UUID> candidates = rows.unendedOnBookingsEndingAfter(now);
+        List<Booking> held = candidates.isEmpty() ? List.of() : bookings.findAllByIdIn(candidates);
+        Map<UUID, DoorHold> holds = doorHoldsOf(held, null);
+        Set<UUID> heldCourts = held.stream()
+                .filter(booking -> Optional.ofNullable(holds.get(booking.getId())).map(DoorHold::heldSince).isPresent())
+                .flatMap(booking -> booking.getAllocations().stream().map(CourtAllocation::getCourtId))
+                .collect(Collectors.toSet());
+        List<DoorSignal> doors = facility.allAccessPoints().stream()
+                .filter(AccessPoint::isActive)
+                .sorted(Comparator.comparing(AccessPoint::getId))
+                .map(accessPoint -> new DoorSignal(accessPoint.getId(),
+                        accessPoint.isOpenToMembers() ? !heldCourts.isEmpty() : heldCourts.stream().anyMatch(accessPoint::serves)))
+                .toList();
+        return new DoorSignals(doors, now.plus(SIGNAL_VALIDITY));
+    }
+
+    public record DoorSignal(UUID accessPointId, boolean open) {
+    }
+
+    public record DoorSignals(List<DoorSignal> doors, Instant expiresAt) {
     }
 
     private Optional<Hold> running(Booking booking) {

@@ -700,7 +700,8 @@ repeating it returns the same result.
 On a booking whose card has `holdsDoorsOpen`, the booker, an administrator or a role the card names
 as managing checks in to hold its doors open, from `access_lead_minutes` before the start until the
 end. This check-in is separate from attendance and works whether the club records attendance or
-not. The booker acts from My bookings, a managing role from the managed appointment. A caller who
+not. The booker acts from My bookings, a managing role from the managed appointment. An external
+player cannot start a hold. A caller who
 may not manage the booking gets the same `404` as for a booking that does not exist; a card without
 the switch, a closed window and a hold somebody else runs are refused by their own codes.
 
@@ -1139,7 +1140,18 @@ polls Courtside; Courtside never switches anything. `GET /api/public/occupancy?k
 `N`, and `court<N>.minutes` counts the whole minutes, rounded down, until the next such booking
 starts. It is `0` while the court is occupied and `1440` when nothing starts within the next 24
 hours. `N` is the court's number, so deactivating another court does not shift it. An inactive court
-is left out. Nothing else is answered: no booker, card, booking or court id.
+is left out.
+
+Two more lines follow per active access point, keyed by its id because an access point has no
+number: `door.<id>.open` is `1` while a door hold runs on a booking whose courts the access point
+serves, the same mapping its codes use, and for an access point open to members while any hold runs;
+otherwise `0`. A hold runs as defined under Holding doors open, and a card that stops offering holds
+closes its doors at once. `door.<id>.expires` is the answer time plus two minutes in Unix seconds,
+on every door line. A controller keeps a lock open only while `open` is `1` and its own clock is
+before `expires`, so an answer that stops arriving reads closed; codes keep working without the
+signal. Wiring a lock to these lines needs HTTPS with certificate verification between instance and
+controller, as `docs/security-risks.md` explains. Nothing else is answered: no booker, card, booking,
+court id or access point name.
 
 `signalsOccupancy` is on by default and never on for the closure card: `CardService` refuses it with
 `card.closure.signalsNoOccupancy`, and `booking_card_closure_signals_no_occupancy` refuses it below

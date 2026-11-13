@@ -418,6 +418,26 @@ class DoorHoldControllerTest extends AbstractIntegrationTest {
         assertThat(auditedEnds(booking)).isEqualTo(1L);
     }
 
+    @Test
+    @WithMockUser(username = "roe.richard", roles = "EXTERNAL")
+    void givenAnExternalPlayersOwnBookingOnAHoldingCard_whenTheyHoldTheDoorsOpen_thenOutsidersAreRefused()
+            throws Exception {
+        // given
+        UUID external = identity.createEnabledAccount(identity.createPerson("Richard", "Roe", "roe@example.org"),
+                "roe.richard", Set.of(Role.EXTERNAL));
+        UUID guestCard = cards.createBookingCard("Guest hour", Set.of(Role.EXTERNAL), Set.of());
+        cards.letBookingsHoldDoorsOpen(guestCard, true);
+        Instant start = NOW.plus(5, ChronoUnit.MINUTES);
+        UUID booking = bookings.insertBookingThatHasStarted(court, guestCard,
+                new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)), external);
+
+        // when / then
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+        assertThat(unendedHoldsOf(booking)).as("an external player holds no door open").isZero();
+    }
+
     private long unendedHoldsOf(UUID booking) {
         return jdbc.sql("SELECT count(*) FROM door_hold WHERE booking_id = :id AND ended_at IS NULL")
                 .param("id", booking).query(Long.class).single();

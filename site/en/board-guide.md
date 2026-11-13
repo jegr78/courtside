@@ -258,7 +258,7 @@ In Loxone Config, create:
 
 The reference deployment accepts requests over HTTPS only, so your Miniserver then has to poll an
 HTTPS address. If you run Courtside behind your own proxy, it is your choice whether this address is
-also reachable over plain HTTP. The key then travels unencrypted, but it reveals occupancy only.
+also reachable over plain HTTP. The key then travels unencrypted and reveals occupancy and which doors are held open, never who booked.
 
 A polling cycle of 60 seconds is enough. A shorter one gains nothing, because `minutes` changes only
 once a minute. If Courtside or the network is down, Loxone keeps the last value until the next
@@ -272,8 +272,18 @@ What the values trigger is up to you in Loxone:
   minutes are fewer than run time plus drying time. If the Loxone weather service reports rain, the
   run is skipped.
 
-Whoever knows the key learns only occupancy and minutes per court, never who booked or with which
-card. The key is part of the address and can therefore show up in the log of a router or proxy.
+Two more lines follow for every active access point, named by its id: `door.<id>.open` is 1 while
+someone checked in on a booking of one of its courts holds the doors open, and for an access point
+open to all members while any hold runs. `door.<id>.expires` gives in Unix seconds how long the
+answer holds, two minutes after the poll. A controller that keeps a lock open from it checks both
+values, so a missing answer reads closed: Loxone keeps the last value when a poll fails or the key
+is revoked, and only the comparison of `expires` with the Miniserver's clock closes the door then.
+Poll at least once a minute. Before you wire a lock to these lines, issue a new key and poll over
+HTTPS with certificate verification only: whoever can change the answer on its way can otherwise
+hold the door open. Codes keep working without this signal.
+
+Whoever knows the key learns occupancy and minutes per court and which doors are held open right
+now, never who booked or with which card. The key is part of the address and can therefore show up in the log of a router or proxy.
 Replace it if it has reached the wrong hands.
 
 ## Connecting a Loxone Miniserver
