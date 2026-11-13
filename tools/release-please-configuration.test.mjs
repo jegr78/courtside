@@ -164,6 +164,24 @@ test("given release-please writes a candidate delta, when it updates the release
     assert.match(commit.run, /git push origin "HEAD:refs\/heads\/\$RELEASE_PR_BRANCH"/);
   });
 
+test("given a push that changes no release note, when release-please finishes, then it brings its pull request up to date",
+  () => {
+    // given
+    const steps = workflow.jobs["release-please"].steps;
+    const commit = steps.find((step) => step.name === "Commit the normalized changelog");
+    const update = steps.find((step) => step.name === "Bring the release pull request up to date with its base");
+
+    // when / then
+    assert.ok(update, "the strict ruleset otherwise holds the release pull request back until someone updates it");
+    assert.equal(update.if, "steps.release_pr.outputs.branch != ''");
+    assert.ok(steps.indexOf(commit) < steps.indexOf(update), "the normalized changelog is pushed before the update");
+    assert.match(update.env.GH_TOKEN, /secrets\.RELEASE_PLEASE_TOKEN/,
+      "an update pushed with GITHUB_TOKEN starts no checks, so the pull request could never merge");
+    assert.match(update.run, /--head "\$RELEASE_PR_BRANCH"/);
+    assert.match(update.run, /! gh pr update-branch "\$number" --repo "\$GITHUB_REPOSITORY"; then\n\s+echo "::warning::/,
+      "the token cannot merge a workflow change from main, and that must not fail the release pull request's upkeep");
+  });
+
 test("given a repository that never released, when it bootstraps, then it starts at its first commit",
   () => {
     // given

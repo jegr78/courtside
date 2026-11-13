@@ -206,9 +206,17 @@ function releaseVersionFields() {
   return fields;
 }
 
-// A release pull request is verified whole once merged, by the push build the candidate waits for.
+// A release pull request is verified whole by its base's full build or, without one, by its full push build.
 function releaseVersionOverrides(changes, commits) {
-  if (commits.event !== "pull_request" || typeof commits.git !== "function") return new Map();
+  if (!(commits.event === "pull_request" || (commits.event === "push" && commits.verifiedBase === true))) {
+    return new Map();
+  }
+  return releaseVersionFiles(changes, commits);
+}
+
+/** The version files of a commit that changes nothing but what release-please writes, or an empty map. */
+export function releaseVersionFiles(changes, commits) {
+  if (typeof commits.git !== "function") return new Map();
   const versionFiles = releaseVersionFields();
   const bumped = changes.filter((change) => versionFiles.has(change.path));
   if (!bumped.some((change) => change.path === releaseManifestPath)
@@ -392,7 +400,8 @@ function main() {
     const changes = parseNameStatus(evidence);
     const plan = bindPlanToRun(classifyChangesAtCommits(changes, labels, {
       baseCommit: base, headCommit: head, git: runGit,
-      event: process.argv.includes("--event") ? argument("--event") : undefined
+      event: process.argv.includes("--event") ? argument("--event") : undefined,
+      verifiedBase: process.argv.includes("--verified-base")
     }), identity);
     writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
     writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });

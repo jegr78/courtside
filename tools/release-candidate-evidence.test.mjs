@@ -217,11 +217,11 @@ test("given the exact-sha push build, when a release record is written or verifi
 
   // when / then
   assert.deepEqual(valid.build, { runId: 37211926309, runAttempt: 2 });
-  assert.throws(() => record({ build: null }), /names no green push build/);
-  assert.throws(() => record({ build: { runId: 37211926309, runAttempt: 0 } }), /names no green push build/);
-  assert.throws(() => verifyCandidateEvidence({ ...valid, build: null }, expected), /names no green push build/);
+  assert.throws(() => record({ build: null }), /names no green build that verified/);
+  assert.throws(() => record({ build: { runId: 37211926309, runAttempt: 0 } }), /names no green build that verified/);
+  assert.throws(() => verifyCandidateEvidence({ ...valid, build: null }, expected), /names no green build that verified/);
   assert.throws(() => verifyCandidateEvidence({ ...valid, build: { runId: "1", runAttempt: 1 } }, expected),
-    /names no green push build/);
+    /names no green build that verified/);
 });
 
 test("given a rehearsal without a push build, when its record is verified, then the missing build is accepted", () => {
