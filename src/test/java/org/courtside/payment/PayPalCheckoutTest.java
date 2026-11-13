@@ -903,6 +903,43 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnExpiredHold_whenTheOrderIsCreated_thenItIsRefusedAndNothingReachesPayPal() throws Exception {
+        // given
+        UUID booking = book();
+        PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
+        jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
+                .param("at", Timestamp.from(clock.instant())).param("id", booking).update();
+
+        // when
+        create("roe.john", booking)
+
+                // then
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:paypal-payment-hold-expired"))
+                .andExpect(jsonPath("$.violations[0].code").value("payment.paypal.holdExpired"));
+        assertThat(PAYPAL.seen(CREATE)).as("a hold that has ended gets no PayPal order").isEmpty();
+        assertThat(jdbc.sql("SELECT count(*) FROM paypal_order").query(Long.class).single()).isZero();
+        assertThat(bookingStatus(booking)).as("the reconciliation releases it").isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
+    void givenAnOrderAndAnExpiredHold_whenCreatingAgain_thenTheStoredOrderComes() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
+                .param("at", Timestamp.from(clock.instant())).param("id", booking).update();
+
+        // when
+        create("roe.john", booking)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(ORDER))
+                .andExpect(jsonPath("$.approveUrl").value(APPROVE));
+        assertThat(PAYPAL.seen(CREATE)).as("the stored order is answered without PayPal").hasSize(1);
+    }
+
+    @Test
     void givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound() throws Exception {
         // given
         UUID booking = bookWithOrder();

@@ -478,6 +478,7 @@ the reconciliation job, and confirms a booking only after it holds the captured 
    an amount.
    The order is stored in `paypal_order` with the environment it was created in and the SHA-256
    fingerprint of the client id that created it, and audited as `payment.paypal.order.created`; calling again for the same booking answers the stored order.
+   A booking past its payment deadline gets no new order and is refused with `payment.paypal.holdExpired`.
    Without a public address the request is refused with `payment.paypal.publicUrlMissing`.
 3. The browser goes to PayPal's approve link and comes back to the shell routes
    `/payment/paypal/return` or `/payment/paypal/cancel` with the order id. A payer whose session

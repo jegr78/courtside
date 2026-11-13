@@ -68,6 +68,10 @@ public class PayPalCheckout {
                 .orElseThrow(PayPalOrderNotFoundException::new);
         Optional<StoredOrder> existing = orders.ofBooking(bookingId);
         if (existing.isPresent()) return created(existing.get());
+        if (!pending.expiresAt().isAfter(clock.instant())) {
+            log.info("Booking {} gets no PayPal order: its payment hold has expired", bookingId);
+            throw new PayPalHoldExpiredException();
+        }
         PayPalClient.Credentials active = this.credentials.active().orElseThrow(() -> {
             log.info("PayPal payment is off, so booking {} gets no PayPal order", bookingId);
             return new PayPalCheckoutUnavailableException();

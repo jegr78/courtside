@@ -1098,7 +1098,7 @@
         "A capture PayPal refuses, with the order then showing no capture and a status in which no money moved, rejects the order and releases the booking.",
         "A capture whose outcome is unknown, or an order whose environment and client id are no longer active, leaves the order open and answers PROCESSING without asking PayPal with another account.",
         "An order PayPal cannot show to the reconciliation keeps its booking held past the deadline for at most 24 hours: then an order without a capture attempt is voided and released, and one with an attempt releases its booking while the order stays open, so a capture read later becomes credit.",
-        "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
+        "Without a public address the order is refused with paypal-public-url-missing, and a booking past its payment deadline with paypal-payment-hold-expired; a refused or unreachable create stores nothing."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalCheckoutController.java",
@@ -1116,6 +1116,7 @@
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAMismatchedAmount_whenCapturing_thenNothingIsCapturedAndTheCourtIsFree",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnExpiredHold_whenTheOrderIsCreated_thenItIsRefusedAndNothingReachesPayPal",
         "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnAttemptedOrderOfAFormerClientId_whenTheJobRuns_thenPayPalIsNotAskedWithTheNewAccount"
       ]
     },

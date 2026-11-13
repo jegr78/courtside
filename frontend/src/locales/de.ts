@@ -1223,6 +1223,8 @@ const de = {
   "error.type.paypal-order-not-found": "Diese Zahlung gibt es nicht mehr, oder sie gehört zu einem anderen Konto.",
   "payment.paypal.unavailable": "PayPal kann die Zahlung gerade nicht annehmen. Versuch es in ein paar Minuten noch einmal.",
   "error.type.paypal-unavailable": "PayPal kann die Zahlung gerade nicht annehmen. Versuch es in ein paar Minuten noch einmal.",
+  "payment.paypal.holdExpired": "Die Zeit zum Bezahlen dieser Buchung ist abgelaufen. Buch den Platz neu, wenn er noch frei ist.",
+  "error.type.paypal-payment-hold-expired": "Die Zeit zum Bezahlen dieser Buchung ist abgelaufen. Buch den Platz neu, wenn er noch frei ist.",
   "payment.paypal.refund.notRefundable": "Diese Zahlung lässt sich nicht über PayPal zurückzahlen. Das geht nur, wenn die Buchung storniert und als Guthaben gutgeschrieben wurde.",
   "payment.paypal.refund.notCredited": "Diese Zahlung wurde nie zu Guthaben. Zahl sie im PayPal-Konto des Vereins zurück.",
   "payment.paypal.refund.alreadyRefunded": "Diese Zahlung wurde schon über PayPal zurückgezahlt.",
