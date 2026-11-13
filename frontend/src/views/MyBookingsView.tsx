@@ -1,7 +1,7 @@
 import { LoadingStatus } from "../components/LoadingGroup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessCode, type AccessGrant, type BookingGrid, type EmergencyAccess, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type AccessCode, type AccessGrant, type BookingGrid, type DoorHold, type EmergencyAccess, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -207,7 +207,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       report(failure);
     }
   };
-  const doorHold = async (booking: PersonalBooking, hold: boolean) => {
+  const doorHold = async (booking: HeldBooking, hold: boolean) => {
     setSuccess(undefined);
     try {
       await (hold ? api.holdDoorsOpen(booking.id) : api.endDoorHold(booking.id));
@@ -218,7 +218,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       report(failure);
     }
   };
-  const extendHeld = async (booking: PersonalBooking) => {
+  const extendHeld = async (booking: HeldBooking) => {
     const endsAt = booking.doorHold?.extensionEndsAt;
     if (!endsAt) return;
     setSuccess(undefined);
@@ -303,14 +303,15 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
     {memberFeatures && !offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       taken={async () => { await load(); setSuccess(t("openPlaces.taken")); }} />}
-    {!loading && grid && (!offline || participations.length > 0) && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} actionable={!offline} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={offline ? undefined : participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
+    {!loading && grid && (!offline || participations.length > 0) && <ParticipationSection participations={participations} doorHold={doorHold} extendHeld={extendHeld} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} actionable={!offline} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={offline ? undefined : participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} incompleteSeries={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
   </section>;
 }
 
-function ParticipationSection({ participations, courtNames, locale, timeZone, reference, actionable, withdrawn, nextCursor, loadingMore, loadMore, t }: {
-  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
+function ParticipationSection({ participations, doorHold, extendHeld, courtNames, locale, timeZone, reference, actionable, withdrawn, nextCursor, loadingMore, loadMore, t }: {
+  participations: Participation[]; doorHold: (booking: HeldBooking, hold: boolean) => Promise<void>;
+  extendHeld: (booking: HeldBooking) => Promise<void>; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
   withdrawn: () => Promise<void>; nextCursor?: string; loadingMore: boolean;
   loadMore: () => Promise<void>; t: Translate;
 }) {
@@ -347,10 +348,12 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, re
               <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             </span>
             <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
+            {participation.doorHold?.heldSince && <span data-testid="doors-held-open">{t("myBookings.doorsHeldOpen", { time: formatClockTime(formatTime(participation.doorHold.heldSince, timeZone), locale) })}</span>}
             {participation.access && <AccessCodes access={participation.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
               emergency={actionable && participation.status === "CONFIRMED" ? () => api.participationEmergencyCode(participation.id) : undefined} />}
             {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
-              : actionable && <div className="pt-1">
+              : actionable && <div className="flex flex-wrap gap-2 pt-1">
+                {participation.status === "CONFIRMED" && <DoorHoldActions booking={participation} doorHold={doorHold} extendHeld={extendHeld} courtNames={courtNames} locale={locale} timeZone={timeZone} reference={reference} t={t} />}
                 <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
               </div>}
           </li>)}</ul>}
@@ -365,8 +368,8 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; movable?: boolean; busy?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
   searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
-  doorHold?: (booking: PersonalBooking, hold: boolean) => Promise<void>;
-  extendHeld?: (booking: PersonalBooking) => Promise<void>;
+  doorHold?: (booking: HeldBooking, hold: boolean) => Promise<void>;
+  extendHeld?: (booking: HeldBooking) => Promise<void>;
   payPal?: { proceed: (booking: PersonalBooking) => Promise<void>; abandon: (booking: PersonalBooking) => Promise<void> };
   paymentClock?: Date; reference?: Date; t: Translate;
 }) {
@@ -403,12 +406,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
             {booking.status === "CONFIRMED" && <>
               {checkIn && reference && booking.checkIn && !booking.checkIn.checkedIn && checkInOpen(booking.checkIn, reference)
                 && <Button variant="primary" aria-label={bookingActionName("myBookings.checkInAccessible", booking, courtNames, locale, timeZone, t)} data-testid="check-in" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void checkIn(booking)}>{t("myBookings.checkIn")}</Button>}
-              {doorHold && reference && booking.doorHold && !booking.doorHold.heldSince && doorHoldOpen(booking.doorHold, reference)
-                && <Button variant="primary" aria-label={bookingActionName("myBookings.holdDoorsOpenAccessible", booking, courtNames, locale, timeZone, t)} data-testid="hold-doors-open" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, true)}>{t("myBookings.holdDoorsOpen")}</Button>}
-              {doorHold && booking.doorHold?.heldSince && booking.doorHold.heldByMe
-                && <Button variant="secondary" aria-label={bookingActionName("myBookings.endDoorHoldAccessible", booking, courtNames, locale, timeZone, t)} data-testid="end-door-hold" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, false)}>{t("myBookings.endDoorHold")}</Button>}
-              {extendHeld && booking.doorHold?.heldSince && booking.doorHold.extensionEndsAt
-                && <Button variant="secondary" aria-label={bookingActionName("myBookings.extendHeldBookingAccessible", booking, courtNames, locale, timeZone, t, { time: formatClockTime(formatTime(booking.doorHold.extensionEndsAt, timeZone), locale) })} data-testid="extend-held-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void extendHeld(booking)}>{t("myBookings.extendHeldBooking", { time: formatClockTime(formatTime(booking.doorHold.extensionEndsAt, timeZone), locale) })}</Button>}
+              <DoorHoldActions booking={booking} doorHold={doorHold} extendHeld={extendHeld} courtNames={courtNames} locale={locale} timeZone={timeZone} reference={reference} t={t} />
               <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
               {movable && booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
               {searchPartner && booking.partnerSearch && <Button variant="secondary"
@@ -479,11 +477,31 @@ function checkInOpen(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference
   return Date.parse(checkIn.opensAt) <= reference.getTime() && reference.getTime() < Date.parse(checkIn.closesAt);
 }
 
-function doorHoldOpen(doorHold: NonNullable<PersonalBooking["doorHold"]>, reference: Date) {
+function doorHoldOpen(doorHold: DoorHold, reference: Date) {
   return Date.parse(doorHold.opensAt) <= reference.getTime() && reference.getTime() < Date.parse(doorHold.closesAt);
 }
 
-function bookingActionName(key: string, booking: PersonalBooking, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate, extra: Record<string, string> = {}) {
+type HeldBooking = Pick<PersonalBooking, "id" | "cardLabel" | "startsAt" | "endsAt" | "courtIds" | "doorHold">;
+
+function DoorHoldActions({ booking, doorHold, extendHeld, courtNames, locale, timeZone, reference, t }: {
+  booking: HeldBooking; doorHold?: (booking: HeldBooking, hold: boolean) => Promise<void>;
+  extendHeld?: (booking: HeldBooking) => Promise<void>; courtNames: Map<string, string>; locale: string; timeZone: string;
+  reference?: Date; t: Translate;
+}) {
+  const hold = booking.doorHold;
+  if (!hold) return null;
+  const extensionEnd = hold.extensionEndsAt ? formatClockTime(formatTime(hold.extensionEndsAt, timeZone), locale) : undefined;
+  return <>
+    {doorHold && reference && !hold.heldSince && doorHoldOpen(hold, reference)
+      && <Button variant="primary" aria-label={bookingActionName("myBookings.holdDoorsOpenAccessible", booking, courtNames, locale, timeZone, t)} data-testid="hold-doors-open" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, true)}>{t("myBookings.holdDoorsOpen")}</Button>}
+    {doorHold && hold.heldSince && hold.heldByMe
+      && <Button variant="secondary" aria-label={bookingActionName("myBookings.endDoorHoldAccessible", booking, courtNames, locale, timeZone, t)} data-testid="end-door-hold" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void doorHold(booking, false)}>{t("myBookings.endDoorHold")}</Button>}
+    {extendHeld && hold.heldSince && extensionEnd
+      && <Button variant="secondary" aria-label={bookingActionName("myBookings.extendHeldBookingAccessible", booking, courtNames, locale, timeZone, t, { time: extensionEnd })} data-testid="extend-held-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void extendHeld(booking)}>{t("myBookings.extendHeldBooking", { time: extensionEnd })}</Button>}
+  </>;
+}
+
+function bookingActionName(key: string, booking: Pick<PersonalBooking, "cardLabel" | "startsAt" | "endsAt" | "courtIds">, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate, extra: Record<string, string> = {}) {
   return t(key, {
     ...extra,
     label: booking.cardLabel,
