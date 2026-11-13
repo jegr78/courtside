@@ -20,7 +20,8 @@ interface RegistrationVerificationRepository extends JpaRepository<RegistrationV
 
     @Query("""
             SELECT pending.accountId FROM RegistrationVerification pending, UserAccount account
-            WHERE pending.expiresAt <= :cutoff AND account.id = pending.accountId AND account.enabled = false""")
+            WHERE pending.expiresAt <= :cutoff AND account.id = pending.accountId AND account.enabled = false
+            AND account.securityEpoch = pending.securityEpoch""")
     List<UUID> expiredUnverifiedAccounts(@Param("cutoff") Instant cutoff);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

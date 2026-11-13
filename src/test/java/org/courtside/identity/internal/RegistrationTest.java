@@ -7,6 +7,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.RosterService;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
@@ -31,6 +33,7 @@ import java.util.regex.Pattern;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.atLeast;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -55,6 +58,10 @@ class RegistrationTest extends AbstractIntegrationTest {
     private UserAccountRepository accounts;
     @Autowired
     private RegistrationService registrations;
+    @Autowired
+    private RosterService roster;
+    @Autowired
+    private TransactionTemplate transactions;
     @Autowired
     private JdbcClient jdbc;
     @Autowired
@@ -358,6 +365,86 @@ class RegistrationTest extends AbstractIntegrationTest {
         assertThat(accounts.findById(referenced)).as("a person other records refer to stays").isPresent();
         assertThat(jdbc.sql("SELECT count(*) FROM registration_verification").query(Long.class).single())
                 .as("an expired verification never outlives the sweep").isZero();
+    }
+
+    @Test
+    void givenTheBoardCorrectedThePendingAddress_whenTheOldLinkIsUsed_thenItIsRefusedAndTheCorrectedAddressVerifies()
+            throws Exception {
+        // given
+        register("roe.john", "john.roe@example.org", "10.0.0.1");
+        UserAccount registered = accounts.findByUsername("roe.john").orElseThrow();
+        String oldCode = codeMailedTo("john.roe@example.org");
+        roster.changePerson(registered.getPerson().getId(), "John", "Roe", "john.roe@example.net");
+
+        // when
+        MockHttpServletResponse refused = verify(oldCode);
+
+        // then
+        assertThat(refused.getStatus()).isEqualTo(400);
+        assertThat(typeOf(refused)).as("the link mailed to the mistyped address is withdrawn")
+                .isEqualTo("urn:courtside:error:registration-code-invalid");
+        assertThat(accounts.findById(registered.getId()).orElseThrow().isEnabled()).isFalse();
+        assertThat(verify(codeMailedTo("john.roe@example.net")).getStatus())
+                .as("the corrected address receives a link of its own").isEqualTo(204);
+        assertThat(accounts.findById(registered.getId()).orElseThrow().isEnabled()).isTrue();
+    }
+
+    @Test
+    void givenTheBoardCorrectingThePendingAddress_whenTheOldLinkArrivesBeforeTheFreshMailLeaves_thenItIsAlreadyRefused()
+            throws Exception {
+        // given
+        register("roe.john", "john.roe@example.org", "10.0.0.1");
+        UUID person = accounts.findByUsername("roe.john").orElseThrow().getPerson().getId();
+        String oldCode = codeMailedTo("john.roe@example.org");
+
+        // when / then
+        transactions.executeWithoutResult(status -> {
+            roster.changePerson(person, "John", "Roe", "john.roe@example.net");
+            assertThatThrownBy(() -> registrations.verify(oldCode))
+                    .as("the correction itself withdraws the link, not the next mail")
+                    .isInstanceOfSatisfying(RegistrationCodeInvalidException.class, refused ->
+                            assertThat(refused.getCode()).isEqualTo("identity.registration.codeInvalid"));
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
+    void givenExpiredRegistrationsTheBoardChangedWhileDisabled_whenTheCleanupRuns_thenOnlyTheUntouchedOneIsSwept()
+            throws Exception {
+        // given
+        register("roe.john", "john.roe@example.org", "10.0.0.1");
+        register("major.mary", "mary.major@example.org", "10.0.0.2");
+        register("miles.richard", "richard.miles@example.org", "10.0.0.3");
+        UserAccount toggled = accounts.findByUsername("roe.john").orElseThrow();
+        UserAccount promoted = accounts.findByUsername("major.mary").orElseThrow();
+        UUID abandoned = accounts.findByUsername("miles.richard").orElseThrow().getId();
+        roster.setAccountEnabled(toggled.getPerson().getId(), true);
+        roster.setAccountEnabled(toggled.getPerson().getId(), false);
+        roster.changeRoles(promoted.getPerson().getId(), Set.of(Role.EXTERNAL, Role.MEMBER));
+        expire(toggled.getId());
+        expire(promoted.getId());
+        expire(abandoned);
+
+        // when
+        int removed = registrations.deleteExpired();
+
+        // then
+        assertThat(removed).as("only the registration nobody touched is swept").isOne();
+        assertThat(accounts.findById(abandoned)).isEmpty();
+        assertThat(accounts.findById(toggled.getId())).as("an account the board switched on and off stays").isPresent();
+        assertThat(accounts.findById(promoted.getId())).as("an account the board gave a role stays").isPresent();
+    }
+
+    @Test
+    void givenTheAnonymisedPrefix_whenSomebodyRegistersWithIt_thenTheNameIsRefusedAsReservedAndNothingIsCreated()
+            throws Exception {
+        // when
+        MockHttpServletResponse response = register("anonymised-roe.john", "john.roe@example.org", "10.0.0.1");
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(typeOf(response)).isEqualTo("urn:courtside:error:username-reserved");
+        assertThat(accounts.findByUsername("anonymised-roe.john")).isEmpty();
     }
 
     private MockHttpServletResponse register(String username, String email, String address) throws Exception {

@@ -8,9 +8,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -32,7 +34,7 @@ class RegistrationVerification {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "expires_at", nullable = false, updatable = false)
+    @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
     RegistrationVerification(UUID accountId, long securityEpoch, Instant createdAt, Instant expiresAt) {
@@ -46,8 +48,17 @@ class RegistrationVerification {
         this.codeHash = codeHash;
     }
 
+    void withdraw(Instant expiresAt) {
+        this.codeHash = null;
+        this.expiresAt = expiresAt;
+    }
+
     boolean stillDescribes(UserAccount account) {
         return securityEpoch == account.getSecurityEpoch() && !account.isEnabled();
+    }
+
+    boolean untouchedIn(UserAccount account) {
+        return stillDescribes(account) && account.getRoles().equals(Set.of(Role.EXTERNAL));
     }
 
     boolean hasExpiredBy(Instant now) {

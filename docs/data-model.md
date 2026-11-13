@@ -328,7 +328,8 @@ and the sign-in path answers such a row exactly as it answers a wrong password.
 its `person` and `user_account` rows so bookings and credit ledger entries still refer to it, but the person's name and email
 and the username are placeholders. `user_account_anonymised_is_disabled` keeps such an account
 disabled and without a password. Closing also empties the notes of the bookings, waitlist entries and
-booking series the account made.
+booking series the account made. No chosen username may start with `anonymised-`, so a placeholder
+never meets an existing name on `user_account_unique_username`.
 
 **`member` holds one row per period.** `started_on` is required and `ended_on` is the first day the
 period no longer holds, so a period covers `[started_on, ended_on)`. Both may lie in the future.
@@ -356,11 +357,15 @@ without touching `version`, and a failed or refused attempt leaves it as it was.
 another change holds the account row does not wait for it and leaves the time unrecorded.
 
 **A `registration_verification` row exists at most 24 hours after a self-registered account was
-created.** The account stays disabled until the mailed code is redeemed, which deletes the row and
-enables the account. A code no longer redeems once the board has acted on the account, which moves
-its security epoch, or once the club stops admitting external bookings. The code hash is empty until the mailer issues the message. Once the row has
-lapsed, the hourly identity cleanup removes it together with a still disabled account and its person.
-An account the board switched on, or a person other rows refer to, stays.
+created or the board last corrected its email address.** The account stays disabled until the mailed
+code is redeemed, which deletes the row and enables the account. A code no longer redeems once the
+board has acted on the account, which moves its security epoch, or once the club stops admitting
+external bookings. The code hash is empty until the mailer issues the message. Correcting the email
+address empties the hash, so the code mailed to the old address stops redeeming, sets `expires_at`
+to 24 hours after the correction and queues a new message to the corrected address. Once the row has lapsed, the hourly
+identity cleanup removes it together with a still disabled account and its person, but only while
+the account still carries the epoch the row recorded and no role beyond `EXTERNAL`; it rechecks that
+under a lock on the account. An account the board acted on, or a person other rows refer to, stays.
 
 **`password_reset_token` holds at most one row per account**, because `account_id` is its primary
 key. Asking again replaces the code that was outstanding, the delete and the insert are what do

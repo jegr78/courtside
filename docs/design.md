@@ -361,6 +361,8 @@ a refund or capture holding the ledger lock commits first. A late capture reads 
 entries, import references and the reasons of its credit ledger entries are deleted, the notes of
 the bookings, waitlist entries and booking series it made are cleared and their guests lose the names it typed, and its sessions
 end after commit. Person and account rows stay, so bookings keep a reference that names nobody.
+Registration and the roster refuse a chosen username starting with `anonymised-` with
+`identity.username.reserved`, so no chosen name collides with the placeholder a closure writes.
 `identity.account.closed` names the account id only. The roster refuses to change, enable or issue
 credentials to an anonymised account with `identity.account.anonymised`, a roster synchronisation
 leaves such a person untouched, and `BookingWriter` reads the booker's account `FOR SHARE`, so a
@@ -1395,14 +1397,17 @@ While the club admits external bookings, a person outside the club registers at 
 name, username, password and email address (`RegistrationService`). The account carries `EXTERNAL`,
 stays disabled and holds a `registration_verification` row. Its mail carries a single-use link valid
 24 hours; redeeming it enables the account, unless the board has disabled the account or changed
-its roles or username since, or external bookings are off again. The response is `202` whether the username is free or
+its roles or username since, or external bookings are off again. A board correction of the email
+address withdraws the link already mailed and mails a fresh one, valid another 24 hours, to the
+corrected address. The response is `202` whether the username is free or
 taken. A taken username creates nothing and mails the submitted address a pointer back to
 registration, recorded against the holder's account without reaching its centre. The verification
 mail repeats nothing the registrant typed. Each client address, and each submitted mailbox, may
 register a configured number of times per window (`COURTSIDE_REGISTRATION_MAX_PER_WINDOW`,
 `COURTSIDE_REGISTRATION_WINDOW`). The hourly identity cleanup removes an unverified account and its
-person once the window lapsed, unless the board has since switched the account on or other records
-refer to the person; then only the row goes. Redeeming a link is audited. Registration answers
+person once the window lapsed. An account the board has switched on, given a role or otherwise moved
+to a new security epoch stays, and so does a person other records refer to; then only the row goes.
+The cleanup rechecks the account under a lock before it deletes anything. Redeeming a link is audited. Registration answers
 `registration-closed` while external bookings are off and while `COURTSIDE_PUBLIC_URL` is unset,
 because the link needs it. The board may set a plain-text registration text per language
 (`registration_text_de`, `registration_text_en`) that the page shows above the form. The address
