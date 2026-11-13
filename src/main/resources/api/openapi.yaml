@@ -419,7 +419,8 @@ components:
       type: object
       description: |
         A person outside the club asking for an account. The username follows the shape
-        `UsernameRequest` states, and the password meets the same policy as any other.
+        `UsernameRequest` states, including its reserved `anonymised-` prefix, and the password
+        meets the same policy as any other.
       required: [firstName, lastName, username, password, email, language]
       properties:
         firstName:
@@ -3215,6 +3216,8 @@ components:
           pattern: "^[a-z0-9._-]+$"
           description: |
             The login identifier, unique across the instance and suggested as `lastname.firstname`.
+            A name starting with `anonymised-` is reserved for closed accounts and refused with
+            `urn:courtside:error:username-reserved`.
         roles:
           type: array
           minItems: 1
@@ -3251,6 +3254,8 @@ components:
           pattern: "^[a-z0-9._-]+$"
           description: |
             The login identifier, unique across the instance and suggested as `lastname.firstname`.
+            A name starting with `anonymised-` is reserved for closed accounts and refused with
+            `urn:courtside:error:username-reserved`.
 
     RolesRequest:
       type: object
@@ -6154,7 +6159,7 @@ paths:
         `urn:courtside:error:registration-closed`. The account is created with the role `EXTERNAL`
         and stays unable to sign in until the address is verified through the link the instance
         mails. The link is single-use and expires after 24 hours; an account still unverified then
-        is removed together with its person.
+        is removed together with its person, unless the board has acted on it since.
 
         The answer is `202` with no body whether or not the username is taken. A taken username
         creates nothing; the submitted address receives a message pointing back to registration
@@ -6193,7 +6198,8 @@ paths:
       description: |
         Enables the account the code was mailed for and consumes the code. An unknown or already
         used code is answered `400` with `urn:courtside:error:registration-code-invalid`, an
-        expired one with `urn:courtside:error:registration-code-expired`.
+        expired one with `urn:courtside:error:registration-code-expired`. A board correction of the
+        address withdraws the code mailed before it, which then answers as unknown.
       security:
         - csrfToken: []
       requestBody:

@@ -643,6 +643,39 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheAnonymisedPrefix_whenCreatingAnAccount_thenTheNameIsRefusedAsReserved() throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+
+        // when / then
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountBody("anonymised-major.mary", "MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:username-reserved"));
+        assertThat(accounts.findByUsername("anonymised-major.mary")).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheAnonymisedPrefix_whenCorrectingAUsername_thenTheNameIsRefusedAsReserved() throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createAccount(mary, "major.mary", Set.of(Role.MEMBER));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", mary)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("anonymised-major.mary"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:username-reserved"));
+        assertThat(accounts.findByUsername("major.mary")).as("the account keeps its name").isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenATakenUsername_whenCreatingAnAccount_thenTheResponseCarriesItsOwnType() throws Exception {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");

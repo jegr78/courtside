@@ -1,8 +1,11 @@
 package org.courtside.identity.internal;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ExternalBookings;
+import org.courtside.identity.AccountAddressChanged;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -17,6 +20,7 @@ import org.courtside.shared.RegistrationVerificationRequested;
 import org.courtside.shared.RegistrationVerified;
 import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -51,6 +55,7 @@ class RegistrationService implements RegistrationCodeIssuer {
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transactions;
     private final DatabaseDeadlines deadlines;
+    private final EntityManager entities;
     private final Clock clock;
 
     record Registration(String firstName, String lastName, String username, String password, String email,
@@ -134,6 +139,17 @@ class RegistrationService implements RegistrationCodeIssuer {
                 }));
     }
 
+    // The mailed link went to the address just corrected, so the corrected one gets a fresh window.
+    @EventListener
+    void on(AccountAddressChanged changed) {
+        verifications.findById(changed.accountId())
+                .filter(pending -> !accountOf(pending).isEnabled())
+                .ifPresent(pending -> {
+                    pending.withdraw(clock.instant().plus(VERIFICATION_WINDOW));
+                    events.publishEvent(new RegistrationVerificationRequested(pending.getAccountId()));
+                });
+    }
+
     int deleteExpired() {
         Instant now = clock.instant();
         List<UUID> expired = transactions.execute(status -> {
@@ -145,14 +161,9 @@ class RegistrationService implements RegistrationCodeIssuer {
         int removed = 0;
         for (UUID accountId : expired) {
             try {
-                isolated.executeWithoutResult(status -> accounts.findById(accountId).ifPresent(account -> {
-                    UUID personId = account.getPerson().getId();
-                    accounts.delete(account);
-                    accounts.flush();
-                    people.deleteById(personId);
-                    people.flush();
-                }));
-                removed++;
+                if (Boolean.TRUE.equals(isolated.execute(status -> deleteIfUntouched(accountId, now)))) {
+                    removed++;
+                }
             } catch (DataIntegrityViolationException referenced) {
                 log.info("Kept unverified account {} because other records refer to its person", accountId);
             }
@@ -162,5 +173,24 @@ class RegistrationService implements RegistrationCodeIssuer {
             verifications.deleteExpired(now);
         });
         return removed;
+    }
+
+    private boolean deleteIfUntouched(UUID accountId, Instant now) {
+        UserAccount account = entities.find(UserAccount.class, accountId, LockModeType.PESSIMISTIC_WRITE);
+        if (account == null) {
+            return false;
+        }
+        boolean untouched = verifications.findById(accountId)
+                .filter(pending -> pending.hasExpiredBy(now) && pending.untouchedIn(account))
+                .isPresent();
+        if (!untouched) {
+            return false;
+        }
+        UUID personId = account.getPerson().getId();
+        accounts.delete(account);
+        accounts.flush();
+        people.deleteById(personId);
+        people.flush();
+        return true;
     }
 }

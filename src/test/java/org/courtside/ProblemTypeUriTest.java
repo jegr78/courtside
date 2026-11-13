@@ -195,6 +195,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:series-not-found",
             "urn:courtside:error:slot-duration-conflict",
             "urn:courtside:error:time-zone-conflict",
+            "urn:courtside:error:username-reserved",
             "urn:courtside:error:username-taken");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(

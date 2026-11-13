@@ -26,6 +26,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserAccount {
 
+    private static final String ANONYMISED_PREFIX = "anonymised-";
+
     @Id
     private UUID id;
 
@@ -107,7 +109,7 @@ public class UserAccount {
                        String locale) {
         this.id = UUID.randomUUID();
         this.person = person;
-        this.username = username;
+        this.username = unreserved(username);
         this.passwordHash = passwordHash;
         this.roles = Set.copyOf(roles);
         this.locale = locale;
@@ -137,7 +139,7 @@ public class UserAccount {
         if (this.username.equals(username)) {
             return;
         }
-        this.username = username;
+        this.username = unreserved(username);
         revokeSessions();
     }
 
@@ -164,13 +166,21 @@ public class UserAccount {
     }
 
     public void anonymise(Instant at) {
-        this.username = "anonymised-" + id;
+        this.username = ANONYMISED_PREFIX + id;
         this.passwordHash = null;
         this.credentialsExpireAt = null;
         this.passwordChangeRequired = false;
         this.enabled = false;
         this.anonymisedAt = at;
         revokeSessions();
+    }
+
+    // A chosen name must never collide with the one a later closure gives this or another account.
+    private static String unreserved(String username) {
+        if (username != null && username.startsWith(ANONYMISED_PREFIX)) {
+            throw new UsernameReservedException();
+        }
+        return username;
     }
 
     void revokeSessions() {

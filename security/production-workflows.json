@@ -98,6 +98,7 @@
         "IdentityCleanupSchedule#deleteUnverifiedRegistrations",
         "RegistrationMailer#on(RegistrationNameTaken)",
         "RegistrationMailer#on(RegistrationVerificationRequested)",
+        "RegistrationService#on(AccountAddressChanged)",
         "ReadNotificationExpirySchedule#deleteExpired"
       ],
       "stateTransitions": [

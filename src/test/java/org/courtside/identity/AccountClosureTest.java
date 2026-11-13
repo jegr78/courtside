@@ -30,6 +30,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -246,6 +247,24 @@ class AccountClosureTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenASeriesFromAnEarlierMembership_whenThePlayerClosesTheirAccount_thenOnlyTheirSeriesNoteIsGone()
+            throws Exception {
+        // given
+        UUID mary = identity.createEnabledAccount(identity.createPerson("Mary", "Major", "mary.major@example.org"),
+                "major.mary", Set.of(Role.MEMBER));
+        UUID johnsSeries = series(johnAccount, "Training with John Roe");
+        UUID marysSeries = series(mary, "Training with Mary Major");
+
+        // when
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+
+        // then
+        assertThat(seriesNote(johnsSeries)).as("the series note the player typed is gone").isEmpty();
+        assertThat(seriesNote(marysSeries)).as("another account's series keeps its note")
+                .contains("Training with Mary Major");
+    }
+
+    @Test
     void givenAClosedAccount_whenTheBoardEnablesOrRenamesIt_thenTheAnonymisedRowIsRefused() throws Exception {
         // given
         close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
@@ -368,5 +387,27 @@ class AccountClosureTest extends AbstractIntegrationTest {
             request.sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli());
         }
         return mockMvc.perform(request);
+    }
+
+    private UUID series(UUID createdBy, String note) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        WITH created AS (
+                            INSERT INTO booking_series (id, card_id, starts_on, start_time, duration_minutes,
+                                                        interval_weeks, weekdays, occurrence_count, note, created_by)
+                            VALUES (:id, :card, DATE '2026-03-02', TIME '18:00', 60, 1, '{1}', 4, :note, :createdBy)
+                            RETURNING id
+                        )
+                        INSERT INTO booking_series_court (booking_series_id, court_id, position)
+                        SELECT id, :court, 0 FROM created
+                        """)
+                .param("id", id).param("card", winterDoubles).param("note", note).param("createdBy", createdBy)
+                .param("court", court).update();
+        return id;
+    }
+
+    private Optional<String> seriesNote(UUID series) {
+        return jdbc.sql("SELECT note FROM booking_series WHERE id = :id").param("id", series).query(String.class)
+                .optional();
     }
 }
