@@ -123,7 +123,10 @@ export function selectReleaseCandidate(facts) {
       throw new Error(`${facts.forwardPort.detail}: ${facts.forwardPort.missing.join(", ")}`);
     }
   }
-  const build = testEvidence(facts, event);
+  const build = testEvidence(facts, event, branch);
+  if (build === null && facts.versionOnly === true && branch !== "main") {
+    throw new Error(`no green dispatched build of ${commit} on ${branch}; dispatch build on ${branch}, then the candidate`);
+  }
   if (build === null && facts.versionOnly === true) {
     throw new Error(`no full build verifies ${commit}: its parent has no green scheduled or dispatched build on ${branch}, `
       + "and its own green push build planned part of the jobs or is missing; dispatch build on the branch, then the candidate");
@@ -134,12 +137,12 @@ export function selectReleaseCandidate(facts) {
 }
 
 /**
- * The full build whose tests stand for the commit. A version-only release commit also needs its own green push build,
- * because that ran the changelog and version guards on its diff.
+ * The full build whose tests stand for the commit. On main a version-only release commit also needs its own green push
+ * build for the guards on its diff; a release branch has only dispatched builds, and those run every job.
  */
-export function testEvidence(facts, event) {
+export function testEvidence(facts, event, branch = "main") {
   const own = event === "workflow_run" ? facts.build : facts.exactBuild;
-  if (facts.versionOnly !== true) return buildRunOf(own);
+  if (facts.versionOnly !== true || branch !== "main") return buildRunOf(own);
   const push = buildRunOf(event === "workflow_run" ? facts.build : facts.pushBuild);
   if (push === null) return null;
   return buildRunOf(facts.parentBuild) ?? (facts.pushPlanFull === true ? push : null)
