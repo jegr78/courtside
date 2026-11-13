@@ -715,8 +715,9 @@ make. A caller who is none of these gets the same `404` as for a booking that do
 the switch, a closed window and a hold somebody else runs are refused by their own codes.
 
 A hold ends at check-out by the person who started it, even one who has since lost access to the
-booking, or by an administrator; when a player who started it withdraws from the booking; at a
-cancellation or move of its booking; and at the booking's end at the latest. A move ends it even when the new
+booking, or by an administrator; when a player who started it withdraws from the booking; when the
+account that started it is closed; at a cancellation, move or displacement of its booking; and at the
+booking's end at the latest. A deactivated card neither starts a hold nor keeps a running one open. A move ends it even when the new
 slot still covers the old window, because the doors may no longer be the booking's. A hold also
 runs only while its booking is confirmed and it began inside the booking's current window, so
 nothing has to run when a booking ends. Starting and ending are audited as `booking.doorHold.started` and

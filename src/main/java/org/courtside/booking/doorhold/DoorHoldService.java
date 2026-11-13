@@ -24,7 +24,9 @@ import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.AccountClosed;
 import org.courtside.shared.BookingCancelled;
+import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.ParticipantWithdrew;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesMoved;
@@ -72,7 +74,8 @@ public class DoorHoldService {
     public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
         requireHoldAccess(booking, actor, actorRoles);
-        if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
+        BookingCard card = cards.requireCard(booking.getCardId());
+        if (!card.isHoldsDoorsOpen() || !card.isActive()) {
             throw new DoorHoldNotOfferedException();
         }
         Window window = windowOf(booking);
@@ -137,6 +140,18 @@ public class DoorHoldService {
         endAll(List.of(cancelled.bookingId()), cancelled.cancelledByAccountId());
     }
 
+    // A displaced booking may stay confirmed, but the court or card it held is out of service.
+    @EventListener
+    public void on(BookingDisplaced displaced) {
+        endAll(List.of(displaced.bookingId()), null);
+    }
+
+    @EventListener
+    public void on(AccountClosed closed) {
+        rows.endHeldBy(closed.accountId(), clock.instant())
+                .forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
+    }
+
     @EventListener
     public void on(ParticipantWithdrew withdrew) {
         Booking booking = lockedBooking(withdrew.bookingId());
@@ -167,7 +182,7 @@ public class DoorHoldService {
     /** The door hold state of each booking whose card offers one and {@code viewer} may hold, as they see it. */
     @Transactional(readOnly = true)
     public Map<UUID, DoorHold> doorHoldsOf(Collection<Booking> candidates, UUID viewer) {
-        Set<UUID> holdingCards = cards.allCards().stream().filter(BookingCard::isHoldsDoorsOpen)
+        Set<UUID> holdingCards = cards.activeCards().stream().filter(BookingCard::isHoldsDoorsOpen)
                 .map(BookingCard::getId).collect(Collectors.toSet());
         boolean outsider = outsiders.isOutsiderAccount(viewer);
         Map<UUID, Window> windows = candidates.stream()
