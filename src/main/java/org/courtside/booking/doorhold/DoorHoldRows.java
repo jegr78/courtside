@@ -93,6 +93,19 @@ class DoorHoldRows {
                 .list();
     }
 
+    /** Ends every unended hold this account runs, recording it as the one who ended them. */
+    List<Hold> endHeldBy(UUID accountId, Instant at) {
+        return jdbc.sql("""
+                        UPDATE door_hold SET ended_at = :at, ended_by = :by
+                        WHERE held_by = :by AND ended_at IS NULL
+                        RETURNING id, booking_id, held_at, held_by
+                        """)
+                .param("at", Timestamp.from(at)).param("by", accountId)
+                .query((rs, row) -> new Hold(rs.getObject("id", UUID.class), rs.getObject("booking_id", UUID.class),
+                        rs.getTimestamp("held_at").toInstant(), rs.getObject("held_by", UUID.class)))
+                .list();
+    }
+
     record Window(UUID bookingId, Instant opensAt, Instant closesAt) {
     }
 

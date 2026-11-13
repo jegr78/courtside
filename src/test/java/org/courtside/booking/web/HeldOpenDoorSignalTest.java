@@ -7,13 +7,17 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.shared.AccountClosed;
+import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
@@ -52,6 +56,12 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private ApplicationEventPublisher events;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private MockMvc mockMvc;
     private String key;
@@ -193,6 +203,49 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenADeactivatedCard_whenPolled_thenTheRunningHoldNoLongerOpensTheGate() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+        cards.deactivateBookingCard(campCard);
+
+        // when / then
+        assertThat(lines()).as("a card out of service opens no door").contains("door." + gateOne + ".open=0");
+    }
+
+    @Test
+    void givenARunningHold_whenAClosureDisplacesTheBookingWithoutCancellingIt_thenTheHoldEndsAndTheGateCloses()
+            throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        transactions.executeWithoutResult(status -> events.publishEvent(
+                new BookingDisplaced(booking, BookingDisplaced.Closure.COURT_CLOSED)));
+
+        // then
+        assertThat(lines()).as("a displaced booking holds its court's gate no longer")
+                .contains("door." + gateOne + ".open=0");
+        assertThat(endedHoldsOf(booking)).as("the end is recorded like any other").isEqualTo(1L);
+    }
+
+    @Test
+    void givenARunningHold_whenItsHoldersAccountIsClosed_thenTheHoldEndsAndTheGateCloses() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        transactions.executeWithoutResult(status -> events.publishEvent(new AccountClosed(trainer)));
+
+        // then
+        assertThat(lines()).as("nobody holds a door open through a closed account")
+                .contains("door." + gateOne + ".open=0");
+        assertThat(endedHoldsOf(booking)).isEqualTo(1L);
+    }
+
+    @Test
     void givenAnInactiveGate_whenPolled_thenItIsNotAnswered() throws Exception {
         // given
         facility.deactivateAccessPoint(gateTwo);
@@ -204,6 +257,11 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     private UUID runningTraining(UUID court) {
         return bookings.insertBookingThatHasStarted(court, campCard,
                 new TimeSlot(NOW.minus(30, ChronoUnit.MINUTES), NOW.plus(30, ChronoUnit.MINUTES)), trainer);
+    }
+
+    private long endedHoldsOf(UUID booking) {
+        return jdbc.sql("SELECT count(*) FROM door_hold WHERE booking_id = :id AND ended_at IS NOT NULL")
+                .param("id", booking).query(Long.class).single();
     }
 
     private List<String> lines() throws Exception {

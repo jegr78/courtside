@@ -125,6 +125,20 @@ class DoorHoldControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "roe.john", roles = "TRAINER")
+    void givenADeactivatedCard_whenItsTrainerHoldsTheDoorsOpen_thenTheConflictSaysTheCardOffersNoHold() throws Exception {
+        // given
+        UUID booking = startingInMinutes(campCard, 5);
+        cards.deactivateBookingCard(campCard);
+
+        // when / then
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:door-hold-not-offered"));
+        assertThat(unendedHoldsOf(booking)).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "roe.john", roles = "TRAINER")
     void givenATrainingAnHourAhead_whenItsTrainerHoldsTheDoorsOpen_thenTheConflictSaysTheWindowIsClosed()
             throws Exception {
         // given

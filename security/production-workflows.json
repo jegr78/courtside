@@ -410,14 +410,16 @@
         "extendHeldBooking"
       ],
       "backgroundEntryPoints": [
+        "DoorHoldService#on(AccountClosed)",
         "DoorHoldService#on(BookingCancelled)",
+        "DoorHoldService#on(BookingDisplaced)",
         "DoorHoldService#on(ParticipantWithdrew)",
         "DoorHoldService#on(SeriesCancelled)",
         "DoorHoldService#on(SeriesMoved)"
       ],
       "stateTransitions": [
         "The booker, a member named as a player, an administrator or a role that manages the card starts a hold on a booking whose card offers one, from the access lead time before the start until the end; an external player only on their own booking.",
-        "The person who started the hold or an administrator ends it, and a player who withdraws from the booking ends their own.",
+        "The person who started the hold or an administrator ends it; a player who withdraws from the booking ends their own; closing the holder's account, a displacement of the booking or a deactivated card ends or closes it.",
         "The person running the hold moves the booking's end half an hour later under the booking rules that bind its booker.",
         "Cancelling or moving the booking ends its unended holds and records each end."
       ],
