@@ -144,9 +144,10 @@ change modifies the release manifest, `CHANGELOG.md` or a file `release-please-c
 the version into, and only when each of those files equals its base once the manifest's old version
 is replaced by the new one. Both versions must be release versions, and each file must hold the old
 version exactly as often as the configuration names version fields in it, so a dependency that
-happens to share the version cannot ride along. Any other change or byte keeps the plan `full`. Merging the release
-commit changes those files on `main`, where the push build plans without the pull request event,
-so it runs full before the candidate starts.
+happens to share the version cannot ride along. Any other change or byte keeps the plan `full`. The push build of the merged
+release commit applies the same rule only when a green scheduled or dispatched build, which is
+always full, verified its parent on `main`. The candidate then takes that build as the release
+commit's test evidence. Without one the push build plans full, as it did before.
 
 The `security-tooling` profile covers the tools that start, observe and clean up the disposable
 security environment. Nothing else in a full run executes them: Maven, the browser journeys and the
