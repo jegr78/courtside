@@ -415,7 +415,7 @@ or closure. Add one card for every type the club needs.
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 | **Bookings receive the access code** | Bookings on this card are the ones the code of their courts' access points applies to. The *Court closed* card does not offer it |
 | **Bookings count as occupied for building automation** | Bookings on this card report their court as occupied to the building automation, see *Building automation* under *Access points*. New cards carry it, the *Court closed* card does not offer it |
-| **Doors may be held open while checked in** | The booker, an administrator or a managing role of the card checks in on a booking from *My bookings* or the managed appointment, and Courtside counts its doors as held open until check-out or the booking's end. Off for new cards, the *Court closed* card does not offer it |
+| **Doors may be held open while checked in** | The booker, an administrator or a managing role of the card checks in on a booking from *My bookings* or the managed appointment, and Courtside counts its doors as held open until check-out or the booking's end. The person who checked in may extend the booking by 30 minutes at a time, or by one slot when slots are longer, while that time is free. Off for new cards, the *Court closed* card does not offer it |
 
 Administrators may use and manage every card. A booking with the *Court closed* card goes before a
 reservation from the waitlist. If you clear its allowed roles, every member may close a

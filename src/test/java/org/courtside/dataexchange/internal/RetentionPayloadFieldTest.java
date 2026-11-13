@@ -20,7 +20,7 @@ class RetentionPayloadFieldTest {
     private static final Set<String> NAMES_NOBODY = Set.of("reason", "closure", "outcome", "grantId",
             "previousStartsAt", "previousEndsAt", "previousCourtIds", "accessPointIds", "entryId", "kind",
             "amountMinor", "currency", "orderId", "captureId", "environment", "credited", "refundId", "anonymised", "cancelled",
-            "holdId");
+            "holdId", "endsAt");
 
     @Test
     void givenEveryEventThatNamesABookingOrSeries_whenItsFieldsAreRead_thenEachFieldNamingSomebodyIsOneTheRunStrips()

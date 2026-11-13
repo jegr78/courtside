@@ -153,6 +153,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.attendance.recorded": "booking",
   "booking.doorHold.started": "booking",
   "booking.doorHold.ended": "booking",
+  "booking.extended": "booking",
   "booking.attendance.cleared": "booking",
   "booking.attendance.released": "booking",
   "booking.attendance.noShowsLifted": "named",

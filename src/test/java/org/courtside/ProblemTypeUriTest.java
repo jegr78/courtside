@@ -79,6 +79,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:check-in-closed",
             "urn:courtside:error:door-hold-not-offered",
             "urn:courtside:error:door-hold-closed",
+            "urn:courtside:error:booking-extension-refused",
             "urn:courtside:error:door-hold-already-running",
             "urn:courtside:error:door-hold-not-running",
             "urn:courtside:error:door-hold-not-holder",

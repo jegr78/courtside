@@ -178,10 +178,12 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
     }
   }
 
-  async function changeDoorHold(hold: boolean) {
+  async function changeDoorHold(change: DoorHoldChange) {
     clear();
     try {
-      await (hold ? api.holdDoorsOpen(bookingId) : api.endDoorHold(bookingId));
+      const extensionEndsAt = detail?.doorHold?.extensionEndsAt;
+      if (change === "extend" && extensionEndsAt) await api.extendHeldBooking(bookingId, extensionEndsAt);
+      else await (change === "hold" ? api.holdDoorsOpen(bookingId) : api.endDoorHold(bookingId));
       const appointment = await api.managedAppointment(bookingId);
       setDetail(appointment);
       setDoorWindowOpen(withinDoorWindow(appointment));
@@ -218,15 +220,18 @@ function withinDoorWindow(appointment: ManagedAppointmentDetail) {
   return !!hold && Date.parse(hold.opensAt) <= now && now < Date.parse(hold.closesAt);
 }
 
+type DoorHoldChange = "hold" | "end" | "extend";
+
 function DoorHoldSection({ doorHold, open, administrator, locale, timeZone, changed, t }: {
   doorHold: NonNullable<ManagedAppointmentDetail["doorHold"]>; open: boolean; administrator: boolean; locale: string;
-  timeZone: string; changed: (hold: boolean) => Promise<void>; t: Translate;
+  timeZone: string; changed: (change: DoorHoldChange) => Promise<void>; t: Translate;
 }) {
   return <section data-testid="managed-door-hold" className="grid gap-2">
     {doorHold.heldSince && <p data-testid="doors-held-open">{t("myBookings.doorsHeldOpen", { time: formatClockTime(formatTime(doorHold.heldSince, timeZone), locale) })}</p>}
     <div className="flex flex-wrap gap-2">
-      {!doorHold.heldSince && open && <Button variant="primary" data-testid="hold-doors-open" onClick={() => void changed(true)}>{t("myBookings.holdDoorsOpen")}</Button>}
-      {doorHold.heldSince && (doorHold.heldByMe || administrator) && <Button variant="secondary" data-testid="end-door-hold" onClick={() => void changed(false)}>{t("myBookings.endDoorHold")}</Button>}
+      {!doorHold.heldSince && open && <Button variant="primary" data-testid="hold-doors-open" onClick={() => void changed("hold")}>{t("myBookings.holdDoorsOpen")}</Button>}
+      {doorHold.heldSince && (doorHold.heldByMe || administrator) && <Button variant="secondary" data-testid="end-door-hold" onClick={() => void changed("end")}>{t("myBookings.endDoorHold")}</Button>}
+      {doorHold.heldSince && doorHold.extensionEndsAt && <Button variant="secondary" data-testid="extend-held-booking" onClick={() => void changed("extend")}>{t("myBookings.extendHeldBooking", { time: formatClockTime(formatTime(doorHold.extensionEndsAt, timeZone), locale) })}</Button>}
     </div>
   </section>;
 }

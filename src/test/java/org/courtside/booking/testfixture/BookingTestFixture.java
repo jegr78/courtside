@@ -1,6 +1,7 @@
 package org.courtside.booking.testfixture;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.booking.internal.BookingExtension;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
@@ -48,6 +49,7 @@ public class BookingTestFixture {
     private final PartnerSearchService partnerSearch;
     private final AttendanceService attendance;
     private final AttendanceRelease release;
+    private final BookingExtension extension;
     private final JdbcClient jdbc;
     private final OccupancyKeys occupancyKeys;
 
@@ -241,6 +243,10 @@ public class BookingTestFixture {
                         WHERE booking_id = :id
                         """)
                 .param("seconds", by.toSeconds()).param("id", bookingId).update();
+    }
+
+    public void extend(UUID bookingId, Instant endsAt, UUID extendedBy, Set<Role> roles) {
+        extension.extend(bookingId, endsAt, extendedBy, roles);
     }
 
     public void holdDoorsOpenAt(UUID bookingId, UUID heldBy, Instant heldAt) {

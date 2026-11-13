@@ -997,6 +997,9 @@ export const api = {
   checkIn: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/check-in`, { method: "POST" }),
   holdDoorsOpen: (bookingId: string) => request<DoorHold>(`/api/my/bookings/${bookingId}/door-hold`, { method: "POST" }),
   endDoorHold: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/door-hold`, { method: "DELETE" }),
+  extendHeldBooking: (bookingId: string, endsAt: string) => request<DoorHold>(`/api/my/bookings/${bookingId}/door-hold/extension`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endsAt })
+  }),
   emergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/bookings/${bookingId}/emergency-code`, { method: "POST" }),
   participationEmergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/participations/${bookingId}/emergency-code`, { method: "POST" }),
   attendancePolicy: () => request<AttendancePolicy>("/api/admin/attendance-policy"),

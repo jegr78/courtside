@@ -357,6 +357,24 @@ describe("AdminManagedAppointmentsView", () => {
     expect(within(screen.getByTestId("managed-door-hold")).getByTestId("doors-held-open")).toBeVisible();
   });
 
+  it("given doors the covering trainer holds open, when they extend the appointment, then the next half hour is asked for", async () => {
+    // given
+    const hold = { opensAt: "2000-01-01T00:00:00Z", closesAt: "2100-01-01T00:00:00Z", heldSince: "2026-08-11T15:50:00Z", heldByMe: true,
+      extensionEndsAt: "2100-01-01T01:00:00Z" };
+    vi.spyOn(api, "managedAppointment").mockResolvedValue({ ...first, note: null, participants: [], doorHold: hold });
+    const extend = vi.spyOn(api, "extendHeldBooking").mockResolvedValue({ ...hold, closesAt: "2100-01-01T00:30:00Z" });
+    show();
+    const series = await screen.findByTestId("managed-series-series-1");
+    await userEvent.click(within(series).getByTestId("managed-series-summary"));
+    await userEvent.click(within(series).getAllByTestId("managed-details")[0]);
+
+    // when
+    await userEvent.click(await within(await screen.findByTestId("managed-door-hold")).findByTestId("extend-held-booking"));
+
+    // then
+    expect(extend).toHaveBeenCalledWith(first.id, "2100-01-01T01:00:00Z");
+  });
+
   it("given a card that holds no doors, when the server answers the detail with a null door hold, then the detail opens without a failure", async () => {
     // given
     vi.spyOn(api, "managedAppointment").mockResolvedValue({

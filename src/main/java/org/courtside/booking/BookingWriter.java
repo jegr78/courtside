@@ -5,6 +5,8 @@ import jakarta.persistence.EntityManager;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingDrafts;
+import org.courtside.booking.internal.BookingExtension;
+import org.courtside.booking.internal.BookingExtensionRefusedException;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CourtReservations;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
@@ -37,6 +39,8 @@ import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.BookingConfirmed;
+import org.courtside.shared.BookingExtended;
+import org.courtside.shared.TimeSlot;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +67,8 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Transactional
-class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, UnattendedRelease, DisplacedPayments {
+class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, UnattendedRelease, DisplacedPayments,
+        BookingExtension {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
@@ -310,6 +315,54 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             }
         }
         return changed;
+    }
+
+    @Override
+    public void extend(UUID bookingId, Instant endsAt, UUID extendedBy, Set<Role> extenderRoles) {
+        bookingGridCoordination.lock();
+        bookings.lockById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        entityManager.clear();
+        Booking booking = bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new IllegalStateException("Only a confirmed booking can be extended");
+        }
+        outsiders.refuse(extendedBy, extenderRoles);
+        if (booking.amount().filter(charged -> charged.minor() > 0).isPresent()) {
+            throw BookingExtensionRefusedException.charged();
+        }
+        Instant previousEndsAt = booking.getAllocations().stream().map(CourtAllocation::getEndsAt)
+                .max(Instant::compareTo)
+                .orElseThrow(() -> new IllegalStateException("A booking must occupy a court"));
+        if (!endsAt.isAfter(previousEndsAt)) {
+            throw new IllegalStateException("An extension must move the end later");
+        }
+        List<UUID> courtIds = booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList();
+        TimeSlot slot = new TimeSlot(startOf(booking), endsAt);
+        TimeSlot added = new TimeSlot(previousEndsAt, endsAt);
+        facility.requireBookableCourts(courtIds);
+        cardEligibility.requireActive(booking.getCardId());
+        if (CourtReservations.overriddenBy(extenderRoles, booking.getCardId(),
+                cardEligibility.admits(booking.getCardId(), extendedBy, extenderRoles))) {
+            reservations.withdrawFor(courtIds, added, booking.getBookedBy());
+        } else {
+            reservations.requireUnreserved(courtIds, added, booking.getBookedBy());
+        }
+        ruleGate.requireExtensionAllowed(new BookingRuleCheck(courtIds, booking.getCardId(), slot,
+                booking.getBookedBy(), ruleGate.personBehind(booking.getBookedBy()), extenderRoles, Set.of(bookingId)));
+        participantCardCapacity.requireAvailableForParticipants(booking.getParticipants(), slot, bookingId,
+                List.of(bookingId), List.of(new ParticipantCardCapacity.Target(bookingId, booking.getParticipants(), slot)));
+        booking.extendTo(endsAt);
+        try {
+            bookings.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException e) {
+            if (isOverlap(e)) {
+                throw BookingExtensionRefusedException.courtTaken(e);
+            }
+            throw e;
+        }
+        events.publishEvent(new BookingExtended(bookingId, extendedBy, previousEndsAt, endsAt));
     }
 
     private static Instant startOf(Booking booking) {

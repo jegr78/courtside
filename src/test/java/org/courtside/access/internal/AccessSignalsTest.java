@@ -76,6 +76,16 @@ class AccessSignalsTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAnIdleWorker_whenABookingIsExtended_thenAPassStartsAtOnce() {
+        // given
+        UUID booking = book(courts.get(0));
+
+        // when / then
+        assertThat(passStartsAfter(() -> bookings.extend(booking, EVENING.end().plus(Duration.ofMinutes(30)), account(),
+                Set.of(Role.MEMBER)))).isTrue();
+    }
+
+    @Test
     void givenAnIdleWorker_whenABookingIsReleasedOrDisplaced_thenEachStartsAPass() {
         // given
         UUID booking = book(courts.get(0));

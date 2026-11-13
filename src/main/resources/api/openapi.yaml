@@ -3565,7 +3565,8 @@ components:
         administrator or a role that manages the card checks in from `opensAt`, the access lead time
         before the start, until `closesAt`, the booking's end. `heldSince` names when the running
         hold began and is absent while nobody holds the doors open; a hold ends at check-out or at
-        the booking's end, and a moved or cancelled booking holds nothing open.
+        the booking's end, and a moved or cancelled booking holds nothing open. The person running
+        the hold may extend the booking, which moves `closesAt` with it.
       required: [opensAt, closesAt, heldByMe]
       properties:
         opensAt: { type: string, format: date-time }
@@ -3574,6 +3575,19 @@ components:
         heldByMe:
           type: boolean
           description: Whether the caller started the running hold and may therefore end it.
+        extensionEndsAt:
+          type: string
+          format: date-time
+          description: The end an extension would give the booking; present only on the caller's own running hold.
+
+    BookingExtensionRequest:
+      type: object
+      required: [endsAt]
+      properties:
+        endsAt:
+          type: string
+          format: date-time
+          description: The end the booking should have afterwards.
 
     AttendanceOutcome:
       type: string
@@ -8497,6 +8511,69 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/bookings/{bookingId}/door-hold/extension:
+    post:
+      tags: [door-hold]
+      operationId: extendHeldBooking
+      summary: Extend a held booking by one step.
+      description: |
+        Moves the end of a booking whose doors the caller holds open one step later, under the
+        booking rules that bind the booker. The step is the smallest whole number of booking slots
+        that reaches thirty minutes, and the hold names the resulting end as `extensionEndsAt`.
+        `endsAt` names the end the caller wants: `extensionEndsAt` extends, the current end changes
+        nothing, so a repeated request extends once. Any other end answers `409` with `urn:courtside:error:booking-extension-refused` and
+        the violation `booking.extension.stale`, whose `endsAt` names the current end. A court taken
+        in the added half hour answers the same type with `booking.extension.courtTaken`, and a
+        charged booking with `booking.extension.charged`. A card that no longer offers a hold answers
+        `409` with `urn:courtside:error:door-hold-not-offered`, a reservation on the added time `409`
+        with `urn:courtside:error:court-reserved`, and an external player `403` with
+        `urn:courtside:error:access-denied`. A deactivated card answers `400` with
+        `urn:courtside:error:card-not-bookable`. A rule that refuses the longer booking answers `422`. Only the
+        person running the hold may extend; anyone else who may act on the booking gets `403` with
+        `urn:courtside:error:door-hold-not-holder`, and with no running hold the answer is `409` with
+        `urn:courtside:error:door-hold-not-running`. A booking the caller may not act on answers
+        `404` like one that does not exist.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingExtensionRequest"
+      responses:
+        "200":
+          description: The running hold, closing at the booking's new end.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoorHold"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          description: One or more booking rules refused the longer booking.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         "429":
           $ref: "#/components/responses/RateLimited"
 

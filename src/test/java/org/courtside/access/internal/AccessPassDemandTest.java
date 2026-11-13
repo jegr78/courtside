@@ -86,6 +86,23 @@ class AccessPassDemandTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAnInstalledGrant_whenItsBookingIsExtendedByHalfAnHour_thenItIsRescheduledUntilTheNewEnd() {
+        // given
+        UUID booking = book(courts.get(0));
+        pass.runPassNow();
+
+        // when
+        bookings.extend(booking, EVENING.end().plus(Duration.ofMinutes(30)), account(), Set.of(Role.MEMBER));
+        passAt(LATER);
+
+        // then
+        Call reschedule = connector.calls(Kind.RESCHEDULE).getFirst();
+        assertThat(reschedule.code()).as("an extension keeps the code").isEqualTo(connector.calls(Kind.GRANT).getFirst().code());
+        assertThat(grantOf(booking).getRemoteUntil()).as("fifteen minutes past the new end")
+                .isEqualTo(VALID_UNTIL.plus(Duration.ofMinutes(30)));
+    }
+
+    @Test
     void givenAnInstalledSeriesOccurrence_whenItMovesToACourtBehindAnotherGate_thenItIsRescheduledThere() {
         // given
         UUID series = series(courts.get(0), 1);

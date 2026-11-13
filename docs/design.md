@@ -712,6 +712,17 @@ nothing has to run when a booking ends. Starting and ending are audited as `book
 `booking.doorHold.ended`. The court plan does not show a hold, because it answers without a session
 and would announce when doors stand open without a code.
 
+While the hold runs, the person who started it may extend the booking one step at a time: the
+smallest whole number of booking slots that reaches half an hour, so thirty minutes on the default
+grid and one hour on an hour grid. The hold names the resulting end as `extensionEndsAt`, and the
+request names the end it wants, so a repeated request changes nothing. The extension keeps the start
+and courts and is measured by the move rules except the one refusing a start in the past. A
+reservation on the added time binds it like a new booking, and an administrator withdraws it the
+same way. It is refused for an external player, for a charged booking, for a card that no longer
+offers a hold or is deactivated, and when a court is taken in the added time, which the overlap constraint decides. It
+is audited as `booking.extended` with the previous end. The court plan, the occupancy signal, the
+hold window and the access grant follow the new end.
+
 ### Errors
 
 The API uses RFC 9457 problem details. Every type is a stable `urn:courtside:error:<slug>`.

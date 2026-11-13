@@ -1527,6 +1527,31 @@ it("given a training whose doors may be held open, when its trainer holds them o
   await waitFor(() => expect(screen.queryByTestId("doors-held-open")).not.toBeInTheDocument());
 });
 
+it("given doors the trainer holds open, when the trainer extends the training, then the next half hour is asked for and the new end shows", async () => {
+  // given
+  await i18n.changeLanguage("en");
+  let endsAt = "2026-08-11T17:00:00Z";
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view ? { items: [] } : { items: [{
+    id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-11T16:00:00Z", endsAt, cardLabel: "Holiday camp", cardColor: "#34584a", status: "CONFIRMED",
+    doorHold: { opensAt: "2026-08-11T15:45:00Z", closesAt: endsAt, heldSince: "2026-08-11T15:50:00Z", heldByMe: true,
+      extensionEndsAt: "2026-08-11T17:30:00Z" }
+  }] }));
+  const extend = vi.spyOn(api, "extendHeldBooking").mockImplementation((_, requested) => {
+    endsAt = requested;
+    return Promise.resolve({ opensAt: "2026-08-11T15:45:00Z", closesAt: requested, heldSince: "2026-08-11T15:50:00Z", heldByMe: true });
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T16:40:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("extend-held-booking"));
+
+  // then
+  expect(extend, "the end the server named is the end asked for").toHaveBeenCalledWith(upcomingId, "2026-08-11T17:30:00Z");
+  expect(await screen.findByRole("status")).toHaveTextContent(i18n.t("myBookings.bookingExtendedSuccess"));
+  expect(screen.getByTestId("extend-held-booking")).toHaveAccessibleName(expect.stringContaining(screen.getByTestId("extend-held-booking").textContent ?? "missing"));
+});
+
 it("given a hold somebody else runs, when the trainer reads the booking, then it shows the running hold without offering to end it", async () => {
   // given
   vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view ? { items: [] } : { items: [{
@@ -1543,4 +1568,5 @@ it("given a hold somebody else runs, when the trainer reads the booking, then it
   expect(await screen.findByTestId("doors-held-open")).toBeVisible();
   expect(screen.queryByTestId("end-door-hold"), "only the person who checked in ends a hold here").not.toBeInTheDocument();
   expect(screen.queryByTestId("hold-doors-open")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("extend-held-booking"), "only the person who checked in extends").not.toBeInTheDocument();
 });

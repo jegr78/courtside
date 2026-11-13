@@ -400,10 +400,11 @@
         "ADMIN",
         "EXTERNAL"
       ],
-      "entryPoints": "Holding a booking's doors open and ending the hold, from My bookings and the managed appointment.",
+      "entryPoints": "Holding a booking's doors open, extending the held booking and ending the hold, from My bookings and the managed appointment.",
       "operationIds": [
         "holdDoorsOpen",
-        "endDoorHold"
+        "endDoorHold",
+        "extendHeldBooking"
       ],
       "backgroundEntryPoints": [
         "DoorHoldService#on(BookingCancelled)",
@@ -413,26 +414,32 @@
       "stateTransitions": [
         "The booker, an administrator or a role that manages the card starts a hold on a booking whose card offers one, from the access lead time before the start until the end.",
         "The person who started the hold or an administrator ends it.",
+        "The person running the hold moves the booking's end half an hour later under the booking rules that bind its booker.",
         "Cancelling or moving the booking ends its unended holds and records each end."
       ],
       "alternatePaths": [
         "A hold nobody ends is over at the booking's end; cancelling or moving the booking ends it and records the end.",
-        "Starting again while one's own hold runs changes nothing."
+        "Starting again while one's own hold runs changes nothing.",
+        "Asking again for an end the booking already has changes nothing."
       ],
       "failurePaths": [
         "A booking the caller may not act on answers as absent.",
-        "A card that offers no hold, a closed window, a hold somebody else runs, no running hold and an end by anyone but the holder or an administrator are refused by their own codes."
+        "A card that offers no hold, a closed window, a hold somebody else runs, no running hold and an end by anyone but the holder or an administrator are refused by their own codes.",
+        "An extension by anyone but the holder, to any end but one step past the current one, into a court taken in that half hour or of a charged booking is refused by its own code; a booking rule refusing the longer booking answers its violations."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java",
         "src/main/java/org/courtside/booking/doorhold/DoorHoldRows.java",
-        "src/main/java/org/courtside/booking/web/DoorHoldController.java"
+        "src/main/java/org/courtside/booking/web/DoorHoldController.java",
+        "src/main/java/org/courtside/booking/BookingWriter.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenATrainingStartingSoon_whenItsTrainerHoldsTheDoorsOpen_thenTheBookingShowsTheRunningHold",
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnotherMember_whenTheyHoldTheTrainingsDoorsOpen_thenTheBookingIsNotFoundForThem",
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt",
-        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenARunningHold_whenTheTrainingMovesToTomorrow_thenItHoldsNothingOpen"
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenARunningHold_whenTheTrainingMovesToTomorrow_thenItHoldsNothingOpen",
+        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenARunningTrainingWithItsTrainerCheckedIn_whenTheTrainerExtendsIt_thenItEndsHalfAnHourLaterAndTheExtensionIsAudited",
+        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenAMemberBookingOnTheNextHalfHourOfOneOfTwoCourts_whenTheTrainerExtends_thenTheConflictSaysTheCourtIsTaken"
       ]
     },
     {
@@ -544,6 +551,7 @@
         "AccessSignals#on(BookingCancelled)",
         "AccessSignals#on(BookingConfirmed)",
         "AccessSignals#on(BookingDisplaced)",
+        "AccessSignals#on(BookingExtended)",
         "AccessSignals#on(BookingReleased)",
         "AccessSignals#on(CardEvent.BookingCardChanged)",
         "AccessSignals#on(FacilityEvent.AccessPointAdded)",

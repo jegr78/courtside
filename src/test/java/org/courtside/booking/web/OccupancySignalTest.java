@@ -10,6 +10,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,8 +26,10 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -115,6 +118,21 @@ class OccupancySignalTest extends AbstractIntegrationTest {
         // when / then
         assertThat(lines()).as("a booking ending now no longer occupies, the next one is five minutes away")
                 .contains("court1.occupied=0", "court1.minutes=5");
+    }
+
+    @Test
+    void givenABookingEndingNow_whenItIsExtendedByHalfAnHour_thenItsCourtReadsOccupiedAgain() throws Exception {
+        // given
+        for (DayOfWeek day : DayOfWeek.values()) {
+            facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        }
+        UUID booking = book(courtOne, MEMBER_BOOKING_CARD, minutes(-60), NOW);
+
+        // when
+        bookings.extend(booking, minutes(30), booker, Set.of(Role.MEMBER));
+
+        // then
+        assertThat(lines()).as("the court is in play until the new end").contains("court1.occupied=1");
     }
 
     @Test

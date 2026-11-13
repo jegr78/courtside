@@ -8,10 +8,14 @@ import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.doorhold.DoorHoldRows.Hold;
 import org.courtside.booking.doorhold.DoorHoldRows.Window;
 import org.courtside.booking.internal.BookingAccessControl;
+import org.courtside.booking.internal.BookingExtension;
+import org.courtside.booking.internal.BookingExtensionRefusedException;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.config.AccessPolicy;
+import org.courtside.config.BookingGridCoordination;
+import org.courtside.config.BookingGridSettings;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.SeriesCancelled;
@@ -40,6 +44,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class DoorHoldService {
 
+    private static final int EXTENSION_MINUTES = 30;
+
     private final DoorHoldRows rows;
     private final BookingRepository bookings;
     private final BookingAccessControl accessControl;
@@ -47,6 +53,9 @@ public class DoorHoldService {
     private final AccessPolicy accessPolicy;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final BookingExtension extension;
+    private final BookingGridCoordination bookingGridCoordination;
+    private final BookingGridSettings bookingGrid;
 
     public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
@@ -70,7 +79,7 @@ public class DoorHoldService {
         UUID holdId = UUID.randomUUID();
         rows.start(holdId, bookingId, actor, now);
         events.publishEvent(new DoorHoldEvent.Started(bookingId, holdId));
-        return new DoorHold(window.opensAt(), window.closesAt(), now, true);
+        return toDoorHold(window, Optional.of(new Hold(holdId, bookingId, now, actor)), actor);
     }
 
     public void end(UUID bookingId, UUID actor, Set<Role> actorRoles) {
@@ -82,6 +91,28 @@ public class DoorHoldService {
         }
         rows.end(hold.id(), actor, clock.instant());
         events.publishEvent(new DoorHoldEvent.Ended(bookingId, hold.id()));
+    }
+
+    /** Extends the booking whose doors {@code actor} holds open to {@code endsAt}, one extension step past its end. */
+    public DoorHold extend(UUID bookingId, Instant endsAt, UUID actor, Set<Role> actorRoles) {
+        bookingGridCoordination.lock();
+        Booking booking = lockedBooking(bookingId);
+        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
+            throw new DoorHoldNotOfferedException();
+        }
+        Hold hold = running(booking).orElseThrow(DoorHoldNotRunningException::new);
+        if (!actor.equals(hold.heldBy())) {
+            throw new DoorHoldNotHolderException();
+        }
+        Instant currentEnd = windowOf(booking).closesAt();
+        if (!endsAt.equals(currentEnd)) {
+            if (!endsAt.equals(currentEnd.plus(extensionStep()))) {
+                throw BookingExtensionRefusedException.stale(currentEnd);
+            }
+            extension.extend(bookingId, endsAt, actor, actorRoles);
+        }
+        return toDoorHold(windowOf(lockedBooking(bookingId)), Optional.of(hold), actor);
     }
 
     @EventListener
@@ -153,11 +184,19 @@ public class DoorHoldService {
         return accessPolicy.accessLead().toDuration();
     }
 
-    private static DoorHold toDoorHold(Window window, Optional<Hold> hold, UUID viewer) {
-        return new DoorHold(window.opensAt(), window.closesAt(), hold.map(Hold::heldAt).orElse(null),
-                hold.map(Hold::heldBy).filter(heldBy -> heldBy.equals(viewer)).isPresent());
+    private DoorHold toDoorHold(Window window, Optional<Hold> hold, UUID viewer) {
+        boolean heldByMe = hold.map(Hold::heldBy).filter(heldBy -> heldBy.equals(viewer)).isPresent();
+        return new DoorHold(window.opensAt(), window.closesAt(), hold.map(Hold::heldAt).orElse(null), heldByMe,
+                heldByMe ? window.closesAt().plus(extensionStep()) : null);
     }
 
-    public record DoorHold(Instant opensAt, Instant closesAt, Instant heldSince, boolean heldByMe) {
+    // The smallest whole number of booking slots that reaches half an hour, so the grid rule accepts it.
+    private Duration extensionStep() {
+        int slot = bookingGrid.slotDuration().minutes();
+        return Duration.ofMinutes((long) Math.ceilDiv(EXTENSION_MINUTES, slot) * slot);
+    }
+
+    public record DoorHold(Instant opensAt, Instant closesAt, Instant heldSince, boolean heldByMe,
+                           Instant extensionEndsAt) {
     }
 }

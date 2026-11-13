@@ -24,6 +24,11 @@ public interface BookingRule {
         return !isOverridable();
     }
 
+    // An extension keeps a start that has usually passed already.
+    default boolean appliesToAnExtension() {
+        return appliesToAMove();
+    }
+
     @FunctionalInterface
     interface Prepared {
 
