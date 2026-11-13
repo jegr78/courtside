@@ -646,9 +646,10 @@ test("given the files release-please changed in a release commit, when they are 
   assert.equal(plan.schemaVersion, 7);
 });
 
-function realCommits(commit, event) {
+function realCommits(commit, event, verifiedBase) {
   const git = (arguments_) => execFileSync("git", arguments_, { cwd: repository, encoding: "utf8" });
-  return { baseCommit: git(["rev-parse", `${commit}^`]).trim(), headCommit: git(["rev-parse", commit]).trim(), git, event };
+  return { baseCommit: git(["rev-parse", `${commit}^`]).trim(), headCommit: git(["rev-parse", commit]).trim(), git, event,
+    verifiedBase };
 }
 
 function releaseChanges(commit) {
@@ -656,7 +657,7 @@ function releaseChanges(commit) {
     ["diff", "--name-status", "-z", "--find-renames", `${commit}^`, commit], { cwd: repository, encoding: "utf8" }));
 }
 
-for (const commit of ["b1cd6c3a", "94640424", "df0ac0cb"]) {
+for (const commit of ["b1cd6c3a", "94640424", "df0ac0cb", "3f355748"]) {
   test(`given release-please's own version bump ${commit} as a pull request, when it is classified, then only docs and tooling run`, () => {
     // when
     const plan = classifyChangesAtCommits(releaseChanges(commit), [], realCommits(commit, "pull_request"));
@@ -667,12 +668,34 @@ for (const commit of ["b1cd6c3a", "94640424", "df0ac0cb"]) {
   });
 }
 
-test("given the same version bump pushed to main, when it is classified, then the plan stays full", () => {
+test("given the same version bump pushed to main without a full build of its parent, when it is classified, then the plan stays full", () => {
   // when
   const plan = classifyChangesAtCommits(releaseChanges("94640424"), [], realCommits("94640424", "push"));
 
   // then
   assert.deepEqual(plan.profiles, ["full"], "the release commit on main feeds the candidate, so it is verified whole");
+});
+
+for (const commit of ["94640424", "3f355748"]) {
+  test(`given release-please's version bump ${commit} pushed onto a parent with a full green build, when it is classified, then only docs run`, () => {
+    // when
+    const plan = classifyChangesAtCommits(releaseChanges(commit), [], realCommits(commit, "push", true));
+
+    // then
+    assert.deepEqual(plan.profiles, ["docs"], JSON.stringify(plan.reasons));
+  });
+}
+
+test("given a verified parent and a push that changes code beside the version, when it is classified, then the plan is full", () => {
+  // given
+  const [changes, labels, commits] = syntheticRelease({
+    changes: [...bumpChanges, { status: "M", path: "frontend/src/App.tsx" }], files: bumpFiles });
+
+  // when
+  const plan = classifyChangesAtCommits(changes, labels, { ...commits, event: "push", verifiedBase: true });
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"], "the parent's build does not cover code the release commit adds");
 });
 
 function syntheticRelease({ changes, files }) {
@@ -754,6 +777,8 @@ test("given the pull request event on the command line, when the classifier plan
   // when / then
   assert.deepEqual(run(["--event", "pull_request"]).profiles, ["docs"]);
   assert.deepEqual(run([]).profiles, ["full"], "without the event the bump is not reduced");
+  assert.deepEqual(run(["--event", "push"]).profiles, ["full"], "a push is reduced only on a verified parent");
+  assert.deepEqual(run(["--event", "push", "--verified-base"]).profiles, ["docs"]);
 });
 
 test("given a dependency that shares the release version, when the pull request bumps both, then the plan is full", () => {

@@ -213,6 +213,19 @@ test("given the pull request plan, when the classifier runs, then it names the e
   assert.match(workflow, /--labels "\$LABELS" \\\n {14}--event "\$EVENT_NAME" \\\n/);
 });
 
+test("given a push onto a parent with a green full build, when the plan runs, then it tells the classifier the parent is verified", () => {
+  // given
+  const plan = workflow.match(/\n  test-profile-plan:\n[\s\S]*?(?=\n  [a-z_-]+:\n)/)?.[0] ?? "";
+
+  // when / then
+  assert.match(plan, /\n      actions: read\n      contents: read\n/, "reading the parent's runs needs actions: read");
+  assert.match(plan, /if \[\[ "\$EVENT_NAME" = push \]\] && /, "only a push asks for its parent's build");
+  assert.match(plan, /actions\/workflows\/build\.yml\/runs\?head_sha=\$BASE_REF&branch=main&status=success/);
+  assert.match(plan, /select\(\.event == "schedule" or \.event == "workflow_dispatch"\)/,
+    "only a scheduled or dispatched build is full; a push build of the parent may be reduced");
+  assert.match(plan, /--event "\$EVENT_NAME" \\\n {14}"\$\{VERIFIED_BASE\[@\]\}" \\\n/);
+});
+
 test("given the plan's security decision, when the gates run for a pull request, then only a surface change starts the active assessment", () => {
   // given
   const gates = readFileSync(new URL("../.github/workflows/release-gates.yml", import.meta.url), "utf8");
