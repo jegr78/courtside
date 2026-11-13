@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,16 +6,26 @@ export const BACKEND_SHARDS = 3;
 
 const SUREFIRE_DEFAULT_INCLUDES = [/^Test[^/]*\.java$/, /Test\.java$/, /Tests\.java$/, /TestCase\.java$/];
 
-export function backendTestClasses(root) {
+// Measured seconds per class, written by tools/backend-test-durations.mjs from a build's surefire reports.
+export const DURATIONS = fileURLToPath(new URL("../ci/backend-test-durations.json", import.meta.url));
+
+export function backendTestClasses(root, durations = {}) {
   const files = readdirSync(root, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => relative(root, join(entry.parentPath, entry.name)).split(sep).join("/"));
-  return files
+  const classes = files
     .filter((path) => SUREFIRE_DEFAULT_INCLUDES.some((pattern) => pattern.test(path.split("/").at(-1))))
     .map((path) => ({ path, source: readFileSync(join(root, path), "utf8") }))
     .filter(({ path, source }) => !isAbstract(path, source))
-    .map(({ path, source }) => ({ name: classPath(path, source), weight: source.length }))
+    .map(({ path, source }) => ({ name: classPath(path, source), length: source.length }))
     .toSorted((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+  const known = classes.filter(({ name }) => Object.hasOwn(durations, name));
+  const knownLength = known.reduce((sum, { length }) => sum + length, 0);
+  const secondsPerCharacter = knownLength === 0 ? 1
+    : known.reduce((sum, { name }) => sum + durations[name], 0) / knownLength;
+  return classes.map(({ name, length }) => ({
+    name, weight: Object.hasOwn(durations, name) ? durations[name] : length * secondsPerCharacter
+  }));
 }
 
 function isAbstract(path, source) {
@@ -31,7 +41,7 @@ function classPath(path, source) {
 }
 
 // Contiguous blocks keep a package's classes, which tend to share a Spring context, in one JVM;
-// source length stands in for run time, which a class count spreads unevenly.
+// a class without a measured duration is weighed by its source length at the measured classes' rate.
 export function backendShard(classes, current, total) {
   const all = classes.reduce((sum, { weight }) => sum + weight, 0);
   const cuts = [0];
@@ -57,9 +67,13 @@ export function parseShard(value) {
   return { current, total };
 }
 
-export function shardList(root, value) {
+export function readDurations(path = DURATIONS) {
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
+}
+
+export function shardList(root, value, durations = readDurations()) {
   const { current, total } = parseShard(value);
-  const classes = backendShard(backendTestClasses(root), current, total);
+  const classes = backendShard(backendTestClasses(root, durations), current, total);
   if (classes.length === 0) throw new Error(`Backend shard ${value} would run no class`);
   return classes;
 }
