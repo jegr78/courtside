@@ -34,7 +34,7 @@ test("given a merge to main, when smoke runs, then it exercises bounded policy, 
   assert.match(smoke, /node --test tools\/post-merge-policy\.test\.mjs/);
   assert.match(smoke, /POLICY_OUTCOME: \$\{\{ steps\.policy\.outcome \}\}/);
   assert.match(smoke, /ConstraintNameTest,HealthEndpointTest,GeneratedApiImplementationTest/);
-  assert.match(smoke, /grep -q -E 'Non-resolvable\|Could not \(resolve\|transfer\|find artifact\)' build\/post-merge\/maven\.log \\\n\s+\|\| exit "\$status"/,
+  assert.match(smoke, /grep -q -E '\^\\\[ERROR\\\]\.\*\(Non-resolvable\|Could not \(resolve\|transfer\|find artifact\)\)' build\/post-merge\/maven\.log \\\n\s+\|\| exit "\$status"/,
     "only a dependency download is retried; a failing test ends the step on its first attempt");
   assert.match(smoke, /update=\(-U\)/, "a retry forces Maven past the missing artifact it cached");
   assert.match(smoke, /post-merge-smoke-/);

@@ -315,7 +315,8 @@ requests and issue labels in this repository. It cannot change workflows or publ
 release alone.
 
 Three jobs hold it. `release-please` runs only after a push to `main` or to a `release/*` branch,
-which carry the same protection, maintains that branch's release pull request and, for a release
+which carry the same protection, maintains that branch's release pull request, including merging
+the branch into it to keep it current, and, for a release
 commit, creates the branch `release-anchor/v<version>/<sha>` at it. The candidate's `anchor` job
 runs only for a selected release and creates that branch when it is missing; it installs no
 packages. The `tag` job runs only for a release commit on the branch its version belongs to whose

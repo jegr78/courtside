@@ -46,7 +46,7 @@ jobs:
               2>&1 | tee build/post-merge/maven.log
             status=${PIPESTATUS[0]}
             [ "$status" = 0 ] && exit 0
-            grep -q -E 'Non-resolvable|Could not (resolve|transfer|find artifact)' build/post-merge/maven.log \
+            grep -q -E '^\[ERROR\].*(Non-resolvable|Could not (resolve|transfer|find artifact))' build/post-merge/maven.log \
               || exit "$status"
             echo "::warning::Maven could not download a dependency on attempt $attempt"
             update=(-U)
