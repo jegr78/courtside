@@ -513,7 +513,7 @@ refunded, the order did not match or the payer turned back. `PROCESSING` means t
 known yet, because PayPal did not answer, the capture timed out, the request used up the 30 seconds
 it may spend on all its PayPal calls together or has less than one request timeout of it left
 before a capture, a capture is still pending at PayPal or the
-credentials are no longer active; the order stays open and the court stays held for the
+credentials of the environment and client id the order was created with are no longer active; the order stays open and the court stays held for the
 reconciliation. A PayPal refusal with HTTP 409, `DUPLICATE_REQUEST_ID` or
 `PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a decline. Every order endpoint answers only the signed-in booker; another account's order is not
 found.
@@ -545,7 +545,9 @@ cannot have moved money, so it is voided and its booking released without asking
 an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
 environment and the client id fingerprint it was created with, and sandbox credentials work on every
-instance.
+instance. Capture, cancel and the reconciliation ask PayPal only with the stored credentials of that
+environment and client id, the same match as a refund below; an order of another account is treated as
+unreadable.
 
 #### Returning a PayPal payment
 

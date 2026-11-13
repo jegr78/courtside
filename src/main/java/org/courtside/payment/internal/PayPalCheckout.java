@@ -109,7 +109,7 @@ public class PayPalCheckout {
         PayPalDeadline deadline = returnDeadline();
         Optional<Settlement> settled = settled(stored);
         if (settled.isPresent()) return settled.get();
-        return credentials.active(stored.environment())
+        return credentials.active(stored)
                 .map(active -> settleOrVoid(stored, active, VoidReason.ABANDONED, deadline))
                 .orElseGet(() -> processing(stored));
     }
@@ -141,10 +141,10 @@ public class PayPalCheckout {
         if (stored.captureAttemptedAt() == null && pending.isEmpty()) {
             return Reconciled.answered(voided(stored, VoidReason.BOOKING_RELEASED));
         }
-        Optional<PayPalClient.Credentials> readable = credentials.stored(stored.environment());
+        Optional<PayPalClient.Credentials> readable = credentials.stored(stored);
         if (readable.isEmpty()) {
-            log.warn("PayPal order {} of booking {} cannot be read: no stored {} credentials", stored.orderId(),
-                    stored.bookingId(), stored.environment());
+            log.warn("PayPal order {} of booking {} cannot be read: no stored credentials of the {} account that"
+                    + " created it", stored.orderId(), stored.bookingId(), stored.environment());
             return Reconciled.answered(unresolved(stored, pending, unresolvedAfter));
         }
         PayPalClient.Order order;
@@ -171,7 +171,7 @@ public class PayPalCheckout {
         if (capture.isPresent()) {
             return settle(stored, capture.get(), mismatch(stored, order).isEmpty(), order.refunds());
         }
-        Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
+        Optional<PayPalClient.Credentials> active = credentials.active(stored);
         Instant now = clock.instant();
         boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(now)).isPresent();
         boolean started = pending.filter(held -> held.startsAt().isBefore(now)).isPresent();
@@ -219,7 +219,7 @@ public class PayPalCheckout {
     public boolean recheckVoided(String orderId) {
         requireNoTransaction();
         Optional<StoredOrder> stored = orders.find(orderId).filter(order -> order.status() == Status.VOIDED);
-        Optional<PayPalClient.Credentials> readable = stored.flatMap(order -> credentials.stored(order.environment()));
+        Optional<PayPalClient.Credentials> readable = stored.flatMap(credentials::stored);
         if (readable.isEmpty()) return true;
         PayPalClient.Order order;
         try {
@@ -276,10 +276,10 @@ public class PayPalCheckout {
         requireNoTransaction();
         Optional<Settlement> settled = settled(stored);
         if (settled.isPresent()) return settled.get();
-        Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
+        Optional<PayPalClient.Credentials> active = credentials.active(stored);
         if (active.isEmpty()) {
-            log.info("PayPal order {} of booking {} waits: no active {} credentials", stored.orderId(),
-                    stored.bookingId(), stored.environment());
+            log.info("PayPal order {} of booking {} waits: no active credentials of the {} account that created it",
+                    stored.orderId(), stored.bookingId(), stored.environment());
             return processing(stored);
         }
         Optional<PayPalClient.Order> order = read(stored, active.get(), deadline);

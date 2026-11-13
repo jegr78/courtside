@@ -881,6 +881,27 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
         assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"capture", "cancel"})
+    void givenAnOrderOfAFormerClientId_whenThePayerReturns_thenPayPalIsNotAskedWithTheNewAccount(String route)
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        jdbc.sql("UPDATE paypal_settings SET client_id = 'client-other'").update();
+
+        // when
+        ResultActions answer = route.equals("capture") ? capture("roe.john") : cancel("roe.john");
+
+        // then
+        answer.andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+        assertThat(PAYPAL.seen(READ)).as("another PayPal account cannot see the order (%s)", route).isEmpty();
+        assertThat(PAYPAL.seen(CAPTURE)).isEmpty();
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+    }
+
     @Test
     void givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound() throws Exception {
         // given

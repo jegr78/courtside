@@ -26,14 +26,6 @@ class PayPalCredentials {
         return credentials(false);
     }
 
-    Optional<PayPalClient.Credentials> active(PayPalEnvironment environment) {
-        return active().filter(credentials -> credentials.environment() == environment);
-    }
-
-    Optional<PayPalClient.Credentials> stored(PayPalEnvironment environment) {
-        return stored().filter(credentials -> credentials.environment() == environment);
-    }
-
     /** The active credentials, when they are of the PayPal account that created the order. */
     Optional<PayPalClient.Credentials> active(PayPalOrders.StoredOrder order) {
         return active().filter(credentials -> created(order, credentials));
