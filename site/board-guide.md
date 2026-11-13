@@ -436,7 +436,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 | **Buchungen erhalten den Zugangscode** | Buchungen mit dieser Karte gehören zu den Buchungen, für die der Code der Zugänge ihrer Plätze gilt. Die Karte *Platz gesperrt* bietet das nicht an |
 | **Buchungen gelten für die Gebäudesteuerung als belegt** | Buchungen mit dieser Karte melden ihren Platz der Gebäudesteuerung als belegt, siehe *Gebäudesteuerung* unter *Zugänge*. Neue Karten tragen es, die Karte *Platz gesperrt* bietet es nicht an |
-| **Türen dürfen beim Einchecken offen gehalten werden** | Bucher, Administration oder eine verwaltende Rolle der Karte checkt in *Meine Buchungen* oder im verwalteten Termin ein, und Courtside führt die Türen der Buchung als offen gehalten, bis zum Auschecken oder zum Ende der Buchung. Neue Karten tragen es nicht, die Karte *Platz gesperrt* bietet es nicht an |
+| **Türen dürfen beim Einchecken offen gehalten werden** | Bucher, Administration oder eine verwaltende Rolle der Karte checkt in *Meine Buchungen* oder im verwalteten Termin ein, und Courtside führt die Türen der Buchung als offen gehalten, bis zum Auschecken oder zum Ende der Buchung. Wer eingecheckt hat, kann die Buchung in Schritten von 30 Minuten verlängern, bei längeren Slots um einen Slot, solange diese Zeit frei ist. Neue Karten tragen es nicht, die Karte *Platz gesperrt* bietet es nicht an |
 
 Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
 gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf

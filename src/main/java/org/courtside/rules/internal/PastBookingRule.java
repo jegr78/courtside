@@ -21,6 +21,11 @@ public class PastBookingRule implements BookingRule {
     }
 
     @Override
+    public boolean appliesToAnExtension() {
+        return false;
+    }
+
+    @Override
     public List<RuleViolation> check(RuleContext context) {
         if (context.slot().start().isBefore(clock.instant())) {
             return List.of(new RuleViolation("booking.rule.startsInPast", Map.of()));

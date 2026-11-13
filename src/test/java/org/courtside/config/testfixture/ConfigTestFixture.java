@@ -44,6 +44,18 @@ public class ConfigTestFixture {
                 unchanged.noMembershipTypeRuleSetId(), new WaitlistOfferWindow(minutes), null, null, null));
     }
 
+    public void bookInSlotsOf(int minutes) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId());
+        config.update(new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                new BookingSlotDuration(minutes), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), null, null, null));
+    }
+
     public void requireAccessCodesOf(int digits) {
         config.update(withAccess(null, null, new AccessCodeLength(digits)));
     }

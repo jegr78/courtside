@@ -163,6 +163,10 @@ public class Booking implements Persistable<UUID> {
         newEntity = false;
     }
 
+    public void extendTo(Instant endsAt) {
+        allocations.forEach(allocation -> allocation.extendTo(endsAt));
+    }
+
     public void clearAllocations() {
         allocations.clear();
     }

@@ -7,6 +7,7 @@ import org.courtside.facility.FacilityEvent;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.BookingDisplaced;
+import org.courtside.shared.BookingExtended;
 import org.courtside.shared.BookingReleased;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesCreated;
@@ -39,6 +40,11 @@ class AccessSignals {
 
     @TransactionalEventListener
     void on(BookingDisplaced displaced) {
+        worker.signal();
+    }
+
+    @TransactionalEventListener
+    void on(BookingExtended extended) {
         worker.signal();
     }
 

@@ -2,7 +2,7 @@ import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, openTheSlot, reachAdministration, rewrite, signIn, signOut, walks } from "../../journey-walking";
 import { TRAINING_CARD } from "../../shipped-rows";
 
-test("given a board that lets training sessions keep their doors open, when a trainer checks in on today's session and checks out again, then the booking shows the doors held open and then no longer",
+test("given a board that lets training sessions keep their doors open, when a trainer checks in on today's session, extends it and checks out again, then the booking shows the doors held open, ends later and then holds nothing open",
   walks("session-and-own-account", "facility-card-and-membership-configuration", "door-hold"), async ({ page, language }) => {
     // given — the training card may hold its doors open, from four hours before a session
     await openTheApplication(page, language);
@@ -30,6 +30,11 @@ test("given a board that lets training sessions keep their doors open, when a tr
 
     // then
     await expect(page.getByTestId("doors-held-open")).toHaveCount(1);
+    const extend = page.getByTestId("extend-held-booking");
+    const title = page.getByTestId(`booking-${await extend.getAttribute("data-booking-id")}`).getByTestId("booking-title");
+    const before = await title.textContent();
+    await activate(extend);
+    await expect(title, "the booking ends half an hour later").not.toHaveText(before ?? "");
     await activate(page.getByTestId("end-door-hold"));
     await expect(page.getByTestId("doors-held-open")).toHaveCount(0);
   });

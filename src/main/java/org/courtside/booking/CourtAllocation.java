@@ -52,6 +52,10 @@ public class CourtAllocation {
         this.status = BookingStatus.CONFIRMED;
     }
 
+    void extendTo(Instant endsAt) {
+        this.endsAt = new TimeSlot(startsAt, endsAt).end();
+    }
+
     void awaitPayment() {
         this.status = BookingStatus.PENDING_PAYMENT;
     }

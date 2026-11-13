@@ -84,6 +84,10 @@ public class BookingRuleGate {
                 : ruleEngine.evaluateNonOverridable(contexts);
     }
 
+    public void requireExtensionAllowed(BookingRuleCheck check) {
+        requireEmpty(ruleEngine.evaluateForAnExtension(contextOf(check), restrictionsApplyTo(check)));
+    }
+
     public UUID personBehind(UUID accountId) {
         if (accountId == null) {
             return null;
