@@ -1017,7 +1017,8 @@ Miniserver answers `getjwt` with 412 for a user whose groups lack the website an
 `updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
 `getip` answer of `connect.loxonecloud.com`, accepted only under `remcov3.loxonecloud.com` on ports
 20000 to 49000 or under `dyndns.loxonecloud.com` on any port, or at a fixed
-`https://` URL. `getip` answering 403 or 418 is Loxone refusing Remote Connect to third-party clients;
+`https://` URL. `getip` answering 403, or 418 from its DNS lookup with the same message, is Loxone refusing Remote
+Connect to third-party clients;
 the connector reports it as unreachable with that cause, and the `miniserver` check as
 `access.check.address.remoteConnectRefused` with the status and the fixed address as the remedy. A
 failed request forgets the relay address, and the next call asks for it again. Each

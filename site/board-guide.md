@@ -340,9 +340,11 @@ Die feste Adresse hat die Form `https://192-168-1-47.<Seriennummer>.dyndns.loxon
 mit der lokalen Adresse des Miniservers in Bindestrichen. Die Instanz muss sie über HTTPS erreichen,
 per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Den Weg über die
 Seriennummer in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` lehnt die Loxone Cloud seit November 2026
-für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet das dann. Kommt
-keine Verbindung zustande, öffnet das Einchecken allein die Türen, wie unter *Gebäudesteuerung*
-beschrieben.
+für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet das dann. Eine
+Relay-Adresse aus der Loxone App oder dem Browser taugt nicht als feste Adresse: Loxone vergibt ihren
+Port neu, sobald der Miniserver sich neu verbindet, und dann kann sie zu einem fremden Miniserver führen.
+Kommt keine Verbindung zustande, öffnet auf Karten, die die Türen offen halten, das Einchecken allein
+die Türen, wie unter *Gebäudesteuerung* beschrieben.
 
 Drücke dann unter *Nachweise → Zugangsberechtigungen* auf **Verbindung prüfen**. Courtside prüft
 beim nächsten Durchgang fünf Punkte und liest dabei die Gruppen neu. Lade die Seite kurz danach neu,
