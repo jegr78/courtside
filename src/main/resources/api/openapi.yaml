@@ -9381,9 +9381,10 @@ paths:
         `/payment/paypal/return` or `/payment/paypal/cancel` on this instance. A booking has at most
         one order: calling this again answers the stored one. A booking that does not belong to the
         signed-in account or no longer awaits payment is answered
-        `urn:courtside:error:paypal-order-not-found`. Without a configured public address the answer
-        is `urn:courtside:error:paypal-public-url-missing`; when PayPal is switched off or does not
-        answer, `urn:courtside:error:paypal-unavailable`.
+        `urn:courtside:error:paypal-order-not-found`. A booking whose time to pay has ended gets no new
+        order and is answered `urn:courtside:error:paypal-payment-hold-expired`. Without a configured
+        public address the answer is `urn:courtside:error:paypal-public-url-missing`; when PayPal is
+        switched off or does not answer, `urn:courtside:error:paypal-unavailable`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -9406,6 +9407,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":

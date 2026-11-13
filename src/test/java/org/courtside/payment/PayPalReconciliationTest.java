@@ -876,6 +876,53 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void givenAnAttemptedOrderOfAFormerClientId_whenTheJobRuns_thenPayPalIsNotAskedWithTheNewAccount(
+            CapturedOutput output) throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 503, UNAVAILABLE);
+        saveSettings("client-other", "SANDBOX", true, "paypal-secret-other").andExpect(status().isOk());
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        age(Duration.ofMinutes(6));
+        int readsBefore = PAYPAL.seen(READ).size();
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("another PayPal account cannot see the order").hasSize(readsBefore);
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(output.getOut()).contains("PayPal order " + ORDER + " of booking " + booking
+                + " cannot be read: no stored credentials of the SANDBOX account that created it");
+    }
+
+    @Test
+    void givenAVoidedOrderOfAFormerClientId_whenTheJobRuns_thenPayPalIsNotAskedWithTheNewAccount()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, null));
+        cancel().andExpect(jsonPath("$.outcome").value("REJECTED"));
+        jdbc.sql("UPDATE paypal_settings SET client_id = 'client-other'").update();
+        age(Duration.ofMinutes(6));
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        int readsBefore = PAYPAL.seen(READ).size();
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("another PayPal account cannot see the voided order").hasSize(readsBefore);
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
     void givenAVoidedOrderWithoutACaptureAttempt_whenTheJobRuns_thenPayPalIsNotAsked() throws Exception {
         // given
         UUID booking = bookWithOrder();

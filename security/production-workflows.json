@@ -1084,7 +1084,7 @@
         "A capture verifies the order at PayPal, captures it outside any transaction and then, under the order row lock, confirms the booking and records the PayPal payment and the booking debit once.",
         "A capture that finds the booking no longer pending, or a captured amount that differs, releases the booking and credits the captured amount to the booker.",
         "Cancelling an order reads it at PayPal first; without money taken it is voided and its booking released at once, a capture is recorded as on return, and an unclear state leaves the order open.",
-        "Every minute the reconciliation reads open orders older than five minutes and those whose hold has passed: a capture is recorded, an approved order is captured while its booking is still held, also past the deadline, and an unapproved order whose hold ended, an order whose booking was released or whose credentials are no longer active is voided and audited.",
+        "Every minute the reconciliation reads open orders older than five minutes and those whose hold has passed: a capture is recorded, an approved order is captured while its booking is still held, also past the deadline, and an unapproved order whose hold ended, an order whose booking was released or whose environment and client id are no longer active is voided and audited.",
         "The reconciliation releases a held booking without an order once its deadline has passed, and for 72 hours rereads voided orders whose capture was attempted so that a capture PayPal completed later becomes credit."
       ],
       "alternatePaths": [
@@ -1096,9 +1096,9 @@
         "An order or booking of another account is answered as not found.",
         "A mismatch of booking id, amount or currency refuses the capture, releases the booking and records the reason; no money moves.",
         "A capture PayPal refuses, with the order then showing no capture and a status in which no money moved, rejects the order and releases the booking.",
-        "A capture whose outcome is unknown, or an order of credentials that are no longer active, leaves the order open and answers PROCESSING.",
+        "A capture whose outcome is unknown, or an order whose environment and client id are no longer active, leaves the order open and answers PROCESSING without asking PayPal with another account.",
         "An order PayPal cannot show to the reconciliation keeps its booking held past the deadline for at most 24 hours: then an order without a capture attempt is voided and released, and one with an attempt releases its booking while the order stays open, so a capture read later becomes credit.",
-        "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
+        "Without a public address the order is refused with paypal-public-url-missing, and a booking past its payment deadline with paypal-payment-hold-expired; a refused or unreachable create stores nothing."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalCheckoutController.java",
@@ -1115,7 +1115,9 @@
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenTwoConcurrentReturns_whenBothCapture_thenOneConfirmationAndOnePayPalPayment",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAMismatchedAmount_whenCapturing_thenNothingIsCapturedAndTheCourtIsFree",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound",
-        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce"
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnExpiredHold_whenTheOrderIsCreated_thenItIsRefusedAndNothingReachesPayPal",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnAttemptedOrderOfAFormerClientId_whenTheJobRuns_thenPayPalIsNotAskedWithTheNewAccount"
       ]
     },
     {

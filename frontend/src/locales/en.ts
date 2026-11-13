@@ -1225,6 +1225,8 @@ const en: Record<keyof typeof de, string> = {
   "error.type.paypal-order-not-found": "This payment no longer exists or belongs to another account.",
   "payment.paypal.unavailable": "PayPal cannot take the payment right now. Try again in a few minutes.",
   "error.type.paypal-unavailable": "PayPal cannot take the payment right now. Try again in a few minutes.",
+  "payment.paypal.holdExpired": "The time to pay this booking has run out. Book the court again if it is still free.",
+  "error.type.paypal-payment-hold-expired": "The time to pay this booking has run out. Book the court again if it is still free.",
   "payment.paypal.refund.notRefundable": "This payment cannot be returned through PayPal. Only a payment whose booking was cancelled and credited back can.",
   "payment.paypal.refund.notCredited": "This payment never became credit. Return it in the club's PayPal account.",
   "payment.paypal.refund.alreadyRefunded": "This payment was already returned through PayPal.",

@@ -58,7 +58,7 @@ test("given a club that takes PayPal and an external player without credit, when
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
     // when: the player books a court and pays for it at PayPal
-    const paid = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').first());
+    const paid = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').last());
     await expect(page.getByTestId("booking-paypal-hint")).toBeVisible();
     await expect(page.getByTestId("booking-submit")).toHaveAttribute("data-payment", "PAYPAL");
     await activate(page.getByTestId("booking-submit"));
@@ -79,7 +79,7 @@ test("given a club that takes PayPal and an external player without credit, when
     await expect(paid, "the paid court is no longer free").toHaveCount(0);
 
     // when: the player books another court and turns back at PayPal
-    const abandoned = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').first());
+    const abandoned = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').last());
     await activate(page.getByTestId("booking-submit"));
     await expect(page.getByTestId("paypal-stub")).toBeVisible();
     await activate(page.getByTestId("paypal-stub-cancel"));
