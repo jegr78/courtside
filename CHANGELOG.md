@@ -4,6 +4,10 @@
 
 ### Features
 
+* collapse read messages and delete them after a club-set period ([#1950](https://github.com/jegr78/courtside/issues/1950)) ([6ea3503](https://github.com/jegr78/courtside/commit/6ea35036322244c5a714ef28e367f535ab15b03c)), closes [#1868](https://github.com/jegr78/courtside/issues/1868)
+* extend a held booking while its doors are held open ([#1964](https://github.com/jegr78/courtside/issues/1964)) ([c05cc5b](https://github.com/jegr78/courtside/commit/c05cc5bbcc0285229bd8dc095bd60242264be1ae))
+* hold a booking's doors open while a responsible person is checked in ([#1963](https://github.com/jegr78/courtside/issues/1963)) ([6b4f1b2](https://github.com/jegr78/courtside/commit/6b4f1b28e90d7d3441c03d0759fd00d85a3030f6))
+* report held-open doors to building automation through the occupancy endpoint ([#1965](https://github.com/jegr78/courtside/issues/1965)) ([3fb9104](https://github.com/jegr78/courtside/commit/3fb9104a6b26192efcc2f503dc364a8c6a416cc1))
 * anonymise external accounts that stayed inactive past the club's period ([#1902](https://github.com/jegr78/courtside/issues/1902)) ([ded8b3b](https://github.com/jegr78/courtside/commit/ded8b3b2e5cf08c414947111ed89fdc441688e32))
 * describe the club in the booking page the server delivers ([#1883](https://github.com/jegr78/courtside/issues/1883)) ([1a9baae](https://github.com/jegr78/courtside/commit/1a9baae324f23c477dfbc5174740de9246db65bb))
 * keep an append-only credit ledger per account ([#1905](https://github.com/jegr78/courtside/issues/1905)) ([c16c7d1](https://github.com/jegr78/courtside/commit/c16c7d124d3e76298ff20ffff7ca795fad5a3fe9))
@@ -24,6 +28,7 @@
 
 ### Bug fixes
 
+* settle PayPal orders correctly when a capture repeats, is refunded or outlasts its deadline ([#1948](https://github.com/jegr78/courtside/issues/1948)) ([dce3c1d](https://github.com/jegr78/courtside/commit/dce3c1d28f47f232df3c751463435c1209a40d72))
 * correct the guest fee report, age-banded imports and the application shell ([#1924](https://github.com/jegr78/courtside/issues/1924)) ([1790f47](https://github.com/jegr78/courtside/commit/1790f4738a4640e351a1b2a2cecf054e0e73da7a))
 * keep external players' money reachable through closure, displacement and the ledger ([#1927](https://github.com/jegr78/courtside/issues/1927)) ([d9bd1f8](https://github.com/jegr78/courtside/commit/d9bd1f8650acd039be75967d9645444c5b38080d))
 * keep pages from shifting while their data loads ([#1944](https://github.com/jegr78/courtside/issues/1944)) ([74f06be](https://github.com/jegr78/courtside/commit/74f06be0617dac01cfd8f1c0b5f4ede7486c4bad))
@@ -40,6 +45,8 @@
 
 ### Performance
 
+* load each administration page only when it opens ([#1953](https://github.com/jegr78/courtside/issues/1953)) ([0ffbcf5](https://github.com/jegr78/courtside/commit/0ffbcf50c07f2cbdcb531bea0b32b242fade4f02)), closes [#1951](https://github.com/jegr78/courtside/issues/1951)
+* show the administration overview without waiting for the parts below it ([#1954](https://github.com/jegr78/courtside/issues/1954)) ([9e770b7](https://github.com/jegr78/courtside/commit/9e770b7cd4ce3b16c770a718b756c79c65f749b5)), closes [#1951](https://github.com/jegr78/courtside/issues/1951)
 * load the account area only when a member opens it ([#1884](https://github.com/jegr78/courtside/issues/1884)) ([d582269](https://github.com/jegr78/courtside/commit/d5822698344072e1457d3f30f3e705b56de8428e))
 
 ### Documentation
