@@ -438,6 +438,28 @@ test("given a patch release merged on its release branch, when the candidate is 
     }, "a patch has no push build, so its one dispatched build on release/0.1 is the exact green build");
   });
 
+test("given a patch release commit that only bumps its version, when the candidate is dispatched, then its dispatched build qualifies it",
+  () => {
+    // given
+    const versionOnly = { parentManifest: "0.1.0", versionOnly: true, parentBuild: null, pushBuild: null };
+
+    // when
+    const selection = selectReleaseCandidate(patchDispatch(versionOnly));
+
+    // then
+    assert.deepEqual(selection.build, { runId: 37311926310, runAttempt: 1 },
+      "a release branch never has a push build, so the dispatched full build there is the evidence");
+    assert.equal(selection.reason, "patch-release");
+  });
+
+test("given a version-only patch release commit without a dispatched build, when the candidate selects, then it asks for one on the release branch",
+  () => {
+    // when / then
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ parentManifest: "0.1.0", versionOnly: true,
+      parentBuild: null, pushBuild: null, exactBuild: null })),
+    /no green dispatched build of [0-9a-f]{40} on release\/0\.1; dispatch build on release\/0\.1, then the candidate/);
+  });
+
 test("given a patch release, when its commit is not on its release branch, then the candidate refuses it", () => {
   // when / then
   assert.throws(() => selectReleaseCandidate(patchDispatch({ onBranch: false })), /is not on release\/0\.1/);
