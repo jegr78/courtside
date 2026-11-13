@@ -135,7 +135,8 @@ describe("AdminOverviewView", () => {
     expect(screen.queryByTestId("admin-overview-cards-pending"), "the cards wait until the sections above them show").not.toBeInTheDocument();
     expect(FakeIntersectionObserver.latest).toBeUndefined();
     await loadedFigure("utilisation");
-    expect(screen.getByTestId("admin-overview-content")).not.toHaveAttribute("aria-hidden");
+    await waitFor(() => expect(screen.getByTestId("admin-overview-content"), "the sections above the cards reveal together")
+      .not.toHaveAttribute("aria-hidden"));
     expect(screen.getByTestId("overview-setup")).toBeInTheDocument();
     expect(api.audit, "a card out of reach reads nothing yet").not.toHaveBeenCalled();
     expect(api.messages).not.toHaveBeenCalled();
