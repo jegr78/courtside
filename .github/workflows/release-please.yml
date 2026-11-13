@@ -130,3 +130,18 @@ jobs:
           git config --local credential.helper \
             '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$RELEASE_PLEASE_TOKEN"; }; f'
           git push origin "HEAD:refs/heads/$RELEASE_PR_BRANCH"
+
+      # The ruleset requires a current branch, and a push that changes no release note leaves this one behind.
+      - name: Bring the release pull request up to date with its base
+        if: steps.release_pr.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_PR_BRANCH: ${{ steps.release_pr.outputs.branch }}
+          TARGET: ${{ github.ref_name }}
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base "$TARGET" --head "$RELEASE_PR_BRANCH" \
+            --json number --jq 'if length == 1 then .[0].number else "" end')
+          if [ -n "$number" ] && ! gh pr update-branch "$number" --repo "$GITHUB_REPOSITORY"; then
+            echo "::warning::Release pull request #$number could not be brought up to date, for example because main" \
+              "changed a workflow the token may not write. Update its branch by hand before merging."
+          fi
