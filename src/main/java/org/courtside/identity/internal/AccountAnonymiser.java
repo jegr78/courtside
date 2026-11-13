@@ -53,6 +53,7 @@ class AccountAnonymiser implements AccountAnonymisation {
                         """)
                 .param("id", accountId).update();
         jdbc.sql("UPDATE waitlist_entry SET note = NULL WHERE account_id = :id").param("id", accountId).update();
+        jdbc.sql("UPDATE booking_series SET note = NULL WHERE created_by = :id").param("id", accountId).update();
         jdbc.sql("DELETE FROM import_external_reference WHERE person_id = :person")
                 .param("person", account.getPerson().getId()).update();
     }
