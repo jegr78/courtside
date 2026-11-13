@@ -1017,7 +1017,10 @@ Miniserver answers `getjwt` with 412 for a user whose groups lack the website an
 `updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
 `getip` answer of `connect.loxonecloud.com`, accepted only under `remcov3.loxonecloud.com` on ports
 20000 to 49000 or under `dyndns.loxonecloud.com` on any port, or at a fixed
-`https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
+`https://` URL. `getip` answering 403 or 418 is Loxone refusing Remote Connect to third-party clients;
+the connector reports it as unreachable with that cause, and the `miniserver` check as
+`access.check.address.remoteConnectRefused` with the status and the fixed address as the remedy. A
+failed request forgets the relay address, and the next call asks for it again. Each
 grant is one timespan user named `courtside_` plus the grant id's hex digits, with deletion at its
 end, the code and the Loxone groups of its access points. Its window is sent as seconds since
 2009-01-01T00:00:00Z, which the Miniserver reads in UTC and its app shows in local time; the token's

@@ -80,6 +80,9 @@ final class LoxoneConnectionChecks {
         } catch (LoxoneClient.Unresolved unresolved) {
             return CheckResult.failed("access.check.address.unresolved",
                     Map.of("status", String.valueOf(unresolved.status())));
+        } catch (LoxoneClient.RemoteConnectRefused refused) {
+            return CheckResult.failed("access.check.address.remoteConnectRefused",
+                    Map.of("status", String.valueOf(refused.status())));
         } catch (LoxoneClient.OutsideRelays outside) {
             return CheckResult.failed("access.check.address.outsideRelays", Map.of());
         }

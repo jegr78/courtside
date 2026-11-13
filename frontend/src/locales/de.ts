@@ -2135,6 +2135,7 @@ const de = {
   "access.check.unclear": "Keine eindeutige Antwort: {{reason}}",
   "access.check.miniserver.reached": "Courtside erreicht den Miniserver über HTTPS mit gültigem Zertifikat, Version {{version}}, mindestens {{minimum}} ist nötig.",
   "access.check.address.unresolved": "Die Loxone Cloud kennt keine Adresse für diese Seriennummer (Status {{status}}).",
+  "access.check.address.remoteConnectRefused": "Die Loxone Cloud lässt über Remote Connect nur die Loxone App und Loxone Config zu (Status {{status}}). Courtside findet den Miniserver deshalb nicht über seine Seriennummer. Macht den Miniserver über HTTPS erreichbar, per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz, und tragt diese Adresse statt der Seriennummer in COURTSIDE_ACCESS_CONTROL_LOXONE_URL ein.",
   "access.check.address.outsideRelays": "Die Loxone Cloud nennt eine Adresse außerhalb der Loxone-Relays. Courtside sendet dorthin nichts.",
   "access.check.address.noMiniserver": "Unter der Adresse antwortet kein Miniserver (Status {{status}}).",
   "access.check.version.tooOld": "Version {{version}} ist zu alt, nötig ist mindestens {{minimum}}.",

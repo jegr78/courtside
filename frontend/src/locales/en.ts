@@ -2137,6 +2137,7 @@ const en: Record<keyof typeof de, string> = {
   "access.check.unclear": "No clear answer: {{reason}}",
   "access.check.miniserver.reached": "Courtside reaches the Miniserver over HTTPS with a valid certificate, version {{version}}, at least {{minimum}} is needed.",
   "access.check.address.unresolved": "Loxone Cloud knows no address for this serial number (status {{status}}).",
+  "access.check.address.remoteConnectRefused": "Loxone Cloud refuses Remote Connect to programs other than the Loxone app and Loxone Config (status {{status}}), so Courtside cannot find the Miniserver by its serial number. Make the Miniserver reachable over HTTPS, through port forwarding at the clubhouse or a tunnel into the club network, and enter that address in COURTSIDE_ACCESS_CONTROL_LOXONE_URL instead of the serial number.",
   "access.check.address.outsideRelays": "Loxone Cloud names an address outside Loxone's relays. Courtside sends nothing there.",
   "access.check.address.noMiniserver": "No Miniserver answers at that address (status {{status}}).",
   "access.check.version.tooOld": "Version {{version}} is too old, at least {{minimum}} is needed.",

@@ -2,6 +2,7 @@ package org.courtside.access.internal;
 
 import org.courtside.access.CheckOutcome;
 import org.courtside.access.CheckResult;
+import org.courtside.access.ProbeOutcome;
 import org.courtside.access.RemoteGroup;
 import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,39 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         // then
         assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.failed("access.check.address.unresolved",
                 Map.of("status", "404")));
+    }
+
+    @Test
+    void givenLoxoneRefusingRemoteConnectForThirdPartyClients_whenChecked_thenTheAddressFailsWithTheFixedAddressRemedy() {
+        // given
+        LoxoneAccessControl bySerial = ready(connectorFor(settingsBySerial(DEADLINE)));
+
+        for (int status : new int[]{403, 418}) {
+            simulator.force("getip", status);
+
+            // when
+            List<ConnectionCheckRun.Checked> checked = checked(bySerial);
+
+            // then
+            assertThat(result(checked, "miniserver")).as("getip %s is Loxone's refusal, not an unknown serial", status)
+                    .isEqualTo(CheckResult.failed("access.check.address.remoteConnectRefused",
+                            Map.of("status", String.valueOf(status))));
+        }
+    }
+
+    @Test
+    void givenLoxoneRefusingRemoteConnect_whenProbed_thenTheProbeReadsUnreachableAndSaysWhy() {
+        // given
+        LoxoneAccessControl bySerial = connectorFor(settingsBySerial(DEADLINE));
+        simulator.force("getip", 403);
+
+        // when
+        ProbeOutcome outcome = bySerial.probe();
+
+        // then
+        assertThat(outcome).isInstanceOfSatisfying(ProbeOutcome.Unreachable.class, unreachable ->
+                assertThat(unreachable.reason()).as("the board reads the cause instead of an empty detail")
+                        .contains("refuses Remote Connect").contains("COURTSIDE_ACCESS_CONTROL_LOXONE_URL"));
     }
 
     @Test

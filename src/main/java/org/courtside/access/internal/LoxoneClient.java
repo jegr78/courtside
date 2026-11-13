@@ -99,6 +99,22 @@ final class LoxoneClient implements AutoCloseable {
         }
     }
 
+    /** Loxone Cloud lets only its own app and Loxone Config through Remote Connect. */
+    static final class RemoteConnectRefused extends Unreachable {
+
+        private final int status;
+
+        RemoteConnectRefused(int status) {
+            super("Loxone Cloud refuses Remote Connect for third-party clients (getip " + status
+                    + "); set the Miniserver's own address in COURTSIDE_ACCESS_CONTROL_LOXONE_URL");
+            this.status = status;
+        }
+
+        int status() {
+            return status;
+        }
+    }
+
     static final class OutsideRelays extends LoxoneFailure {
 
         OutsideRelays() {
@@ -379,6 +395,9 @@ final class LoxoneClient implements AutoCloseable {
         int status = response.statusCode();
         if (status == 400 || status == 404 || status == 504) {
             throw new Unresolved(status);
+        }
+        if (status == 403 || status == 418) {
+            throw new RemoteConnectRefused(status);
         }
         if (status != 200) {
             throw new LoxoneFailure("getip answered " + status);
