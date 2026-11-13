@@ -1638,6 +1638,6 @@ it("given a participation whose door hold is refused, when the player holds its 
   await userEvent.click(await screen.findByTestId("hold-doors-open"));
 
   // then
-  const section = screen.getByRole("region", { name: i18n.t("participations.title") });
+  const section = screen.getByTestId("participations-title").closest("section") as HTMLElement;
   expect(await within(section).findByRole("alert"), "the failure sits where the player clicked").toBeInTheDocument();
 });

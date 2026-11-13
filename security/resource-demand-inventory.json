@@ -869,9 +869,10 @@
     {
       "id": "door-hold-ends",
       "kind": "ordinary",
-      "rationale": "Each runs inside the cancelling or moving transaction and ends the unended door holds of the bookings it names with one indexed update, publishing one audit event per hold it ended; it calls nothing outside the process.",
+      "rationale": "Each runs inside the cancelling, moving or withdrawing transaction and ends the unended door holds of the bookings it names, or the withdrawing player's own, with one indexed update, publishing one audit event per hold it ended; it calls nothing outside the process.",
       "entryPoints": [
         "DoorHoldService#on(BookingCancelled)",
+        "DoorHoldService#on(ParticipantWithdrew)",
         "DoorHoldService#on(SeriesCancelled)",
         "DoorHoldService#on(SeriesMoved)"
       ]
