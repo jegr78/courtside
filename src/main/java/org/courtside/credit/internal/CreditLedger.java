@@ -65,13 +65,13 @@ public class CreditLedger implements BookingPayments {
     @Transactional
     public LedgerEntry record(UUID accountId, CreditEntryKind kind, int amountMinor, String note,
                               @Nullable String idempotencyKey) {
+        if (idempotencyKey != null && (idempotencyKey.isEmpty() || idempotencyKey.length() > 128
+                || idempotencyKey.chars().anyMatch(character -> character < '!' || character > '~'))) {
+            throw new IllegalStateException("The idempotency key must be 1 to 128 visible ASCII characters");
+        }
         recentAuthentication.requireRecent();
         if (idempotencyKey == null) {
             return appendEntry(accountId, kind, amountMinor, note, null);
-        }
-        if (idempotencyKey.isEmpty() || idempotencyKey.length() > 128
-                || idempotencyKey.chars().anyMatch(character -> character < '!' || character > '~')) {
-            throw new IllegalStateException("The idempotency key must be 1 to 128 visible ASCII characters");
         }
         UUID actor = currentUser.accountId().orElseThrow(() -> new IllegalStateException(
                 "A credit entry is recorded by a signed-in account"));
