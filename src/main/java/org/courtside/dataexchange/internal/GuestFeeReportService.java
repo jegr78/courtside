@@ -19,6 +19,7 @@ import java.text.Collator;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Year;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Currency;
@@ -36,6 +37,8 @@ public class GuestFeeReportService {
 
     private static final List<String> TRAILING_HEADER =
             List.of("firstName", "lastName", "email", "guestPlaces", "amount", "currency");
+
+    private static final long MAX_DAYS = 366;
 
     private static final Collator NAMES = Collator.getInstance(Locale.ROOT);
 
@@ -77,7 +80,9 @@ public class GuestFeeReportService {
         List<String> header = new ArrayList<>();
         report.sources().forEach(source -> header.add("memberNumber " + source.displayName()));
         header.addAll(TRAILING_HEADER);
-        List<List<String>> rows = report.rows().stream().map(row -> cells(row, report.sources())).toList();
+        char decimalSeparator = separator == ';' ? ',' : '.';
+        List<List<String>> rows = report.rows().stream()
+                .map(row -> cells(row, report.sources(), decimalSeparator)).toList();
         return new Download(report.from(), report.to(),
                 ExportCsv.write(header, rows, separator, charset));
     }
@@ -89,6 +94,7 @@ public class GuestFeeReportService {
         Year year = Year.now(clock.withZone(clubTimeZone.zoneId()));
         LocalDate from = requestedFrom == null ? year.atDay(1) : requestedFrom;
         LocalDate to = requestedTo == null ? year.atMonth(12).atEndOfMonth() : requestedTo;
+        validate(from, to);
         BookingLedger.GuestFeeLedger charged = ledger.chargedGuestsBetween(from, to);
         Set<UUID> personIds = charged.members().stream().map(BookingLedger.ChargedGuests::personId)
                 .collect(Collectors.toSet());
@@ -112,6 +118,18 @@ public class GuestFeeReportService {
         return new Report(from, to, known, rows, charged.unassignedGuestPlaces());
     }
 
+    private static void validate(LocalDate from, LocalDate to) {
+        if (from.getYear() < 1 || from.getYear() > 9999 || to.getYear() < 1 || to.getYear() > 9999) {
+            throw new GuestFeePeriodInvalidException("treasury.guestFees.dateOutOfRange", Map.of());
+        }
+        if (to.isBefore(from)) {
+            throw new GuestFeePeriodInvalidException("treasury.guestFees.periodOrder", Map.of());
+        }
+        if (ChronoUnit.DAYS.between(from, to) + 1 > MAX_DAYS) {
+            throw new GuestFeePeriodInvalidException("treasury.guestFees.periodTooLong", Map.of("maxDays", MAX_DAYS));
+        }
+    }
+
     private static Row row(BookingLedger.ChargedGuests line, Person person, List<Reference> references) {
         if (person == null) {
             throw new IllegalStateException("A charged booking names an account without a person");
@@ -120,18 +138,19 @@ public class GuestFeeReportService {
                 line.currency(), line.guestPlaces(), line.sumMinor());
     }
 
-    private static List<String> cells(Row row, List<Source> sources) {
+    private static List<String> cells(Row row, List<Source> sources, char decimalSeparator) {
         List<String> cells = new ArrayList<>();
         for (Source source : sources) {
             cells.add(row.references().stream().filter(reference -> reference.sourceId().equals(source.id()))
                     .map(Reference::externalId).findFirst().orElse(""));
         }
         cells.addAll(List.of(row.firstName(), row.lastName(), row.email(), String.valueOf(row.guestPlaces()),
-                amount(row.sumMinor(), row.currency()), row.currency()));
+                amount(row.sumMinor(), row.currency(), decimalSeparator), row.currency()));
         return cells;
     }
 
-    private static String amount(long sumMinor, String currency) {
-        return BigDecimal.valueOf(sumMinor, Currency.getInstance(currency).getDefaultFractionDigits()).toPlainString();
+    private static String amount(long sumMinor, String currency, char decimalSeparator) {
+        return BigDecimal.valueOf(sumMinor, Currency.getInstance(currency).getDefaultFractionDigits()).toPlainString()
+                .replace('.', decimalSeparator);
     }
 }

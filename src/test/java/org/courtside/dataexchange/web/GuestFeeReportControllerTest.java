@@ -3,6 +3,7 @@ package org.courtside.dataexchange.web;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
@@ -55,6 +56,8 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
     private UserDetailsService userDetailsService;
     @Autowired
     private JdbcClient jdbc;
+    @Autowired
+    private AccountAnonymisation anonymisation;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -143,9 +146,49 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
         // then
         assertThat(Arrays.asList(written.split("\r\n"))).containsExactly(
                 "﻿memberNumber Main roster;memberNumber Youth roster;firstName;lastName;email;guestPlaces;amount;currency",
-                "A-17;B-3;Jane;Doe;jane.doe@example.org;1;3.00;CHF",
-                "A-17;B-3;Jane;Doe;jane.doe@example.org;5;25.00;EUR",
-                "'-4;;John;Roe;john.roe@example.org;1;7.50;EUR");
+                "A-17;B-3;Jane;Doe;jane.doe@example.org;1;3,00;CHF",
+                "A-17;B-3;Jane;Doe;jane.doe@example.org;5;25,00;EUR",
+                "'-4;;John;Roe;john.roe@example.org;1;7,50;EUR");
+    }
+
+    @Test
+    void givenAYearOfGuestBookings_whenTheReportIsDownloadedWithCommas_thenTheAmountsCarryADecimalPoint() throws Exception {
+        // given
+        aTestYear();
+
+        // when
+        String written = mockMvc.perform(post(EXPORT).param("from", "2026-01-01").param("to", "2026-12-31")
+                        .param("separator", ",").with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        // then
+        assertThat(Arrays.asList(written.split("\r\n"))).as("a decimal comma would split the amount cell")
+                .containsExactly(
+                        "\uFEFFmemberNumber Main roster,memberNumber Youth roster,firstName,lastName,email,guestPlaces,amount,currency",
+                        "A-17,B-3,Jane,Doe,jane.doe@example.org,1,3.00,CHF",
+                        "A-17,B-3,Jane,Doe,jane.doe@example.org,5,25.00,EUR",
+                        "'-4,,John,Roe,john.roe@example.org,1,7.50,EUR");
+    }
+
+    @Test
+    void givenABookerWhoseAccountWasAnonymised_whenTheReportIsRead_thenTheirGuestPlacesAreOnlyCounted() throws Exception {
+        // given
+        aTestYear();
+        UUID richard = identity.createPerson("Richard", "Roe", "richard.roe@example.org");
+        UUID closedAccount = identity.createEnabledAccount(richard, "roe.richard", Set.of(Role.MEMBER));
+        bookings.chargeGuests(booking(closedAccount, "2026-05-01T10:00:00Z"), 2, 400, "EUR");
+        anonymisation.anonymise(closedAccount);
+
+        // when / then
+        mockMvc.perform(post(REPORT).param("from", "2026-01-01").param("to", "2026-12-31")
+                        .with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[*].personId").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem(richard.toString()))))
+                .andExpect(jsonPath("$.members[*].lastName").value(org.hamcrest.Matchers.contains(
+                        "Doe", "Doe", "Roe")))
+                .andExpect(jsonPath("$.unassignedGuestPlaces").value(3));
     }
 
     @Test
@@ -177,7 +220,9 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(REPORT).param("from", "2025-01-01").param("to", "2026-01-02")
                         .with(csrf()).with(user(as("major.mary"))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.violations[0].code").value("booking.facilityUtilisation.periodTooLong"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guest-fee-period-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("treasury.guestFees.periodTooLong"))
+                .andExpect(jsonPath("$.violations[0].params.maxDays").value(366));
         assertThat(readsRecorded()).as("a refused period reads nothing").isZero();
     }
 
@@ -215,7 +260,19 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(REPORT).param("from", "2026-12-31").param("to", "2026-01-01")
                         .with(csrf()).with(user(as("major.mary"))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.violations[0].code").value("booking.facilityUtilisation.periodOrder"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guest-fee-period-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("treasury.guestFees.periodOrder"));
+    }
+
+    @Test
+    void givenAYearBeyondTheCalendar_whenTheFileIsDownloaded_thenThePeriodIsRefusedByNameAndNothingIsRecorded() throws Exception {
+        // when / then
+        mockMvc.perform(post(EXPORT).param("from", "+10000-01-01").param("to", "+10000-01-02")
+                        .with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guest-fee-period-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("treasury.guestFees.dateOutOfRange"));
+        assertThat(readsRecorded()).as("a refused period reads nothing").isZero();
     }
 
     @Test

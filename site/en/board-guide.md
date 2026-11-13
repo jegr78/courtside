@@ -895,10 +895,12 @@ days. Every guest place with a fee above zero counts when its booking is confirm
 the period and is over. Cancelled bookings and bookings not yet played do not count. The fee belongs
 to the account the booking was made for, also when a guardian booked for their child. If the club
 changed its currency, a member has one row per currency. Guest places from bookings that no longer
-name a member after the retention period appear only as a count.
+name a member after the retention period, or whose account was closed and anonymised, appear only
+as a count.
 
 *Download the file* saves the list as a CSV file with one member number column per import source, first
-name, last name, email address, guest places, amount and currency. Courtside marks nothing as
+name, last name, email address, guest places, amount and currency. With a semicolon as separator the
+amount carries a decimal comma (`25,00`), otherwise a decimal point (`25.00`). Courtside marks nothing as
 invoiced. Every opening and every download is in the change log with its period, without names or
 amounts.
 
