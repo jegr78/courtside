@@ -1,31 +1,10 @@
 # Changelog
 
-## [0.5.0-rc.4](https://github.com/jegr78/courtside/compare/v0.5.0-rc.3...v0.5.0-rc.4) (2026-11-13)
-
-
-### Features
-
-* let guests and named players hold the doors of their booking open ([#1973](https://github.com/jegr78/courtside/issues/1973)) ([f61c685](https://github.com/jegr78/courtside/commit/f61c6858a7b3e430a6b503942aa8f0adc2b6d0ca))
-
-
-### Bug fixes
-
-* clear a closed account's series notes and withdraw a registration link when the board corrects the address ([#1987](https://github.com/jegr78/courtside/issues/1987)) ([1eb3c75](https://github.com/jegr78/courtside/commit/1eb3c75752b50014afb0721053afc1ee0b48d1a0))
-* end a door hold when its card is deactivated, its booking displaced or its holder closed ([#1988](https://github.com/jegr78/courtside/issues/1988)) ([d43f2d9](https://github.com/jegr78/courtside/commit/d43f2d921d2c08205c51b54f369eba1b080a9fb1))
-* read PayPal orders with the credentials they were created with and refuse an order after the hold expired ([#1984](https://github.com/jegr78/courtside/issues/1984)) ([0b1a5bd](https://github.com/jegr78/courtside/commit/0b1a5bd24ece3e5d57020d3ce09935b914a2252f))
-* refuse an age-banded import whose file lacks the birth date column ([#1985](https://github.com/jegr78/courtside/issues/1985)) ([1d992a8](https://github.com/jegr78/courtside/commit/1d992a889bd90a02d686af0a620f1fe0c265d910)), closes [#1977](https://github.com/jegr78/courtside/issues/1977)
-* state the guest fee report's amount format and leave anonymised bookers out ([#1986](https://github.com/jegr78/courtside/issues/1986)) ([b1ff110](https://github.com/jegr78/courtside/commit/b1ff110644e4ca44ff232971b1cae17017dc4d34)), closes [#1980](https://github.com/jegr78/courtside/issues/1980)
-* tell the board when Loxone refuses Remote Connect, and stop recommending the serial ([#1990](https://github.com/jegr78/courtside/issues/1990)) ([638e8b1](https://github.com/jegr78/courtside/commit/638e8b12684f55339f82ae21dc40de05fcfedbe1))
-
-
-### Documentation
-
-* close a held door through the HTTP input's online status in the Loxone recipe ([#1993](https://github.com/jegr78/courtside/issues/1993)) ([0ca39b6](https://github.com/jegr78/courtside/commit/0ca39b658ce02afcaf11e1c24a43d16c6de4a030))
-
 ## 0.5.0 (2026-11-09)
 
 ### Features
 
+* let guests and named players hold the doors of their booking open ([#1973](https://github.com/jegr78/courtside/issues/1973)) ([f61c685](https://github.com/jegr78/courtside/commit/f61c6858a7b3e430a6b503942aa8f0adc2b6d0ca))
 * collapse read messages and delete them after a club-set period ([#1950](https://github.com/jegr78/courtside/issues/1950)) ([6ea3503](https://github.com/jegr78/courtside/commit/6ea35036322244c5a714ef28e367f535ab15b03c)), closes [#1868](https://github.com/jegr78/courtside/issues/1868)
 * extend a held booking while its doors are held open ([#1964](https://github.com/jegr78/courtside/issues/1964)) ([c05cc5b](https://github.com/jegr78/courtside/commit/c05cc5bbcc0285229bd8dc095bd60242264be1ae))
 * hold a booking's doors open while a responsible person is checked in ([#1963](https://github.com/jegr78/courtside/issues/1963)) ([6b4f1b2](https://github.com/jegr78/courtside/commit/6b4f1b28e90d7d3441c03d0759fd00d85a3030f6))
@@ -50,6 +29,12 @@
 
 ### Bug fixes
 
+* clear a closed account's series notes and withdraw a registration link when the board corrects the address ([#1987](https://github.com/jegr78/courtside/issues/1987)) ([1eb3c75](https://github.com/jegr78/courtside/commit/1eb3c75752b50014afb0721053afc1ee0b48d1a0))
+* end a door hold when its card is deactivated, its booking displaced or its holder closed ([#1988](https://github.com/jegr78/courtside/issues/1988)) ([d43f2d9](https://github.com/jegr78/courtside/commit/d43f2d921d2c08205c51b54f369eba1b080a9fb1))
+* read PayPal orders with the credentials they were created with and refuse an order after the hold expired ([#1984](https://github.com/jegr78/courtside/issues/1984)) ([0b1a5bd](https://github.com/jegr78/courtside/commit/0b1a5bd24ece3e5d57020d3ce09935b914a2252f))
+* refuse an age-banded import whose file lacks the birth date column ([#1985](https://github.com/jegr78/courtside/issues/1985)) ([1d992a8](https://github.com/jegr78/courtside/commit/1d992a889bd90a02d686af0a620f1fe0c265d910)), closes [#1977](https://github.com/jegr78/courtside/issues/1977)
+* state the guest fee report's amount format and leave anonymised bookers out ([#1986](https://github.com/jegr78/courtside/issues/1986)) ([b1ff110](https://github.com/jegr78/courtside/commit/b1ff110644e4ca44ff232971b1cae17017dc4d34)), closes [#1980](https://github.com/jegr78/courtside/issues/1980)
+* tell the board when Loxone refuses Remote Connect, and stop recommending the serial ([#1990](https://github.com/jegr78/courtside/issues/1990)) ([638e8b1](https://github.com/jegr78/courtside/commit/638e8b12684f55339f82ae21dc40de05fcfedbe1))
 * settle PayPal orders correctly when a capture repeats, is refunded or outlasts its deadline ([#1948](https://github.com/jegr78/courtside/issues/1948)) ([dce3c1d](https://github.com/jegr78/courtside/commit/dce3c1d28f47f232df3c751463435c1209a40d72))
 * correct the guest fee report, age-banded imports and the application shell ([#1924](https://github.com/jegr78/courtside/issues/1924)) ([1790f47](https://github.com/jegr78/courtside/commit/1790f4738a4640e351a1b2a2cecf054e0e73da7a))
 * keep external players' money reachable through closure, displacement and the ledger ([#1927](https://github.com/jegr78/courtside/issues/1927)) ([d9bd1f8](https://github.com/jegr78/courtside/commit/d9bd1f8650acd039be75967d9645444c5b38080d))
@@ -73,6 +58,7 @@
 
 ### Documentation
 
+* close a held door through the HTTP input's online status in the Loxone recipe ([#1993](https://github.com/jegr78/courtside/issues/1993)) ([0ca39b6](https://github.com/jegr78/courtside/commit/0ca39b658ce02afcaf11e1c24a43d16c6de4a030))
 * record that an external booker reads the members' door code from confirmation on ([#1923](https://github.com/jegr78/courtside/issues/1923)) ([e26b1d7](https://github.com/jegr78/courtside/commit/e26b1d7ae11cc433d51cc8c6eaea1c870c608c60))
 
 ### Chores
