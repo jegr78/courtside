@@ -6,6 +6,8 @@ import { branchFetchArguments, remoteRefOf } from "./release-line.mjs";
 import {
   greenExactBuild,
   greenFullBuild,
+  greenPushBuild,
+  planIsFull,
   pendingReleasePullRequests,
   readCommitFacts,
   releasePullRequestOf,
@@ -295,27 +297,76 @@ test("given a later commit whose push build planned only part of the jobs, when 
     "without the commit's kind a push build does not count");
 });
 
-test("given a release commit whose parent has a green full build, when the candidate selects, then that build is the test evidence", () => {
-  // given
-  const parentBuild = { runId: 43377273551, runAttempt: 1 };
+const parentBuild = { runId: 43377273551, runAttempt: 1 };
+const pushBuild = { runId: 43397720067, runAttempt: 1 };
+const dispatchedBuild = { runId: 43397720999, runAttempt: 1 };
 
+test("given a version-only release commit whose parent has a green full build, when the candidate selects, then that build is the test evidence", () => {
   // when
-  const selection = selectReleaseCandidate(workflowRun({ parentBuild }));
+  const selection = selectReleaseCandidate(workflowRun({ versionOnly: true, parentBuild }));
 
   // then
   assert.equal(selection.release, true);
   assert.deepEqual(selection.build, parentBuild, "the push build of a version bump on a verified parent ran only docs");
 });
 
-test("given a dispatched re-run of a release commit whose parent has a green full build, when the candidate selects, then that build is the test evidence", () => {
-  // given
-  const parentBuild = { runId: 43377273551, runAttempt: 1 };
-
+test("given a version-only release commit without a parent build, when its push build planned every job, then the push build is the evidence", () => {
   // when
-  const selection = selectReleaseCandidate(dispatch({ parentBuild }));
+  const selection = selectReleaseCandidate(workflowRun({ versionOnly: true, parentBuild: null, pushPlanFull: true }));
+
+  // then
+  assert.deepEqual(selection.build, { runId: 37211926309, runAttempt: 1 });
+});
+
+test("given a version-only release commit whose push build planned part of the jobs and whose parent build vanished, when the candidate selects, then the run fails", () => {
+  // when / then
+  assert.throws(() => selectReleaseCandidate(workflowRun({ versionOnly: true, parentBuild: null, pushPlanFull: false })),
+    /no full build verifies b{40}: its parent has no green scheduled or dispatched build on main/);
+});
+
+test("given a dispatched re-run of a version-only release commit, when its parent has a full build and its push build is green, then the parent build is the evidence", () => {
+  // when
+  const selection = selectReleaseCandidate(dispatch({ versionOnly: true, parentBuild, pushBuild, exactBuild: null }));
 
   // then
   assert.deepEqual(selection.build, parentBuild);
+});
+
+test("given a dispatched re-run of a version-only release commit whose own push build is not green, when the candidate selects, then the run fails", () => {
+  // when / then
+  assert.throws(() => selectReleaseCandidate(dispatch({ versionOnly: true, parentBuild, pushBuild: null,
+    exactBuild: dispatchedBuild })), /no full build verifies/,
+  "the push build ran the changelog and version guards on the release diff, which the parent's build never saw");
+});
+
+test("given a dispatched re-run of a version-only release commit with a partial push build, when a dispatched build of the commit is green, then that build is the evidence", () => {
+  // when
+  const selection = selectReleaseCandidate(dispatch({ versionOnly: true, parentBuild: null, pushBuild,
+    pushPlanFull: false, exactBuild: dispatchedBuild }));
+
+  // then
+  assert.deepEqual(selection.build, dispatchedBuild);
+});
+
+test("given build runs of a commit, when its push build is read, then only a green push on the branch of this repository counts", () => {
+  // given
+  const push = { id: 43397720067, run_attempt: 1, event: "push", head_branch: "main", conclusion: "success",
+    head_repository: { full_name: "jegr78/courtside" } };
+
+  // when / then
+  assert.deepEqual(greenPushBuild([{ workflow_runs: [push] }], "jegr78/courtside"), pushBuild);
+  for (const other of [{ event: "workflow_dispatch" }, { head_branch: "feature" }, { conclusion: "failure" },
+    { head_repository: { full_name: "someone/courtside" } }]) {
+    assert.equal(greenPushBuild([{ workflow_runs: [{ ...push, ...other }] }], "jegr78/courtside"), null, JSON.stringify(other));
+  }
+});
+
+test("given an uploaded test-profile plan, when it is read, then only a plan of the full profile counts as full", () => {
+  // when / then
+  assert.equal(planIsFull({ isFull: true, profiles: ["full"] }), true);
+  assert.equal(planIsFull({ isFull: false, profiles: ["docs"] }), false);
+  assert.equal(planIsFull({ isFull: true, profiles: ["docs"] }), false, "a contradictory plan is not trusted");
+  assert.equal(planIsFull(null), false);
 });
 
 test("given build runs of a release commit's parent, when its full build is read, then only a green scheduled or dispatched main run counts", () => {

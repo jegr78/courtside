@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   branchFetchArguments, forwardPortVerdict, newestLineVerdict, releasableTypes, releaseBranchOf, releaseToolingPaths,
@@ -121,10 +123,27 @@ export function selectReleaseCandidate(facts) {
       throw new Error(`${facts.forwardPort.detail}: ${facts.forwardPort.missing.join(", ")}`);
     }
   }
-  const build = buildRunOf(facts.parentBuild ?? (event === "workflow_run" ? facts.build : facts.exactBuild));
+  const build = testEvidence(facts, event);
+  if (build === null && facts.versionOnly === true) {
+    throw new Error(`no full build verifies ${commit}: its parent has no green scheduled or dispatched build on ${branch}, `
+      + "and its own green push build planned part of the jobs or is missing; dispatch build on the branch, then the candidate");
+  }
   if (build === null) throw new Error(`no green build of ${commit} on ${branch}`);
   const reason = event === "workflow_run" ? "release-commit" : branch === "main" ? "re-run" : "patch-release";
   return selected(reason, pullRequest, build);
+}
+
+/**
+ * The full build whose tests stand for the commit. A version-only release commit also needs its own green push build,
+ * because that ran the changelog and version guards on its diff.
+ */
+export function testEvidence(facts, event) {
+  const own = event === "workflow_run" ? facts.build : facts.exactBuild;
+  if (facts.versionOnly !== true) return buildRunOf(own);
+  const push = buildRunOf(event === "workflow_run" ? facts.build : facts.pushBuild);
+  if (push === null) return null;
+  return buildRunOf(facts.parentBuild) ?? (facts.pushPlanFull === true ? push : null)
+    ?? (event === "workflow_dispatch" ? buildRunOf(facts.exactBuild) : null);
 }
 
 export function readCommitFacts(commit, git) {
@@ -158,7 +177,7 @@ export function releasePullRequestOf(pull, mergeCommitIsAncestor, branch = "main
     mergeCommitIsAncestor: commitPattern.test(mergeCommit ?? "") && mergeCommitIsAncestor === true };
 }
 
-/** A push build plans by its diff, so it proves every job only on a release commit, which plans full. */
+/** A push build plans by its diff, so it proves every job only on a release commit that changes more than its version. */
 export function greenExactBuild(pages, repository, branch = "main", { releaseCommit = false } = {}) {
   const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === branch
     && ((candidate.event === "push" && releaseCommit === true) || candidate.event === "workflow_dispatch")
@@ -176,6 +195,33 @@ export function greenFullBuild(pages, repository, branch = "main") {
     && candidate.head_repository?.full_name === repository)
     .toSorted((left, right) => right.id - left.id)[0];
   return run === undefined ? null : buildRunOf({ runId: run.id, runAttempt: run.run_attempt });
+}
+
+export function greenPushBuild(pages, repository, branch = "main") {
+  const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === branch
+    && candidate.event === "push" && candidate.conclusion === "success"
+    && candidate.head_repository?.full_name === repository)
+    .toSorted((left, right) => right.id - left.id)[0];
+  return run === undefined ? null : buildRunOf({ runId: run.id, runAttempt: run.run_attempt });
+}
+
+/** Whether the plan a build uploaded selected every job; anything unreadable counts as partial. */
+export function planIsFull(plan) {
+  return plan !== null && typeof plan === "object" && plan.isFull === true
+    && Array.isArray(plan.profiles) && plan.profiles.length === 1 && plan.profiles[0] === "full";
+}
+
+function planWasFull(repository, runId) {
+  try {
+    const name = command("gh", ["api", `repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`, "--jq",
+      `[.artifacts[].name | select(startswith("test-profile-plan-${runId}-"))] | first // ""`]);
+    if (name === "") return false;
+    const directory = mkdtempSync(join(tmpdir(), "candidate-plan-"));
+    command("gh", ["run", "download", String(runId), "--repo", repository, "--name", name, "--dir", directory]);
+    return planIsFull(JSON.parse(readFileSync(join(directory, "plan.json"), "utf8")));
+  } catch {
+    return false;
+  }
 }
 
 function command(executable, arguments_) {
@@ -249,20 +295,22 @@ export function gatherFacts(options, environment = process.env) {
         && succeeds("git", ["merge-base", "--is-ancestor", merged, commit]), branch);
     })
     .filter((pullRequest) => pullRequest !== null);
+  const runsOf = (sha) => api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${sha}&status=success&per_page=100`);
   if (facts.manifest !== facts.parentManifest) {
     const parent = git("rev-parse", `${commit}^1`);
     const changes = parseNameStatus(git("diff", "--name-status", "-z", "--find-renames", parent, commit, "--"));
     const raw = (arguments_) => execFileSync("git", arguments_, { encoding: "utf8" });
-    if (releaseVersionFiles(changes, { baseCommit: parent, headCommit: commit, git: raw }).size > 0) {
-      facts.parentBuild = greenFullBuild(
-        api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${parent}&status=success&per_page=100`),
-        repository, branch);
-    }
+    facts.versionOnly = releaseVersionFiles(changes, { baseCommit: parent, headCommit: commit, git: raw }).size > 0;
+  }
+  if (facts.versionOnly) {
+    facts.parentBuild = greenFullBuild(runsOf(git("rev-parse", `${commit}^1`)), repository, branch);
+    facts.pushBuild = event === "workflow_run" ? null : greenPushBuild(runsOf(commit), repository, branch);
+    const push = event === "workflow_run" ? facts.build : facts.pushBuild;
+    facts.pushPlanFull = facts.parentBuild === null && push?.runId !== undefined && planWasFull(repository, push.runId);
   }
   if (event === "workflow_dispatch") {
-    facts.exactBuild = greenExactBuild(
-      api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),
-      repository, branch, { releaseCommit: facts.manifest !== facts.parentManifest });
+    facts.exactBuild = greenExactBuild(runsOf(commit), repository, branch,
+      { releaseCommit: facts.manifest !== facts.parentManifest && facts.versionOnly !== true });
   }
   facts.newestLine = newestLineVerdict(facts.manifest, JSON.parse(command(process.execPath,
     [fileURLToPath(new URL("./published-release-tags.mjs", import.meta.url))])));
