@@ -14,7 +14,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -36,9 +36,23 @@ jobs:
       - id: application
         name: Verify migration discovery and critical application paths
         continue-on-error: true
-        run: >
-          ./mvnw -B test -Pjava-only
-          -Dtest=ConstraintNameTest,HealthEndpointTest,GeneratedApiImplementationTest
+        # A transient miss at Maven Central is retried with forced updates; a failing test is not.
+        run: |
+          mkdir -p build/post-merge
+          update=()
+          for attempt in 1 2 3; do
+            ./mvnw -B "${update[@]}" test -Pjava-only \
+              -Dtest=ConstraintNameTest,HealthEndpointTest,GeneratedApiImplementationTest \
+              2>&1 | tee build/post-merge/maven.log
+            status=${PIPESTATUS[0]}
+            [ "$status" = 0 ] && exit 0
+            grep -q -E 'Non-resolvable|Could not (resolve|transfer|find artifact)' build/post-merge/maven.log \
+              || exit "$status"
+            echo "::warning::Maven could not download a dependency on attempt $attempt"
+            update=(-U)
+            sleep 20
+          done
+          exit 1
       - name: Record first-attempt outcome
         if: always()
         env:
