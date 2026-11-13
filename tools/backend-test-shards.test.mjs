@@ -4,7 +4,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { BACKEND_SHARDS, backendShard, backendTestClasses, parseShard, shardList } from "./backend-test-shards.mjs";
+import { BACKEND_SHARDS, backendShard, backendTestClasses, parseShard, readDurations, shardList } from "./backend-test-shards.mjs";
+import { durationsOf, suiteDuration } from "./backend-test-durations.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -113,6 +114,82 @@ test("given any weights, when they are split into any number of shards, then eve
     const shards = Array.from({ length: total }, (_, index) => backendShard(classes, index + 1, total));
     assert.deepEqual(shards.flat(), classes.map(({ name }) => name),
       `${JSON.stringify(classes)} in ${total} shards loses, repeats or reorders a class`);
+  }
+});
+
+test("given measured durations for some classes, when the classes are listed, then the others are weighed at the measured rate", () => {
+  // given
+  const root = sourceTree({
+    "org/example/MeasuredTest.java": `class MeasuredTest {${" ".repeat(79)}}`,
+    "org/example/UnmeasuredTest.java": `class UnmeasuredTest {${" ".repeat(177)}}`
+  });
+
+  // when
+  const classes = backendTestClasses(root, { "org/example/MeasuredTest.java": 60 });
+
+  // then
+  assert.deepEqual(classes, [
+    { name: "org/example/MeasuredTest.java", weight: 60 },
+    { name: "org/example/UnmeasuredTest.java", weight: 120 }
+  ], "twice the source of a class that took a minute is weighed as two minutes");
+});
+
+test("given a report as Surefire writes it, when its duration is read, then the class and its seconds come out", () => {
+  // given
+  const report = '<?xml version="1.0" encoding="UTF-8"?>\n<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+    + 'xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" '
+    + 'version="3.0.2" name="org.courtside.booking.web.BookingControllerTest" time="97.704" tests="76" errors="0" '
+    + 'skipped="0" failures="0" flakes="0">\n  <properties>\n    <property name="java.version" value="25"/>';
+
+  // when / then
+  assert.deepEqual(suiteDuration(report), { name: "org/courtside/booking/web/BookingControllerTest.java", seconds: 97.7 });
+});
+
+test("given report directories, when the durations are collected, then every class appears once in name order", () => {
+  // given
+  const reports = sourceTree({
+    "a/TEST-org.example.ZetaTest.xml": '<testsuite name="org.example.ZetaTest" time="1,234.5" tests="1">',
+    "b/nested/TEST-org.example.AlphaTest.xml": '<testsuite version="3.0.2" name="org.example.AlphaTest" time="2.04">',
+    "b/suite-metrics.json": "{}"
+  });
+
+  // when
+  const durations = durationsOf([join(reports, "a"), join(reports, "b")]);
+
+  // then
+  assert.deepEqual(Object.entries(durations),
+    [["org/example/AlphaTest.java", 2], ["org/example/ZetaTest.java", 1234.5]]);
+});
+
+test("given one class reported by two builds, when the durations are collected, then the shorter time is kept", () => {
+  // given
+  const reports = sourceTree({
+    "first/TEST-org.example.WaitlistTest.xml": '<testsuite name="org.example.WaitlistTest" time="82.1">',
+    "second/TEST-org.example.WaitlistTest.xml": '<testsuite name="org.example.WaitlistTest" time="42.3">'
+  });
+
+  // when
+  const durations = durationsOf([join(reports, "first"), join(reports, "second")]);
+
+  // then
+  assert.deepEqual(durations, { "org/example/WaitlistTest.java": 42.3 },
+    "the longer run paid for a context start that follows the shard cut, not the class");
+});
+
+test("given the checked-in durations, when the repository's tests are sharded, then each shard holds about an even share of the measured time", () => {
+  // given
+  const root = new URL("../src/test/java", import.meta.url).pathname;
+  const durations = readDurations();
+
+  // when
+  const seconds = Array.from({ length: BACKEND_SHARDS }, (_, index) =>
+    shardList(root, `${index + 1}/${BACKEND_SHARDS}`).reduce((sum, name) => sum + (durations[name] ?? 0), 0));
+
+  // then
+  const even = seconds.reduce((sum, value) => sum + value, 0) / BACKEND_SHARDS;
+  for (const shard of seconds) {
+    assert.ok(Math.abs(shard - even) <= even * 0.1,
+      `measured shard times ${seconds.map(Math.round).join(", ")} s stray more than a tenth from ${Math.round(even)} s`);
   }
 });
 
