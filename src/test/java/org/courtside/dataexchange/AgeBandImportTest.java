@@ -2,6 +2,7 @@ package org.courtside.dataexchange;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.dataexchange.internal.SnapshotHeaderInvalidException;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.MemberRepository;
@@ -238,6 +239,45 @@ class AgeBandImportTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> preview(source, EXPORT))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .hasFieldOrPropertyWithValue("code", "import.source.ageBands.birthDateNotMapped");
+    }
+
+    @Test
+    void givenAnImportedSplit_whenAFileLacksTheBirthDateColumn_thenItIsRefusedAndNoMembershipChanges() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+        executions.execute(preview(source, EXPORT).previewId(), false, actor);
+        String withoutBorn = EXPORT.lines().map(line -> line.substring(0, line.lastIndexOf(',')))
+                .collect(Collectors.joining("\n", "", "\n"));
+
+        // when / then
+        assertThatThrownBy(() -> preview(source, withoutBorn))
+                .isInstanceOf(SnapshotHeaderInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.snapshot.header.missingField")
+                .extracting("params").asInstanceOf(InstanceOfAssertFactories.MAP)
+                .containsEntry("missing", List.of("BIRTH_DATE"));
+        Map<String, UUID> people = references.list(source, null, 50).items().stream()
+                .collect(Collectors.toMap(ExternalLink::externalId, ExternalLink::personId));
+        assertThat(typeOf(people.get("4711"))).as("the youth band stays").isEqualTo(youth);
+        assertThat(typeOf(people.get("4712"))).as("the adult band stays").isEqualTo(adult);
+    }
+
+    @Test
+    void givenASplitReadByPosition_whenAFileLacksTheBirthDateColumn_thenItIsRefusedBeforeAPreview() {
+        // given
+        UUID source = sources.create("club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.positions(Map.of(1, CanonicalField.EXTERNAL_ID, 2, CanonicalField.FIRST_NAME,
+                        3, CanonicalField.LAST_NAME, 4, CanonicalField.MEMBERSHIP_TYPE, 5, CanonicalField.BIRTH_DATE), 5),
+                Map.of("active", unsorted), List.of(),
+                Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(18, adult))), unsorted,
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
+
+        // when / then
+        assertThatThrownBy(() -> preview(source, "4711,Jane,Doe,active\n"))
+                .isInstanceOf(SnapshotHeaderInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.snapshot.columns.countChanged")
+                .extracting("params").asInstanceOf(InstanceOfAssertFactories.MAP)
+                .containsEntry("expected", 5).containsEntry("found", 4);
+        assertThat(references.list(source, null, 50).items()).as("no member was linked").isEmpty();
     }
 
     @Test
