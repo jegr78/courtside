@@ -312,7 +312,7 @@ describe("AdminOverviewView", () => {
     expect(upcoming[0]).toHaveTextContent("4:00 PM");
     expect(upcoming[2]).toHaveTextContent("Garden Court");
     expect(api.allocations).toHaveBeenCalledWith("2026-09-25");
-    expect(within(today).getByRole("link")).toHaveAttribute("href", "/");
+    expect(await within(today).findByRole("link"), "the cards reveal together").toHaveAttribute("href", "/");
   });
 
   it("given a court without a name, when its booking is still to come today, then the court is named by its number", async () => {
@@ -390,7 +390,8 @@ describe("AdminOverviewView", () => {
     const entries = within(credentials).getAllByTestId("overview-credentials-entry");
     expect(entries[0]).toHaveTextContent("Jane Doe");
     expect(entries[0]).toHaveTextContent(i18n.t("admin.roster.credential.CREDENTIAL_ISSUED"));
-    expect(within(entries[1]).getByRole("link")).toHaveAttribute("href", "/admin/roster/88888888-8888-8888-8888-888888888888");
+    expect(await within(entries[1]).findByRole("link"), "the cards reveal together")
+      .toHaveAttribute("href", "/admin/roster/88888888-8888-8888-8888-888888888888");
     expect(api.roster).toHaveBeenCalledWith(expect.objectContaining({
       credentialStates: ["AWAITING_CREDENTIAL", "CREDENTIAL_ISSUED", "CREDENTIAL_EXPIRED"]
     }));
