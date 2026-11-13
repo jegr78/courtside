@@ -8459,7 +8459,8 @@ paths:
       description: |
         Starts a door hold on a booking whose card offers one. The booker, a member named as a player,
         an administrator or a role that manages the card may start it from the access lead time before
-        the start until the end. An external player may start it on their own booking.
+        the start until the end. An external player may start it on their own booking only; on another
+        booking its role lets it manage it gets `403` with `urn:courtside:error:access-denied`.
         A card that offers no hold answers `409` with `urn:courtside:error:door-hold-not-offered`;
         outside the window or on a booking that is not confirmed the answer is `409` with
         `urn:courtside:error:door-hold-closed`; a hold somebody else runs answers `409` with
@@ -8498,10 +8499,12 @@ paths:
       operationId: endDoorHold
       summary: End a booking's running door hold.
       description: |
-        Checks out. Only the person who started the hold or an administrator may end it; anyone else
-        who may act on the booking gets `403` with `urn:courtside:error:door-hold-not-holder`. With
-        no running hold the answer is `409` with `urn:courtside:error:door-hold-not-running`. A
-        booking the caller may not act on answers `404` like one that does not exist.
+        Checks out. Only the person who started the hold or an administrator may end it, and the
+        person who started it may even after losing access to the booking; anyone else who may act on
+        the booking gets `403` with `urn:courtside:error:door-hold-not-holder`, an external player
+        whose role lets it manage the booking `403` with `urn:courtside:error:access-denied`. With no
+        running hold the answer is `409` with `urn:courtside:error:door-hold-not-running`. A booking
+        the caller may not act on answers `404` like one that does not exist.
       security:
         - sessionCookie: []
           csrfToken: []

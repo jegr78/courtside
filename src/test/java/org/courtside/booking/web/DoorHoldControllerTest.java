@@ -583,6 +583,38 @@ class DoorHoldControllerTest extends AbstractIntegrationTest {
         assertThat(unendedHoldsOf(booking)).as("a guest holds the doors of their own booking only").isZero();
     }
 
+    @Test
+    void givenACoveringTrainersRunningHold_whenTheCardStopsNamingTheirRole_thenTheyStillCheckOut() throws Exception {
+        // given
+        UUID booking = startingInMinutes(campCard, 5);
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf())
+                .with(user("miles.richard").roles("TRAINER"))).andExpect(status().isOk());
+        cards.letManage(campCard, Set.of(Role.SPORT_DIRECTOR));
+
+        // when
+        mockMvc.perform(delete("/api/my/bookings/{id}/door-hold", booking).with(csrf())
+                        .with(user("miles.richard").roles("TRAINER")))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(unendedHoldsOf(booking)).as("whoever holds the doors open can always close them").isZero();
+    }
+
+    @Test
+    void givenAnExternalPlayerNamedOnAMemberBooking_whenTheyReadTheirParticipations_thenNoDoorHoldIsOffered()
+            throws Exception {
+        // given
+        UUID external = identity.createPerson("Richard", "Roe", "roe@example.org");
+        identity.createEnabledAccount(external, "roe.richard", Set.of(Role.EXTERNAL));
+        UUID booking = memberBookingWithPlayer();
+        bookings.nameMemberAsPlayer(booking, external);
+
+        // when / then
+        mockMvc.perform(get("/api/my/participations").with(user("roe.richard").roles("EXTERNAL")))
+                .andExpect(jsonPath("$.items[0].id").value(booking.toString()))
+                .andExpect(jsonPath("$.items[0].doorHold").doesNotExist());
+    }
+
     private UUID guestBooking() {
         UUID external = identity.createEnabledAccount(identity.createPerson("Richard", "Roe", "roe@example.org"),
                 "roe.richard", Set.of(Role.EXTERNAL));

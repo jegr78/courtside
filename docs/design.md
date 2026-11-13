@@ -704,8 +704,9 @@ works whether the club records attendance or not, and it needs no access-control
 club whose Miniserver Courtside cannot reach runs on holds alone. The booker acts from My bookings,
 a named player from the participation listed there, a managing role from the managed appointment.
 An external player is never admitted as a named player or through a managing role: they hold the
-doors of their own booking open, are refused with `403` on any other, and are never offered an
-extension. A caller who is none of these gets the same `404` as for a booking that does not exist; a card without
+doors of their own booking open, get `403` on another booking their role would let them manage and
+the `404` below on the rest, and are never offered an extension or a hold on a booking they did not
+make. A caller who is none of these gets the same `404` as for a booking that does not exist; a card without
 the switch, a closed window and a hold somebody else runs are refused by their own codes.
 
 A hold ends at check-out by the person who started it, even one who has since lost access to the

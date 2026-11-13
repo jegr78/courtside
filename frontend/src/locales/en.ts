@@ -1406,7 +1406,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.cancelledSuccess": "Booking cancelled.",
   "booking.moved": "Booking moved.",
   "participations.title": "Recorded as a co-player",
-  "participations.description": "Bookings where another member added you as a player. You can remove yourself here.",
+  "participations.description": "Bookings where another member added you as a player. You can remove yourself here and, if the booking card allows it, hold the doors open.",
   "participations.empty": "Bookings where another member names you as a player appear here. Ask the booking member to add you.",
   "participations.withdraw": "Take me out of this booking",
   "participations.withdrawn": "Participation withdrawn.",

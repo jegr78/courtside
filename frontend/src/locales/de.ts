@@ -1404,7 +1404,7 @@ const de = {
   "booking.cancelledSuccess": "Buchung storniert.",
   "booking.moved": "Buchung verschoben.",
   "participations.title": "Als Mitspieler eingetragen",
-  "participations.description": "Hier stehen Buchungen, zu denen andere Mitglieder dich hinzugefügt haben. Du kannst dich selbst wieder austragen.",
+  "participations.description": "Hier stehen Buchungen, zu denen andere Mitglieder dich hinzugefügt haben. Du kannst dich selbst wieder austragen und, wenn die Buchungskarte es erlaubt, die Türen offen halten.",
   "participations.empty": "Hier erscheinen Buchungen, in denen dich ein anderes Mitglied als Mitspieler einträgt. Bitte das buchende Mitglied, dich hinzuzufügen.",
   "participations.withdraw": "Aus dieser Buchung austragen",
   "participations.withdrawn": "Teilnahme zurückgezogen.",

@@ -52,6 +52,13 @@ public final class CardTestFixture {
                 card.isShowGenericOccupancy(), card.isGrantsAccess(), signalsOccupancy, null, null, null);
     }
 
+    public void letManage(UUID cardId, Set<Role> managingRoles) {
+        BookingCard card = cards.requireCard(cardId);
+        cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), managingRoles,
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), null, null, null);
+    }
+
     public void letBookingsHoldDoorsOpen(UUID cardId, boolean holdsDoorsOpen) {
         BookingCard card = cards.requireCard(cardId);
         cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),

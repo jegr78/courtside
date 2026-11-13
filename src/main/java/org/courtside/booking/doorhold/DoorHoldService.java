@@ -164,12 +164,14 @@ public class DoorHoldService {
                 .forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
     }
 
-    /** The door hold state of each booking whose card offers one, as {@code viewer} sees it. */
+    /** The door hold state of each booking whose card offers one and {@code viewer} may hold, as they see it. */
     @Transactional(readOnly = true)
     public Map<UUID, DoorHold> doorHoldsOf(Collection<Booking> candidates, UUID viewer) {
         Set<UUID> holdingCards = cards.allCards().stream().filter(BookingCard::isHoldsDoorsOpen)
                 .map(BookingCard::getId).collect(Collectors.toSet());
+        boolean outsider = outsiders.isOutsiderAccount(viewer);
         Map<UUID, Window> windows = candidates.stream()
+                .filter(booking -> !outsider || viewer.equals(booking.getBookedBy()))
                 .filter(booking -> !booking.getAllocations().isEmpty())
                 .filter(booking -> holdingCards.contains(booking.getCardId()))
                 .collect(Collectors.toMap(Booking::getId, this::windowOf));
@@ -180,9 +182,8 @@ public class DoorHoldService {
                 .filter(hold -> confirmed.contains(hold.bookingId()))
                 .filter(hold -> now.isBefore(windows.get(hold.bookingId()).closesAt()))
                 .collect(Collectors.toMap(Hold::bookingId, Function.identity()));
-        boolean extensible = !outsiders.isOutsiderAccount(viewer);
         return windows.values().stream().collect(Collectors.toMap(Window::bookingId,
-                window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer, extensible)));
+                window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer, !outsider)));
     }
 
     /** Every active access point and whether a running hold keeps it open, valid until {@code expiresAt}. */
@@ -252,8 +253,11 @@ public class DoorHoldService {
 
     // A guest holds the doors of their own booking only, whatever role they also carry.
     private void requireHoldAccess(Booking booking, UUID actor, Set<Role> actorRoles) {
+        if (actor == null || actorRoles == null) {
+            throw new IllegalStateException("Holding doors open requires an authenticated actor");
+        }
         boolean outsider = outsiders.isOutsider(actor, actorRoles);
-        Optional<UUID> person = actor == null || outsider ? Optional.empty()
+        Optional<UUID> person = outsider ? Optional.empty()
                 : accounts.findById(actor).map(UserAccount::getPerson).map(Person::getId);
         boolean namedPlayer = person.isPresent()
                 && booking.getParticipants().stream().map(BookingParticipant::getPersonId).anyMatch(person.get()::equals);
