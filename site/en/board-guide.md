@@ -275,10 +275,24 @@ What the values trigger is up to you in Loxone:
 Two more lines follow for every active access point, named by its id: `door.<id>.open` is 1 while
 someone checked in on a booking of one of its courts holds the doors open, and for an access point
 open to all members while any hold runs. `door.<id>.expires` gives in Unix seconds how long the
-answer holds, two minutes after the poll. A controller that keeps a lock open from it checks both
-values, so a missing answer reads closed: Loxone keeps the last value when a poll fails or the key
-is revoked, and only the comparison of `expires` with the Miniserver's clock closes the door then.
-Poll at least once a minute. Before you wire a lock to these lines, issue a new key and poll over
+answer holds, two minutes after the poll. A controller that keeps a lock open from it may trust
+`open` only while the polls arrive: Loxone keeps the last value when a poll fails or the key is
+revoked, and a command's error output does not report it. In Loxone Config:
+
+1. On the Virtual HTTP Input, turn on **Show diagnostic inputs** and set **Number of allowed
+   timeouts** to 2. An **Online status** appears below it and drops to 0 as soon as the polls fail.
+2. Per door, one command with `\idoor.<id>.open=\i\v` and an **AND** with that command on I1 and the
+   online status on I2.
+3. Route the line from the Code Touch block to the door output through an **OR**: the Code Touch
+   output on I1, the AND on I2, the OR on the door output. Codes then open as before, and holding
+   the door open comes on top.
+
+While the online status is 0, every AND is off and the door is closed, even if `open` still shows 1.
+Check that before you wire a lock: with a character appended to the key in the URL, the online status
+must read 0 within three minutes. Ask your electrician as well whether the door output may stay on for
+an hour and longer, because some door openers are built for short pulses only. Other controllers
+without such a status compare `expires` with their clock. Poll at least once a minute. Before you
+wire a lock to these lines, issue a new key and poll over
 HTTPS with certificate verification only: whoever can change the answer on its way can otherwise
 hold the door open. Codes keep working without this signal.
 

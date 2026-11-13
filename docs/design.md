@@ -1166,8 +1166,9 @@ number: `door.<id>.open` is `1` while a door hold runs on a booking whose courts
 serves, the same mapping its codes use, and for an access point open to members while any hold runs;
 otherwise `0`. A hold runs as defined under Holding doors open, and a card that stops offering holds
 closes its doors at once. `door.<id>.expires` is the answer time plus two minutes in Unix seconds,
-on every door line. A controller keeps a lock open only while `open` is `1` and its own clock is
-before `expires`, so an answer that stops arriving reads closed; codes keep working without the
+on every door line. A controller keeps a lock open only while `open` is `1` and the answers keep
+arriving, read from its own clock before `expires` or, in Loxone, from the online status of the
+Virtual HTTP Input, so an answer that stops arriving reads closed; codes keep working without the
 signal. Wiring a lock to these lines needs HTTPS with certificate verification between instance and
 controller, as `docs/security-risks.md` explains. Nothing else is answered: no booker, card, booking,
 court id or access point name.
