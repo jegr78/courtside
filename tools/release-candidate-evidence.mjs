@@ -35,7 +35,7 @@ function buildOf(build, rehearsal) {
   if (build === null && rehearsal) return null;
   if (!hasExactly(build, ["runAttempt", "runId"]) || !Number.isSafeInteger(build.runId) || build.runId < 1
       || !Number.isSafeInteger(build.runAttempt) || build.runAttempt < 1) {
-    throw new Error("candidate evidence names no green push build of its commit");
+    throw new Error("candidate evidence names no green build that verified its commit");
   }
   return { runId: build.runId, runAttempt: build.runAttempt };
 }

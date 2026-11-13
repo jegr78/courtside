@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { branchFetchArguments, remoteRefOf } from "./release-line.mjs";
 import {
   greenExactBuild,
+  greenFullBuild,
   pendingReleasePullRequests,
   readCommitFacts,
   releasePullRequestOf,
@@ -292,6 +293,45 @@ test("given a later commit whose push build planned only part of the jobs, when 
     { releaseCommit: false }), { runId: 37211926310, runAttempt: 1 }, "a dispatched build always runs every job");
   assert.equal(greenExactBuild([{ workflow_runs: [push] }], "jegr78/courtside"), null,
     "without the commit's kind a push build does not count");
+});
+
+test("given a release commit whose parent has a green full build, when the candidate selects, then that build is the test evidence", () => {
+  // given
+  const parentBuild = { runId: 43377273551, runAttempt: 1 };
+
+  // when
+  const selection = selectReleaseCandidate(workflowRun({ parentBuild }));
+
+  // then
+  assert.equal(selection.release, true);
+  assert.deepEqual(selection.build, parentBuild, "the push build of a version bump on a verified parent ran only docs");
+});
+
+test("given a dispatched re-run of a release commit whose parent has a green full build, when the candidate selects, then that build is the test evidence", () => {
+  // given
+  const parentBuild = { runId: 43377273551, runAttempt: 1 };
+
+  // when
+  const selection = selectReleaseCandidate(dispatch({ parentBuild }));
+
+  // then
+  assert.deepEqual(selection.build, parentBuild);
+});
+
+test("given build runs of a release commit's parent, when its full build is read, then only a green scheduled or dispatched main run counts", () => {
+  // given
+  const scheduled = { id: 43377270000, run_attempt: 1, event: "schedule", head_branch: "main", conclusion: "success",
+    head_repository: { full_name: "jegr78/courtside" } };
+  const dispatched = { ...scheduled, id: 43377273551, event: "workflow_dispatch" };
+
+  // when / then
+  assert.deepEqual(greenFullBuild([{ workflow_runs: [scheduled, dispatched] }], "jegr78/courtside"),
+    { runId: 43377273551, runAttempt: 1 }, "the newest full build counts");
+  for (const other of [{ event: "push" }, { event: "pull_request" }, { head_branch: "feature" }, { conclusion: "failure" },
+    { head_repository: { full_name: "someone/courtside" } }]) {
+    assert.equal(greenFullBuild([{ workflow_runs: [{ ...scheduled, ...other }] }], "jegr78/courtside"), null,
+      `${JSON.stringify(other)} is no full build of the parent on main`);
+  }
 });
 
 test("given a push build that turned green on its second attempt, when a candidate is selected, then that attempt is recorded",

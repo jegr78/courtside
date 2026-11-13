@@ -5,6 +5,7 @@ import {
   branchFetchArguments, forwardPortVerdict, newestLineVerdict, releasableTypes, releaseBranchOf, releaseToolingPaths,
   remoteRefOf
 } from "./release-line.mjs";
+import { parseNameStatus, releaseVersionFiles } from "./test-profile-classifier.mjs";
 
 const releaseWorkflows = ["release-candidate.yml", "release-gates.yml", "release.yml", "release-plan-sync.yml"]
   .map((name) => `.github/workflows/${name}`);
@@ -120,7 +121,7 @@ export function selectReleaseCandidate(facts) {
       throw new Error(`${facts.forwardPort.detail}: ${facts.forwardPort.missing.join(", ")}`);
     }
   }
-  const build = buildRunOf(event === "workflow_run" ? facts.build : facts.exactBuild);
+  const build = buildRunOf(facts.parentBuild ?? (event === "workflow_run" ? facts.build : facts.exactBuild));
   if (build === null) throw new Error(`no green build of ${commit} on ${branch}`);
   const reason = event === "workflow_run" ? "release-commit" : branch === "main" ? "re-run" : "patch-release";
   return selected(reason, pullRequest, build);
@@ -161,6 +162,16 @@ export function releasePullRequestOf(pull, mergeCommitIsAncestor, branch = "main
 export function greenExactBuild(pages, repository, branch = "main", { releaseCommit = false } = {}) {
   const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === branch
     && ((candidate.event === "push" && releaseCommit === true) || candidate.event === "workflow_dispatch")
+    && candidate.conclusion === "success"
+    && candidate.head_repository?.full_name === repository)
+    .toSorted((left, right) => right.id - left.id)[0];
+  return run === undefined ? null : buildRunOf({ runId: run.id, runAttempt: run.run_attempt });
+}
+
+/** A scheduled or dispatched build runs every job, so it verifies a release commit that only bumps the version. */
+export function greenFullBuild(pages, repository, branch = "main") {
+  const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === branch
+    && (candidate.event === "schedule" || candidate.event === "workflow_dispatch")
     && candidate.conclusion === "success"
     && candidate.head_repository?.full_name === repository)
     .toSorted((left, right) => right.id - left.id)[0];
@@ -238,6 +249,16 @@ export function gatherFacts(options, environment = process.env) {
         && succeeds("git", ["merge-base", "--is-ancestor", merged, commit]), branch);
     })
     .filter((pullRequest) => pullRequest !== null);
+  if (facts.manifest !== facts.parentManifest) {
+    const parent = git("rev-parse", `${commit}^1`);
+    const changes = parseNameStatus(git("diff", "--name-status", "-z", "--find-renames", parent, commit, "--"));
+    const raw = (arguments_) => execFileSync("git", arguments_, { encoding: "utf8" });
+    if (releaseVersionFiles(changes, { baseCommit: parent, headCommit: commit, git: raw }).size > 0) {
+      facts.parentBuild = greenFullBuild(
+        api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${parent}&status=success&per_page=100`),
+        repository, branch);
+    }
+  }
   if (event === "workflow_dispatch") {
     facts.exactBuild = greenExactBuild(
       api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),
