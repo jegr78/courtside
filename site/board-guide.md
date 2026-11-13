@@ -269,8 +269,8 @@ In Loxone Config legst du dafür an:
 
 Die Referenz-Installation nimmt Abfragen nur über HTTPS an, euer Miniserver muss dann HTTPS-Adressen
 abfragen können. Betreibt ihr Courtside hinter eurem eigenen Proxy, entscheidet ihr selbst, ob ihr
-diese Adresse auch über HTTP erreichbar macht. Der Schlüssel geht dann unverschlüsselt durchs Netz,
-verrät aber nur die Belegung.
+diese Adresse auch über HTTP erreichbar macht. Der Schlüssel geht dann unverschlüsselt durchs Netz
+und verrät die Belegung und welche Türen offen gehalten werden, nie wer gebucht hat.
 
 Ein Abfragezyklus von 60 Sekunden genügt. Kürzer bringt nichts, weil `minutes` sich nur einmal pro
 Minute ändert. Fällt Courtside oder das Netz aus, behält Loxone den letzten Wert, bis die nächste
@@ -285,8 +285,20 @@ Was die Werte auslösen, entscheidet ihr in Loxone:
   Minuten kleiner sind als Laufzeit plus Trockenzeit. Meldet der Loxone Wetterdienst Regen, fällt der
   Lauf aus.
 
-Wer den Schlüssel kennt, erfährt nur Belegung und Minuten je Platz, nie wer gebucht hat oder mit
-welcher Karte. Der Schlüssel steht in der Adresse und kann deshalb im Protokoll eines Routers oder
+Für jeden aktiven Zugang folgen zwei weitere Zeilen, benannt nach seiner Kennung:
+`door.<Kennung>.open` ist 1, solange jemand auf einer Buchung eines seiner Plätze eingecheckt ist und
+die Türen offen hält, bei einem Zugang für alle Mitglieder bei jedem laufenden Offenhalten.
+`door.<Kennung>.expires` nennt in Unix-Sekunden, bis wann diese Antwort gilt, zwei Minuten nach der
+Abfrage. Eine Steuerung, die ein Schloss danach offen hält, prüft beide Werte, damit eine ausbleibende
+Antwort als geschlossen gilt: Loxone behält bei einer gescheiterten Abfrage oder einem widerrufenen
+Schlüssel den letzten Wert, und erst der Vergleich von `expires` mit der Uhr des Miniservers schließt
+die Tür dann. Fragt mindestens einmal pro Minute ab. Bevor ihr ein Schloss an diese Zeilen hängt,
+stellt einen neuen Schlüssel aus und fragt nur noch über HTTPS mit Zertifikatsprüfung ab: Wer die
+Antwort unterwegs verändern kann, hält die Tür sonst offen. Die Codes funktionieren auch ohne dieses
+Signal.
+
+Wer den Schlüssel kennt, erfährt Belegung und Minuten je Platz und welche Türen gerade offen gehalten
+werden, nie wer gebucht hat oder mit welcher Karte. Der Schlüssel steht in der Adresse und kann deshalb im Protokoll eines Routers oder
 Proxys auftauchen. Ersetze ihn, wenn er in falsche Hände geraten ist.
 
 ## Loxone Miniserver anbinden

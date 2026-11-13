@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +15,9 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 class DoorHoldRows {
+
+    // A booking lies within one day and the access lead is at most four hours, so no running hold is older.
+    private static final Duration RUNNING_HOLD_REACH = Duration.ofDays(2);
 
     private final JdbcClient jdbc;
 
@@ -60,6 +64,17 @@ class DoorHoldRows {
                 .param("by", endedBy)
                 .param("id", id)
                 .update();
+    }
+
+    List<UUID> unendedOnBookingsEndingAfter(Instant now) {
+        return jdbc.sql("""
+                        SELECT DISTINCT hold.booking_id FROM door_hold hold
+                        JOIN court_allocation allocation ON allocation.booking_id = hold.booking_id
+                        WHERE hold.ended_at IS NULL AND hold.held_at > :since AND allocation.ends_at > :now
+                        """)
+                .param("since", Timestamp.from(now.minus(RUNNING_HOLD_REACH)))
+                .param("now", Timestamp.from(now))
+                .query(UUID.class).list();
     }
 
     /** Ends every unended hold of these bookings and answers which holds it ended. */

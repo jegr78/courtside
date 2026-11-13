@@ -17,3 +17,5 @@ CREATE TABLE door_hold (
 );
 
 CREATE INDEX door_hold_booking ON door_hold (booking_id);
+
+CREATE INDEX door_hold_unended ON door_hold (held_at) WHERE ended_at IS NULL;

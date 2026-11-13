@@ -7191,13 +7191,18 @@ paths:
     get:
       tags: [occupancy]
       operationId: getCourtOccupancy
-      summary: Whether each active court is occupied now, and how many minutes until its next booking.
+      summary: Whether each active court is occupied now, how many minutes until its next booking, and which doors are held open.
       description: |
         One `name=value` line per value, two per active court in the order of its number:
         `court<N>.occupied` is `1` while a booking whose card signals occupancy runs on court `N`
         and `0` otherwise, and `court<N>.minutes` counts the whole minutes, rounded down, until the
         next such booking starts. It is `0` while the court is occupied and `1440` when nothing
-        starts within the next 24 hours. Nothing about who booked or which card leaves the instance.
+        starts within the next 24 hours. Two more lines per active access point follow, keyed by
+        its id: `door.<id>.open` is `1` while a door hold runs on a booking whose courts it serves,
+        or for an access point open to members while any hold runs, and `door.<id>.expires` is the
+        answer time plus two minutes in Unix seconds. A controller keeps a lock open only while
+        `open` is `1` and its clock is before `expires`. Nothing about who booked or which card
+        leaves the instance.
 
         The key travels in the query because a Loxone Virtual HTTP Input sets no request headers.
         Building automation polls this every minute or so; an outage heals on the next poll.
@@ -7219,6 +7224,8 @@ paths:
                 court1.minutes=0
                 court2.occupied=0
                 court2.minutes=37
+                door.5c1f7a52-3b8e-4d0a-9e61-2f4b8c7d9a10.open=1
+                door.5c1f7a52-3b8e-4d0a-9e61-2f4b8c7d9a10.expires=1778580120
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
@@ -8451,7 +8458,8 @@ paths:
         A card that offers no hold answers `409` with `urn:courtside:error:door-hold-not-offered`;
         outside the window or on a booking that is not confirmed the answer is `409` with
         `urn:courtside:error:door-hold-closed`; a hold somebody else runs answers `409` with
-        `urn:courtside:error:door-hold-already-running`. Starting again while one's own hold runs
+        `urn:courtside:error:door-hold-already-running`. An external player gets `403` with
+        `urn:courtside:error:access-denied`. Starting again while one's own hold runs
         changes nothing. A booking the caller may not act on answers `404` like one that does not
         exist.
       security:
