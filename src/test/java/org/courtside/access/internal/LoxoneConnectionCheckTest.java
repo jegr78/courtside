@@ -77,6 +77,23 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
                 Map.of("status", "404")));
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {403, 418})
+    void givenLoxoneRefusingRemoteConnectForThirdPartyClients_whenChecked_thenTheAddressFailsWithTheFixedAddressRemedy(
+            int status) {
+        // given
+        LoxoneAccessControl bySerial = ready(connectorFor(settingsBySerial(DEADLINE)));
+        simulator.force("getip", status);
+
+        // when
+        List<ConnectionCheckRun.Checked> checked = checked(bySerial);
+
+        // then
+        assertThat(result(checked, "miniserver")).as("getip %s is Loxone's refusal, not an unknown serial", status)
+                .isEqualTo(CheckResult.failed("access.check.address.remoteConnectRefused",
+                        Map.of("status", String.valueOf(status))));
+    }
+
     @Test
     void givenAResolverNamingAHostOutsideTheRelays_whenChecked_thenTheAddressFailsAndTheHostIsNeverAsked() {
         // given

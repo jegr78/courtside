@@ -315,17 +315,26 @@ In Loxone Config you set up:
    **Loxone group**.
 4. no keypad permission for the group **All**. Otherwise every code the Miniserver knows opens there.
 
-Your operator sets in the instance's environment: `COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`, the
-Miniserver's serial number in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` or a fixed address in
-`COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, and the technical user's name and password in
-`COURTSIDE_ACCESS_CONTROL_LOXONE_USER` and `COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`. The connection
-applies after the instance restarts.
+Your operator sets in the instance's environment: `COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`, a
+fixed address of the Miniserver in `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, and the technical user's
+name and password in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` and
+`COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`. The connection applies after the instance restarts.
+
+The fixed address reads `https://192-168-1-47.<serial number>.dyndns.loxonecloud.com:<port>`, with
+the Miniserver's local address in dashes. The instance must reach it over HTTPS, through port
+forwarding at the clubhouse or a tunnel into the club network. Since November 2026 Loxone Cloud
+refuses the way through the serial number in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` to programs
+other than the Loxone app and Loxone Config, and the connection check then says so. A relay
+address taken from the Loxone app or a browser is no fixed address: Loxone assigns its port anew
+whenever the Miniserver reconnects, and it may then lead to somebody else's Miniserver. Without a
+connection, checking in alone opens the doors on cards that hold doors open, as described under
+*Building automation*.
 
 Then press **Check connection** under *Records → Access grants*. In its next pass Courtside checks
 five points and reads the groups again. Reload the page a moment later, and each point is listed
 with its outcome below the button:
 
-* **Miniserver**: Courtside reaches the Miniserver through Loxone Cloud or the fixed address, its
+* **Miniserver**: Courtside reaches the Miniserver through the fixed address or Loxone Cloud, its
   certificate is valid and its version is at least 14.2.5.16.
 * **Login**: The technical user logs in and may manage users and change codes.
 * **Groups**: Every active access point without a static code has a Loxone group, and the

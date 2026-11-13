@@ -128,6 +128,22 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenLoxoneRefusingRemoteConnect_whenProbed_thenTheProbeNamesTheRefusalAndTheFixedAddress() {
+        // given
+        simulator.force("getip", 403);
+
+        // when
+        ProbeOutcome probed = bySerial.probe();
+
+        // then
+        assertThat(probed).isEqualTo(new ProbeOutcome.Unreachable("Loxone Cloud refuses Remote Connect for "
+                + "third-party clients (getip 403); set the Miniserver's own address in "
+                + "COURTSIDE_ACCESS_CONTROL_LOXONE_URL"));
+        assertThat(((ProbeOutcome.Unreachable) probed).reason()).doesNotContain(LoxoneSimulator.SERIAL);
+        assertThat(simulator.commands()).containsExactly("getip");
+    }
+
+    @Test
     void givenACloudFailure_whenProbed_thenTheStatusIsNamedAndNoMiniserverIsAsked() {
         // given
         simulator.force("getip", 500);

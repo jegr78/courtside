@@ -332,16 +332,25 @@ In Loxone Config richtest du ein:
    Miniserver kennt.
 
 Dein Betrieb trägt in die Umgebung der Instanz ein: `COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`,
-die Seriennummer des Miniservers in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` oder eine feste
-Adresse in `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, dazu Benutzername und Passwort des technischen
-Benutzers in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` und `COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`.
-Nach einem Neustart der Instanz gilt die Verbindung.
+eine feste Adresse des Miniservers in `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, dazu Benutzername und
+Passwort des technischen Benutzers in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` und
+`COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`. Nach einem Neustart der Instanz gilt die Verbindung.
+
+Die feste Adresse hat die Form `https://192-168-1-47.<Seriennummer>.dyndns.loxonecloud.com:<Port>`,
+mit der lokalen Adresse des Miniservers in Bindestrichen. Die Instanz muss sie über HTTPS erreichen,
+per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Den Weg über die
+Seriennummer in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` lehnt die Loxone Cloud seit November 2026
+für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet das dann. Eine
+Relay-Adresse aus der Loxone App oder dem Browser taugt nicht als feste Adresse: Loxone vergibt ihren
+Port neu, sobald der Miniserver sich neu verbindet, und dann kann sie zu einem fremden Miniserver führen.
+Kommt keine Verbindung zustande, öffnet auf Karten, die die Türen offen halten, das Einchecken allein
+die Türen, wie unter *Gebäudesteuerung* beschrieben.
 
 Drücke dann unter *Nachweise → Zugangsberechtigungen* auf **Verbindung prüfen**. Courtside prüft
 beim nächsten Durchgang fünf Punkte und liest dabei die Gruppen neu. Lade die Seite kurz danach neu,
 dann steht jeder Punkt mit seinem Ergebnis unter dem Knopf:
 
-* **Miniserver**: Courtside erreicht den Miniserver über die Loxone Cloud oder die feste Adresse, sein
+* **Miniserver**: Courtside erreicht den Miniserver über die feste Adresse oder die Loxone Cloud, sein
   Zertifikat ist gültig und seine Version ist mindestens 14.2.5.16.
 * **Anmeldung**: Der technische Benutzer meldet sich an und darf Benutzer verwalten und Codes ändern.
 * **Gruppen**: Jeder aktive Zugang ohne festen Code hat eine Loxone-Gruppe, und der Miniserver
