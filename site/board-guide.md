@@ -289,10 +289,25 @@ Für jeden aktiven Zugang folgen zwei weitere Zeilen, benannt nach seiner Kennun
 `door.<Kennung>.open` ist 1, solange jemand auf einer Buchung eines seiner Plätze eingecheckt ist und
 die Türen offen hält, bei einem Zugang für alle Mitglieder bei jedem laufenden Offenhalten.
 `door.<Kennung>.expires` nennt in Unix-Sekunden, bis wann diese Antwort gilt, zwei Minuten nach der
-Abfrage. Eine Steuerung, die ein Schloss danach offen hält, prüft beide Werte, damit eine ausbleibende
-Antwort als geschlossen gilt: Loxone behält bei einer gescheiterten Abfrage oder einem widerrufenen
-Schlüssel den letzten Wert, und erst der Vergleich von `expires` mit der Uhr des Miniservers schließt
-die Tür dann. Fragt mindestens einmal pro Minute ab. Bevor ihr ein Schloss an diese Zeilen hängt,
+Abfrage. Eine Steuerung, die ein Schloss danach offen hält, darf `open` nur glauben, solange die
+Abfragen ankommen: Loxone behält bei einer gescheiterten Abfrage oder einem widerrufenen Schlüssel den
+letzten Wert, und der Fehlerausgang eines Befehls meldet das nicht. In Loxone Config geht das so:
+
+1. Beim Virtuellen HTTP Eingang **Diagnose-Eingänge anzeigen** einschalten und **Anzahl erlaubte
+   Timeouts** auf 2 setzen. Darunter erscheint **Onlinestatus**, der auf 0 fällt, sobald die
+   Abfragen scheitern.
+2. Je Tür einen Befehl mit `\idoor.<Kennung>.open=\i\v` und ein **UND** mit diesem Befehl an I1
+   und dem Onlinestatus an I2.
+3. Die Linie vom Code-Touch-Baustein zum Türausgang durch ein **ODER** führen: Code-Touch-Ausgang an
+   I1, das UND an I2, das ODER an den Türausgang. Dann öffnen Codes wie bisher, und das Offenhalten
+   kommt dazu.
+
+Steht der Onlinestatus auf 0, ist jedes UND aus und die Tür zu, auch wenn `open` noch 1 zeigt. Prüft
+das vor dem Anschluss an ein Schloss: Hängt ein Zeichen an den Schlüssel in der URL, muss der
+Onlinestatus nach spätestens drei Minuten auf 0 stehen. Klärt außerdem mit eurem Elektriker, ob der
+Türausgang eine Stunde und länger eingeschaltet bleiben darf, denn manche Türöffner sind nur für
+kurze Impulse gebaut. Andere Steuerungen ohne einen solchen Status vergleichen `expires` mit ihrer
+Uhr. Fragt mindestens einmal pro Minute ab. Bevor ihr ein Schloss an diese Zeilen hängt,
 stellt einen neuen Schlüssel aus und fragt nur noch über HTTPS mit Zertifikatsprüfung ab: Wer die
 Antwort unterwegs verändern kann, hält die Tür sonst offen. Die Codes funktionieren auch ohne dieses
 Signal.
