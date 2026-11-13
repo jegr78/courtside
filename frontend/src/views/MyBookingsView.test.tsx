@@ -1570,3 +1570,74 @@ it("given a hold somebody else runs, when the trainer reads the booking, then it
   expect(screen.queryByTestId("hold-doors-open")).not.toBeInTheDocument();
   expect(screen.queryByTestId("extend-held-booking"), "only the person who checked in extends").not.toBeInTheDocument();
 });
+
+it("given a member booking that names this member as a player, when they hold its doors open, extend and check out, then their participation follows each step", async () => {
+  // given
+  await i18n.changeLanguage("en");
+  const window = { opensAt: "2026-08-19T15:45:00Z", closesAt: "2026-08-19T17:00:00Z" };
+  let held = false;
+  vi.spyOn(api, "participations").mockImplementation(() => Promise.resolve({ items: [{
+    ...participation(participationId),
+    doorHold: held ? { ...window, heldSince: "2026-08-19T15:50:00Z", heldByMe: true, extensionEndsAt: "2026-08-19T17:30:00Z" }
+      : { ...window, heldByMe: false }
+  }] }));
+  const hold = vi.spyOn(api, "holdDoorsOpen").mockImplementation(() => {
+    held = true;
+    return Promise.resolve({ ...window, heldSince: "2026-08-19T15:50:00Z", heldByMe: true });
+  });
+  const extend = vi.spyOn(api, "extendHeldBooking").mockResolvedValue({ ...window, heldSince: "2026-08-19T15:50:00Z", heldByMe: true });
+  const end = vi.spyOn(api, "endDoorHold").mockImplementation(() => {
+    held = false;
+    return Promise.resolve(undefined);
+  });
+  render(<MyBookingsView now={new Date("2026-08-19T15:50:00Z")} />);
+  const entry = await screen.findByTestId(`participation-${participationId}`);
+
+  // when
+  await userEvent.click(within(entry).getByTestId("hold-doors-open"));
+
+  // then
+  expect(hold).toHaveBeenCalledWith(participationId);
+  expect(await within(entry).findByTestId("doors-held-open")).toBeVisible();
+  await userEvent.click(within(entry).getByTestId("extend-held-booking"));
+  expect(extend, "the player asks for the end the server named").toHaveBeenCalledWith(participationId, "2026-08-19T17:30:00Z");
+  await userEvent.click(within(entry).getByTestId("end-door-hold"));
+  expect(end).toHaveBeenCalledWith(participationId);
+  await waitFor(() => expect(within(entry).queryByTestId("doors-held-open")).not.toBeInTheDocument());
+});
+
+it("given a participation whose doors somebody else holds open, when it is listed, then it shows the hold and offers neither its end nor an extension", async () => {
+  // given
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [{
+    ...participation(participationId),
+    doorHold: { opensAt: "2026-08-19T15:45:00Z", closesAt: "2026-08-19T17:00:00Z", heldSince: "2026-08-19T15:46:00Z", heldByMe: false }
+  }] });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-19T15:50:00Z")} />);
+
+  // then
+  const entry = await screen.findByTestId(`participation-${participationId}`);
+  expect(within(entry).getByTestId("doors-held-open")).toBeVisible();
+  expect(within(entry).queryByTestId("hold-doors-open"), "a running hold is not started twice").not.toBeInTheDocument();
+  expect(within(entry).queryByTestId("end-door-hold"), "only the person who checked in ends a hold").not.toBeInTheDocument();
+  expect(within(entry).queryByTestId("extend-held-booking"), "only the person who checked in extends").not.toBeInTheDocument();
+});
+
+it("given a participation whose door hold is refused, when the player holds its doors open, then the reason shows beside the participations", async () => {
+  // given
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [{
+    ...participation(participationId),
+    doorHold: { opensAt: "2026-08-19T15:45:00Z", closesAt: "2026-08-19T17:00:00Z", heldByMe: false }
+  }] });
+  vi.spyOn(api, "holdDoorsOpen").mockRejectedValue(
+    { status: 409, problem: { type: "urn:courtside:error:door-hold-already-running" } });
+  render(<MyBookingsView now={new Date("2026-08-19T15:50:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("hold-doors-open"));
+
+  // then
+  const section = screen.getByTestId("participations-title").closest("section") as HTMLElement;
+  expect(await within(section).findByRole("alert"), "the failure sits where the player clicked").toBeInTheDocument();
+});

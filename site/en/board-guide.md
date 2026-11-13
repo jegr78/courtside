@@ -282,6 +282,14 @@ Poll at least once a minute. Before you wire a lock to these lines, issue a new 
 HTTPS with certificate verification only: whoever can change the answer on its way can otherwise
 hold the door open. Codes keep working without this signal.
 
+If Courtside cannot reach the Miniserver to create codes, checking in alone opens the doors. Leave
+`COURTSIDE_ACCESS_CONTROL_CONNECTOR` at `none`, turn *Bookings receive the access code* off and
+*Doors may be held open while checked in* on for every booking card, member play and guest bookings
+included. A player of the booking then checks in from *Access before play starts*, and the door of
+its courts stays open until check-out or the booking's end. An access point open to all members
+stays open while anyone is checked in, so on a busy evening it stays open throughout. Courtside does
+not check that anyone is on site: checking in works from anywhere.
+
 Whoever knows the key learns occupancy and minutes per court and which doors are held open right
 now, never who booked or with which card. The key is part of the address and can therefore show up in the log of a router or proxy.
 Replace it if it has reached the wrong hands.
@@ -425,7 +433,7 @@ or closure. Add one card for every type the club needs.
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 | **Bookings receive the access code** | Bookings on this card are the ones the code of their courts' access points applies to. The *Court closed* card does not offer it |
 | **Bookings count as occupied for building automation** | Bookings on this card report their court as occupied to the building automation, see *Building automation* under *Access points*. New cards carry it, the *Court closed* card does not offer it |
-| **Doors may be held open while checked in** | The booker, an administrator or a managing role of the card checks in on a booking from *My bookings* or the managed appointment, and Courtside counts its doors as held open until check-out or the booking's end. The person who checked in may extend the booking by 30 minutes at a time, or by one slot when slots are longer, while that time is free. Off for new cards, the *Court closed* card does not offer it |
+| **Doors may be held open while checked in** | The booker, a player named on the booking, an administrator or a managing role of the card checks in on a booking from *My bookings* or the managed appointment, and Courtside counts its doors as held open until check-out or the booking's end. Guests check in on their own booking. The person who checked in may extend the booking by 30 minutes at a time, or by one slot when slots are longer, while that time is free. Guests do not extend. Off for new cards, the *Court closed* card does not offer it |
 
 Administrators may use and manage every card. A booking with the *Court closed* card goes before a
 reservation from the waitlist. If you clear its allowed roles, every member may close a

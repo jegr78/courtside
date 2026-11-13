@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "085f0b4b6c996c6f1c882e55e8ba2b2038caa00c52562ba5b31c17f3682c615c",
+  "openApiFieldInventorySha256": "ed8e3f3f077a194ce4de028b3a702e3964088c0d9b049fc7e1beb121cddb5b13",
   "protectedFieldInventorySha256": "bba653fd32465525cc1239f5f745cac7e5eb7bb9f74685dd16ab7e75b5adacce",
-  "productionAuthorizationSha256": "cb472bcc3decf014631a87d688bb5c7e1fb7058898fe7708ff811b3131c3bdd2",
+  "productionAuthorizationSha256": "beab9366ff1068005dd673f303dd050f5572614070920eca7a91c27825e4f085",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2466,6 +2466,11 @@
     "listOwnParticipations:parameter:$parameter.query.cursor",
     "listOwnParticipations:parameter:$parameter.query.limit",
     "listOwnParticipations:response:$response.header.Retry-After",
+    "listOwnParticipations:response:DoorHold.closesAt",
+    "listOwnParticipations:response:DoorHold.extensionEndsAt",
+    "listOwnParticipations:response:DoorHold.heldByMe",
+    "listOwnParticipations:response:DoorHold.heldSince",
+    "listOwnParticipations:response:DoorHold.opensAt",
     "listOwnParticipations:response:FieldError.code",
     "listOwnParticipations:response:FieldError.field",
     "listOwnParticipations:response:FieldError.params",
@@ -2473,6 +2478,7 @@
     "listOwnParticipations:response:Participation.cardColor",
     "listOwnParticipations:response:Participation.cardLabel",
     "listOwnParticipations:response:Participation.courtIds",
+    "listOwnParticipations:response:Participation.doorHold",
     "listOwnParticipations:response:Participation.endsAt",
     "listOwnParticipations:response:Participation.id",
     "listOwnParticipations:response:Participation.startsAt",
@@ -4729,7 +4735,7 @@
     },
     {
       "id": "door-hold",
-      "description": "A permanent account holds a booking's doors open only on a booking it may manage; only the person who started a hold extends the booking, and that person or an administrator ends the hold.",
+      "description": "A permanent account holds a booking's doors open only on a booking it may manage or is named on as a player, an external player only on its own booking; only the person who started a hold extends the booking, and that person or an administrator ends the hold.",
       "operationIds": [
         "holdDoorsOpen",
         "endDoorHold",
@@ -5818,10 +5824,11 @@
     {
       "id": "door-hold-scope",
       "title": "Door hold scope",
-      "rule": "Starting a door hold requires the booker, ADMIN or a role the booking card names as managing, on a card that offers a hold; a caller outside that set is answered as if the booking did not exist. Extending the booking requires the person running the hold. Ending a running hold requires the person who started it or ADMIN. A listing marks a hold as the caller's own, and offers its extension, only when the current account started it.",
+      "rule": "Starting a door hold requires the booker, a member named as a player on the booking, ADMIN or a role the booking card names as managing, on a card that offers a hold; a caller outside that set is answered as if the booking did not exist. An external player is never admitted as a named player and holds the doors of its own booking only; any other booking it may manage answers 403. Extending the booking requires the person running the hold. Ending a running hold requires the person who started it, even after losing access to the booking, or ADMIN; a player who withdraws from the booking ends its own hold. A listing marks a hold as the caller's own, and offers its extension, only when the current account started it and is no external player; an external player sees a hold only on its own booking.",
       "attributes": [
         "current-account",
         "booking-owner",
+        "participant-person",
         "administrator-override"
       ],
       "productionPaths": [
@@ -5832,19 +5839,33 @@
         "src/main/java/org/courtside/booking/web/PersonalBookingPages.java#doorHolds",
         "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#doorHoldsOf",
         "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#extend",
-        "src/main/java/org/courtside/booking/web/DoorHoldController.java#extendHeldBooking"
+        "src/main/java/org/courtside/booking/web/DoorHoldController.java#extendHeldBooking",
+        "src/main/java/org/courtside/booking/web/PersonalBookingPages.java#renderParticipations",
+        "src/main/java/org/courtside/booking/doorhold/DoorHoldService.java#requireHoldAccess"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenATrainingStartingSoon_whenItsTrainerHoldsTheDoorsOpen_thenTheBookingShowsTheRunningHold",
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt",
-        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenARunningTrainingWithItsTrainerCheckedIn_whenTheTrainerExtendsIt_thenItEndsHalfAnHourLaterAndTheExtensionIsAudited"
+        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenARunningTrainingWithItsTrainerCheckedIn_whenTheTrainerExtendsIt_thenItEndsHalfAnHourLaterAndTheExtensionIsAudited",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAPlayerNamedOnAMemberBooking_whenTheyHoldTheDoorsOpenAndCheckOut_thenTheirParticipationShowsTheHold",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAGuestsOwnBookingOnAHoldingCard_whenTheyHoldTheDoorsOpenAndCheckOut_thenTheHoldRunsWithoutAnExtensionAndEnds",
+        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenAPlayersOwnHoldOnAMemberBooking_whenThePlayerExtends_thenTheBookingEndsHalfAnHourLater",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAPlayersRunningHold_whenThePlayerWithdrawsFromTheBooking_thenTheHoldEnds",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainersRunningHold_whenTheCardStopsNamingTheirRole_thenTheyStillCheckOut"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnotherMember_whenTheyHoldTheTrainingsDoorsOpen_thenTheBookingIsNotFoundForThem",
         "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenACoveringTrainer_whenTheyHoldAnotherTrainersDoorsOpen_thenTheHoldRunsAndOnlyTheyOrTheBoardEndIt",
         "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenAnotherTrainersRunningHold_whenACoveringTrainerExtends_thenOnlyTheCheckedInPersonMay",
         "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenATrainersRunningHold_whenAnAdministratorExtends_thenOnlyTheCheckedInPersonMay",
-        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenATrainersRunningHold_whenAMemberWhoMayNotManageItExtends_thenTheBookingIsNotFound"
+        "src/test/java/org/courtside/booking/web/DoorHoldExtensionTest.java#givenATrainersRunningHold_whenAMemberWhoMayNotManageItExtends_thenTheBookingIsNotFound",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAPlayerNamedOnAMemberBooking_whenAnotherMemberHoldsItsDoorsOpen_thenTheBookingIsNotFoundForThem",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnExternalPlayerNamedOnAMemberBooking_whenTheyHoldItsDoorsOpen_thenTheBookingIsNotFoundForThem",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnExternalAccountWithAManagingRole_whenTheyHoldATrainingTheyDidNotBookOpen_thenOutsidersAreRefused",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAGuestsBookingOnAHoldingCard_whenAMemberWhoMayNotManageItHoldsTheDoorsOpen_thenTheBookingIsNotFound",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenTheBookersRunningHold_whenAPlayerNamedOnTheBookingChecksOut_thenOnlyTheCheckedInPersonMay",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenTheBookersRunningHold_whenAPlayerWithdraws_thenTheBookersHoldKeepsRunning",
+        "src/test/java/org/courtside/booking/web/DoorHoldControllerTest.java#givenAnExternalPlayerNamedOnAMemberBooking_whenTheyReadTheirParticipations_thenNoDoorHoldIsOffered"
       ]
     },
     {

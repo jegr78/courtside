@@ -321,7 +321,7 @@ they signal occupancy and whether their doors may be held open. The access attri
 refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
 refuses it below the service. The last, `signalsOccupancy`, decides whether its bookings count as
 occupied for building automation; it is on by default and off for the closure card the same way.
-`holdsDoorsOpen` lets a responsible person hold a booking's doors open; it is off by default and
+`holdsDoorsOpen` lets the people on a booking hold its doors open; it is off by default and
 never on for the closure card, refused with `card.closure.holdsNoDoors` and by the
 `booking_card_closure_holds_no_doors` CHECK.
 
@@ -697,16 +697,21 @@ repeating it returns the same result.
 
 ### Holding doors open
 
-On a booking whose card has `holdsDoorsOpen`, the booker, an administrator or a role the card names
-as managing checks in to hold its doors open, from `access_lead_minutes` before the start until the
-end. This check-in is separate from attendance and works whether the club records attendance or
-not. The booker acts from My bookings, a managing role from the managed appointment. An external
-player cannot start a hold. A caller who
-may not manage the booking gets the same `404` as for a booking that does not exist; a card without
+On a booking whose card has `holdsDoorsOpen`, the booker, a member named as a player, an
+administrator or a role the card names as managing checks in to hold its doors open, from
+`access_lead_minutes` before the start until the end. This check-in is separate from attendance and
+works whether the club records attendance or not, and it needs no access-control connector, so a
+club whose Miniserver Courtside cannot reach runs on holds alone. The booker acts from My bookings,
+a named player from the participation listed there, a managing role from the managed appointment.
+An external player is never admitted as a named player or through a managing role: they hold the
+doors of their own booking open, get `403` on another booking their role would let them manage and
+the `404` below on the rest, and are never offered an extension or a hold on a booking they did not
+make. A caller who is none of these gets the same `404` as for a booking that does not exist; a card without
 the switch, a closed window and a hold somebody else runs are refused by their own codes.
 
-A hold ends at check-out by the person who started it or by an administrator, at a cancellation
-or move of its booking, and at the booking's end at the latest. A move ends it even when the new
+A hold ends at check-out by the person who started it, even one who has since lost access to the
+booking, or by an administrator; when a player who started it withdraws from the booking; at a
+cancellation or move of its booking; and at the booking's end at the latest. A move ends it even when the new
 slot still covers the old window, because the doors may no longer be the booking's. A hold also
 runs only while its booking is confirmed and it began inside the booking's current window, so
 nothing has to run when a booking ends. Starting and ending are audited as `booking.doorHold.started` and
@@ -719,7 +724,9 @@ grid and one hour on an hour grid. The hold names the resulting end as `extensio
 request names the end it wants, so a repeated request changes nothing. The extension keeps the start
 and courts and is measured by the move rules except the one refusing a start in the past. A
 reservation on the added time binds it like a new booking, and an administrator withdraws it the
-same way. It is refused for an external player, for a charged booking, for a card that no longer
+same way. When a named player extends a member booking, the rules that bind its booker measure the
+longer booking, while the player's own roles decide a reservation override as they do for a covering
+trainer. It is refused for an external player, for a charged booking, for a card that no longer
 offers a hold or is deactivated, and when a court is taken in the added time, which the overlap constraint decides. It
 is audited as `booking.extended` with the previous end. The court plan, the occupancy signal, the
 hold window and the access grant follow the new end.

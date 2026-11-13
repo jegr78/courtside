@@ -165,7 +165,7 @@ decides whether the card's bookings receive access codes; it defaults to false, 
 `booking_card_closure_grants_no_access` keeps it false on the closure card. `signals_occupancy`
 decides whether the card's bookings count as occupied in the occupancy signal; it defaults to true,
 and `booking_card_closure_signals_no_occupancy` keeps it false on the closure card.
-`holds_doors_open` decides whether a responsible person may hold the doors of the card's bookings
+`holds_doors_open` decides whether the people on one of the card's bookings may hold its doors
 open while checked in; it defaults to false, and `booking_card_closure_holds_no_doors` keeps it
 false on the closure card.
 `guest_fee_minor` is the price of one guest place in the minor unit of the club currency, 0 by

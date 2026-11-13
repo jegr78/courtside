@@ -327,6 +327,25 @@ class DoorHoldExtensionTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "major.richard", roles = "MEMBER")
+    void givenAPlayersOwnHoldOnAMemberBooking_whenThePlayerExtends_thenTheBookingEndsHalfAnHourLater() throws Exception {
+        // given
+        UUID player = identity.createPerson("Richard", "Major", "richard.major@example.org");
+        UUID playerAccount = identity.createEnabledAccount(player, "major.richard", Set.of(Role.MEMBER));
+        cards.letBookingsHoldDoorsOpen(MEMBER_CARD, true);
+        UUID booking = bookings.insertBookingThatHasStarted(court, MEMBER_CARD,
+                new TimeSlot(NOW.minus(30, ChronoUnit.MINUTES), ENDS), member);
+        bookings.nameMemberAsPlayer(booking, player);
+        bookings.holdDoorsOpenAt(booking, playerAccount, NOW.minus(30, ChronoUnit.MINUTES));
+
+        // when / then
+        mockMvc.perform(extend(booking, EXTENDED))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.closesAt").value(EXTENDED.toString()));
+        assertThat(endsOf(booking)).containsExactly(EXTENDED);
+    }
+
+    @Test
     @WithMockUser(username = "roe.john", roles = "TRAINER")
     void givenADeactivatedCard_whenTheTrainerExtends_thenTheCardIsNoLongerBookable() throws Exception {
         // given

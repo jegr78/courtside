@@ -128,6 +128,7 @@ class PersonalBookingPages {
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, AnnouncedAccess> access = accessGrants.of(page.bookings());
         Map<UUID, DynamicAccess> dynamic = accessGrants.dynamicOf(page.bookings());
+        Map<UUID, DoorHoldService.DoorHold> doorHolds = doorHolds(page.bookings());
         List<ApiParticipation> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();
@@ -142,7 +143,9 @@ class PersonalBookingPages {
                             card == null ? "#999999" : card.getColor(),
                             ApiBookingStatus.fromValue(booking.getStatus().name()))
                             .access(toAccess(booking.getId(), access.get(booking.getId()),
-                                    dynamic.get(booking.getId())));
+                                    dynamic.get(booking.getId())))
+                            .doorHold(doorHolds.containsKey(booking.getId())
+                                    ? DoorHoldController.toResponse(doorHolds.get(booking.getId())) : null);
                 })
                 .toList();
         return new ApiParticipationPage(items).nextCursor(page.nextCursor());

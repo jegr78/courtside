@@ -19,14 +19,22 @@ public class Outsiders {
                 && (accountId == null || !membership.holdsRunningMembership(accountId));
     }
 
+    public boolean isOutsiderAccount(UUID accountId) {
+        return isOutsider(accountId, rolesOf(accountId));
+    }
+
     public void refuseAccount(UUID accountId) {
-        refuse(accountId, accountId == null ? Set.of()
-                : accounts.findById(accountId).map(UserAccount::getRoles).orElse(Set.of()));
+        refuse(accountId, rolesOf(accountId));
     }
 
     public void refuse(UUID accountId, Set<Role> roles) {
         if (isOutsider(accountId, roles)) {
             throw new OutsiderRefusedException();
         }
+    }
+
+    private Set<Role> rolesOf(UUID accountId) {
+        return accountId == null ? Set.of()
+                : accounts.findById(accountId).map(UserAccount::getRoles).orElse(Set.of());
     }
 }

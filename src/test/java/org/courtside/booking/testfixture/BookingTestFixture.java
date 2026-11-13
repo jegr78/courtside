@@ -226,6 +226,17 @@ public class BookingTestFixture {
         }
     }
 
+    public void nameMemberAsPlayer(UUID bookingId, UUID personId) {
+        jdbc.sql("""
+                        INSERT INTO booking_participant (id, booking_id, kind, person_id, position)
+                        VALUES (:id, :bookingId, 'MEMBER', :personId,
+                                (SELECT coalesce(max(position), -1) + 1 FROM booking_participant
+                                 WHERE booking_id = :bookingId))
+                        """)
+                .param("id", UUID.randomUUID()).param("bookingId", bookingId).param("personId", personId)
+                .update();
+    }
+
     public void allocateAnotherCourt(UUID bookingId, UUID courtId) {
         jdbc.sql("""
                         INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
