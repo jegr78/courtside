@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0-rc.3](https://github.com/jegr78/courtside/compare/v0.5.0-rc.2...v0.5.0-rc.3) (2026-11-13)
+
+
+### Features
+
+* collapse read messages and delete them after a club-set period ([#1950](https://github.com/jegr78/courtside/issues/1950)) ([6ea3503](https://github.com/jegr78/courtside/commit/6ea35036322244c5a714ef28e367f535ab15b03c)), closes [#1868](https://github.com/jegr78/courtside/issues/1868)
+* extend a held booking while its doors are held open ([#1964](https://github.com/jegr78/courtside/issues/1964)) ([c05cc5b](https://github.com/jegr78/courtside/commit/c05cc5bbcc0285229bd8dc095bd60242264be1ae))
+* hold a booking's doors open while a responsible person is checked in ([#1963](https://github.com/jegr78/courtside/issues/1963)) ([6b4f1b2](https://github.com/jegr78/courtside/commit/6b4f1b28e90d7d3441c03d0759fd00d85a3030f6))
+* report held-open doors to building automation through the occupancy endpoint ([#1965](https://github.com/jegr78/courtside/issues/1965)) ([3fb9104](https://github.com/jegr78/courtside/commit/3fb9104a6b26192efcc2f503dc364a8c6a416cc1))
+
+
+### Bug fixes
+
+* settle PayPal orders correctly when a capture repeats, is refunded or outlasts its deadline ([#1948](https://github.com/jegr78/courtside/issues/1948)) ([dce3c1d](https://github.com/jegr78/courtside/commit/dce3c1d28f47f232df3c751463435c1209a40d72))
+
+
+### Performance
+
+* load each administration page only when it opens ([#1953](https://github.com/jegr78/courtside/issues/1953)) ([0ffbcf5](https://github.com/jegr78/courtside/commit/0ffbcf50c07f2cbdcb531bea0b32b242fade4f02)), closes [#1951](https://github.com/jegr78/courtside/issues/1951)
+* show the administration overview without waiting for the parts below it ([#1954](https://github.com/jegr78/courtside/issues/1954)) ([9e770b7](https://github.com/jegr78/courtside/commit/9e770b7cd4ce3b16c770a718b756c79c65f749b5)), closes [#1951](https://github.com/jegr78/courtside/issues/1951)
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
