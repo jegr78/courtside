@@ -76,10 +76,10 @@ it("given a period typed but not read, when the treasurer downloads the file, th
   await waitFor(() => expect(exported).toHaveBeenCalledWith({ from: "2026-01-01", to: "2026-12-31", separator: ";" }));
 });
 
-it("given a period the server refuses, when it is read, then the refusal is shown", async () => {
+it("given a period the server refuses as too long, when it is read, then the refusal names the limit", async () => {
   // given
   vi.spyOn(api, "guestFees").mockResolvedValueOnce(report).mockRejectedValueOnce(
-    new ApiError(400, { type: "urn:courtside:error:facility-utilisation-period-invalid", title: "Period invalid", status: 400, violations: [{ code: "booking.facilityUtilisation.periodOrder", params: {} }] }));
+    new ApiError(400, { type: "urn:courtside:error:guest-fee-period-invalid", title: "Guest fee period invalid", status: 400, violations: [{ code: "treasury.guestFees.periodTooLong", params: { maxDays: 366 } }] }));
   render(<AdminGuestFeesView />);
   await screen.findByTestId("guest-fees-row");
 
@@ -87,7 +87,24 @@ it("given a period the server refuses, when it is read, then the refusal is show
   await userEvent.click(screen.getByTestId("guest-fees-read"));
 
   // then
-  expect(await screen.findByTestId("guest-fees-error")).toBeInTheDocument();
+  expect(await screen.findByTestId("guest-fees-error")).toHaveTextContent("The period may span at most 366 days.");
+});
+
+it.each([
+  ["periodOrder", "The end date must not precede the start date."],
+  ["dateOutOfRange", "The dates must use years 0001 to 9999."]
+])("given a period the server refuses with %s, when it is read, then the refusal has a sentence of its own", async (code, sentence) => {
+  // given
+  vi.spyOn(api, "guestFees").mockResolvedValueOnce(report).mockRejectedValueOnce(
+    new ApiError(400, { type: "urn:courtside:error:guest-fee-period-invalid", title: "Guest fee period invalid", status: 400, violations: [{ code: `treasury.guestFees.${code}`, params: {} }] }));
+  render(<AdminGuestFeesView />);
+  await screen.findByTestId("guest-fees-row");
+
+  // when
+  await userEvent.click(screen.getByTestId("guest-fees-read"));
+
+  // then
+  expect(await screen.findByTestId("guest-fees-error")).toHaveTextContent(sentence);
 });
 
 it("given no guest fees, when the page opens, then it says so instead of an empty table", async () => {

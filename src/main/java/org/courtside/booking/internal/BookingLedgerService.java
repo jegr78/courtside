@@ -68,7 +68,7 @@ class BookingLedgerService implements BookingLedger {
                         SELECT u.person_id, p.guest_fee_currency, count(*) AS places, sum(p.guest_fee_minor) AS total
                         FROM held h
                         JOIN booking_participant p ON p.booking_id = h.id AND p.kind = 'GUEST' AND p.guest_fee_minor > 0
-                        LEFT JOIN user_account u ON u.id = h.booked_by
+                        LEFT JOIN user_account u ON u.id = h.booked_by AND u.anonymised_at IS NULL
                         GROUP BY u.person_id, p.guest_fee_currency
                         """)
                 .param("from", Timestamp.from(from.atStartOfDay(zone).toInstant()))

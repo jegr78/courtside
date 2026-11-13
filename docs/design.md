@@ -608,8 +608,10 @@ guest places and their sum for a period, by default the current calendar year in
 zone. A guest place counts when its fee is above zero and its booking is confirmed, started within
 the period and has ended. The fee belongs to the booking's `booked_by` account, so a dependant's
 booking is listed under the dependant. Sums are per currency, never converted. Guest places of a
-pseudonymised booking are only counted. The CSV download carries one member number column per import
-source. Each read and download records a `dataexchange.guestFees.read` entry with the period and the
+pseudonymised booking, or of a booking whose account is anonymised, are only counted as unassigned.
+The period is refused with its own `treasury.guestFees.*` codes. The CSV download carries one member
+number column per import source and states each amount in the currency's major unit with its minor
+digits, with a decimal comma when `;` separates the cells and a decimal point otherwise. Each read and download records a `dataexchange.guestFees.read` entry with the period and the
 form, not the content.
 
 ### Series

@@ -948,11 +948,12 @@ Es zählt jeder Gastplatz mit einer Gebühr über null aus einer bestätigten Bu
 begonnen hat und vorbei ist. Stornierte und noch nicht gespielte Buchungen zählen nicht. Die Gebühr
 gehört dem Konto, für das gebucht wurde, auch wenn ein Elternteil für sein Kind gebucht hat. Hat
 der Verein die Währung gewechselt, steht ein Mitglied für jede Währung in einer eigenen Zeile.
-Gastplätze aus Buchungen, die nach der Aufbewahrungsfrist kein Mitglied mehr nennen, nennt die Seite
-nur als Anzahl.
+Gastplätze aus Buchungen, die nach der Aufbewahrungsfrist kein Mitglied mehr nennen oder deren Konto
+geschlossen und anonymisiert ist, nennt die Seite nur als Anzahl.
 
 *Datei herunterladen* speichert die Liste als CSV-Datei mit einer Spalte Mitgliedsnummer je Importquelle,
-Vorname, Nachname, E-Mail-Adresse, Gastplätzen, Betrag und Währung. Courtside markiert nichts als
+Vorname, Nachname, E-Mail-Adresse, Gastplätzen, Betrag und Währung. Mit Semikolon als Trennzeichen
+steht im Betrag ein Dezimalkomma (`25,00`), sonst ein Dezimalpunkt (`25.00`). Courtside markiert nichts als
 abgerechnet. Jedes Öffnen und jeder Download steht im Änderungsprotokoll, mit dem Zeitraum, ohne
 Namen oder Beträge.
 
