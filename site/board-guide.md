@@ -300,7 +300,7 @@ Signal.
 Erreicht Courtside den Miniserver nicht, um Codes anzulegen, öffnet das Einchecken allein die Türen.
 Dafür bleibt `COURTSIDE_ACCESS_CONTROL_CONNECTOR` auf `none`, an allen Buchungskarten ist *Buchungen
 erhalten den Zugangscode* aus und *Türen dürfen beim Einchecken offen gehalten werden* an, auch für
-Mitgliederspiel und Gastbuchung. Dann checkt ein Spieler der Buchung ab 15 Minuten vor Beginn ein,
+Mitgliederspiel und Gastbuchung. Dann checkt ein Spieler der Buchung ab *Zugang vor Spielbeginn* ein,
 und die Tür seiner Plätze bleibt bis zum Auschecken oder zum Ende der Buchung offen. Ein Zugang für
 alle Mitglieder bleibt offen, solange irgendwer eingecheckt ist, an einem vollen Abend also
 durchgehend. Courtside prüft nicht, ob jemand vor Ort ist: Einchecken geht auch von unterwegs.

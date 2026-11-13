@@ -334,8 +334,9 @@ darüber eine Nachricht. Einchecken kann nur, wer gebucht hat.
 
 ### Türen offen halten
 
-Erlaubt die Buchungskarte es, hältst du unter *Meine Buchungen* mit **Türen offen halten** die Türen
-deiner Plätze ab 15 Minuten vor Beginn offen, bis du mit **Offenhalten beenden** auscheckst oder die
+Das ist ein anderes Einchecken als das für die Anwesenheit. Erlaubt die Buchungskarte es, hältst du
+unter *Meine Buchungen* mit **Türen offen halten** die Türen deiner Plätze offen, ab der Vorlaufzeit
+deines Vereins, meist 15 Minuten vor Beginn, bis du mit **Offenhalten beenden** auscheckst oder die
 Buchung endet. Das geht auch, wenn du nur als Mitspieler eingetragen bist: Die Schaltfläche steht
 dann bei der Buchung unter *Als Mitspieler eingetragen*. Hält schon jemand anderes die Türen offen, siehst du
 seit wann. Solange du eingecheckt bist, verlängerst du die Buchung mit **Verlängern**, wenn die Zeit

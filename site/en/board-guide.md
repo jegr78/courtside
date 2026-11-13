@@ -285,7 +285,7 @@ hold the door open. Codes keep working without this signal.
 If Courtside cannot reach the Miniserver to create codes, checking in alone opens the doors. Leave
 `COURTSIDE_ACCESS_CONTROL_CONNECTOR` at `none`, turn *Bookings receive the access code* off and
 *Doors may be held open while checked in* on for every booking card, member play and guest bookings
-included. A player of the booking then checks in from 15 minutes before the start, and the door of
+included. A player of the booking then checks in from *Access before play starts*, and the door of
 its courts stays open until check-out or the booking's end. An access point open to all members
 stays open while anyone is checked in, so on a busy evening it stays open throughout. Courtside does
 not check that anyone is on site: checking in works from anywhere.

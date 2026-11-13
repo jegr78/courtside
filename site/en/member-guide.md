@@ -321,8 +321,9 @@ member who booked can check in.
 
 ### Holding the doors open
 
-If the booking card allows it, **Hold doors open** under *My bookings* keeps the doors of your
-courts open from 15 minutes before the start until you check out with **End door hold** or the
+This is a different check-in from the one for attendance. If the booking card allows it, **Hold
+doors open** under *My bookings* keeps the doors of your courts open from your club's lead time,
+usually 15 minutes before the start, until you check out with **End door hold** or the
 booking ends. This works when you are only named as a player too: the button then sits on the
 booking under *Recorded as a co-player*. If someone else already holds the doors open, you see since
 when. While you are checked in, **Extend** lengthens the booking when the time after it is free. As

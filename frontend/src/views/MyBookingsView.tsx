@@ -207,7 +207,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       report(failure);
     }
   };
-  const doorHold = async (booking: HeldBooking, hold: boolean) => {
+  const doorHold = async (booking: HeldBooking, hold: boolean, failed: (failure: unknown) => void = report) => {
     setSuccess(undefined);
     try {
       await (hold ? api.holdDoorsOpen(booking.id) : api.endDoorHold(booking.id));
@@ -215,10 +215,10 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       await load();
       setSuccess(t(hold ? "myBookings.doorsHeldOpenSuccess" : "myBookings.doorHoldEndedSuccess"));
     } catch (failure) {
-      report(failure);
+      failed(failure);
     }
   };
-  const extendHeld = async (booking: HeldBooking) => {
+  const extendHeld = async (booking: HeldBooking, failed: (failure: unknown) => void = report) => {
     const endsAt = booking.doorHold?.extensionEndsAt;
     if (!endsAt) return;
     setSuccess(undefined);
@@ -228,7 +228,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       await load();
       setSuccess(t("myBookings.bookingExtendedSuccess"));
     } catch (failure) {
-      report(failure);
+      failed(failure);
     }
   };
   const payPal = {
@@ -310,8 +310,8 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
 }
 
 function ParticipationSection({ participations, doorHold, extendHeld, courtNames, locale, timeZone, reference, actionable, withdrawn, nextCursor, loadingMore, loadMore, t }: {
-  participations: Participation[]; doorHold: (booking: HeldBooking, hold: boolean) => Promise<void>;
-  extendHeld: (booking: HeldBooking) => Promise<void>; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
+  participations: Participation[]; doorHold: (booking: HeldBooking, hold: boolean, failed: (failure: unknown) => void) => Promise<void>;
+  extendHeld: (booking: HeldBooking, failed: (failure: unknown) => void) => Promise<void>; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
   withdrawn: () => Promise<void>; nextCursor?: string; loadingMore: boolean;
   loadMore: () => Promise<void>; t: Translate;
 }) {
@@ -353,7 +353,7 @@ function ParticipationSection({ participations, doorHold, extendHeld, courtNames
               emergency={actionable && participation.status === "CONFIRMED" ? () => api.participationEmergencyCode(participation.id) : undefined} />}
             {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
               : actionable && <div className="flex flex-wrap gap-2 pt-1">
-                {participation.status === "CONFIRMED" && <DoorHoldActions booking={participation} doorHold={doorHold} extendHeld={extendHeld} courtNames={courtNames} locale={locale} timeZone={timeZone} reference={reference} t={t} />}
+                {participation.status === "CONFIRMED" && <DoorHoldActions booking={participation} doorHold={(held, hold) => { clear(); return doorHold(held, hold, report); }} extendHeld={(held) => { clear(); return extendHeld(held, report); }} courtNames={courtNames} locale={locale} timeZone={timeZone} reference={reference} t={t} />}
                 <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
               </div>}
           </li>)}</ul>}

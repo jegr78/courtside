@@ -25,6 +25,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.BookingCancelled;
+import org.courtside.shared.ParticipantWithdrew;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesMoved;
 import org.springframework.context.ApplicationEventPublisher;
@@ -96,9 +97,13 @@ public class DoorHoldService {
 
     public void end(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
-        requireHoldAccess(booking, actor, actorRoles);
-        Hold hold = running(booking).orElseThrow(DoorHoldNotRunningException::new);
-        if (!actorRoles.contains(Role.ADMIN) && !actor.equals(hold.heldBy())) {
+        Optional<Hold> running = running(booking);
+        boolean holder = actor != null && running.map(Hold::heldBy).filter(actor::equals).isPresent();
+        if (!holder) {
+            requireHoldAccess(booking, actor, actorRoles);
+        }
+        Hold hold = running.orElseThrow(DoorHoldNotRunningException::new);
+        if (!holder && !actorRoles.contains(Role.ADMIN)) {
             throw new DoorHoldNotHolderException();
         }
         rows.end(hold.id(), actor, clock.instant());
@@ -130,6 +135,17 @@ public class DoorHoldService {
     @EventListener
     public void on(BookingCancelled cancelled) {
         endAll(List.of(cancelled.bookingId()), cancelled.cancelledByAccountId());
+    }
+
+    @EventListener
+    public void on(ParticipantWithdrew withdrew) {
+        Booking booking = lockedBooking(withdrew.bookingId());
+        running(booking).filter(hold -> hold.heldBy() != null && accounts.findById(hold.heldBy())
+                        .map(UserAccount::getPerson).map(Person::getId).filter(withdrew.personId()::equals).isPresent())
+                .ifPresent(hold -> {
+                    rows.end(hold.id(), hold.heldBy(), clock.instant());
+                    events.publishEvent(new DoorHoldEvent.Ended(booking.getId(), hold.id()));
+                });
     }
 
     @EventListener
@@ -234,12 +250,19 @@ public class DoorHoldService {
         return !outsiders.isOutsider(actor, actorRoles);
     }
 
+    // A guest holds the doors of their own booking only, whatever role they also carry.
     private void requireHoldAccess(Booking booking, UUID actor, Set<Role> actorRoles) {
-        Optional<UUID> person = accounts.findById(actor).map(UserAccount::getPerson).map(Person::getId);
-        boolean namedPlayer = person.isPresent() && !outsiders.isOutsider(actor, actorRoles)
+        boolean outsider = outsiders.isOutsider(actor, actorRoles);
+        Optional<UUID> person = actor == null || outsider ? Optional.empty()
+                : accounts.findById(actor).map(UserAccount::getPerson).map(Person::getId);
+        boolean namedPlayer = person.isPresent()
                 && booking.getParticipants().stream().map(BookingParticipant::getPersonId).anyMatch(person.get()::equals);
-        if (!namedPlayer) {
-            accessControl.requireManagementAccess(booking, actor, actorRoles);
+        if (namedPlayer) {
+            return;
+        }
+        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        if (outsider && !actor.equals(booking.getBookedBy())) {
+            outsiders.refuse(actor, actorRoles);
         }
     }
 

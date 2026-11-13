@@ -24,6 +24,7 @@ import org.courtside.booking.internal.AccessGrants;
 import org.courtside.booking.partner.PartnerSearchService;
 import org.courtside.booking.partner.PartnerSearchState;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.UserAccount;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -59,6 +60,7 @@ class PersonalBookingPages {
     private final DoorHoldService doorHoldService;
     private final CurrentUser currentUser;
     private final IssuedAccessCodes issuedCodes;
+    private final Outsiders outsiders;
 
     // A booking's own code goes only to its participants, so a page of somebody else's bookings carries none.
     ApiPersonalBookingPage render(PersonalBookingPage page, ApiPersonalBookingView view, boolean ownBookings) {
@@ -128,7 +130,8 @@ class PersonalBookingPages {
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, AnnouncedAccess> access = accessGrants.of(page.bookings());
         Map<UUID, DynamicAccess> dynamic = accessGrants.dynamicOf(page.bookings());
-        Map<UUID, DoorHoldService.DoorHold> doorHolds = doorHolds(page.bookings());
+        Map<UUID, DoorHoldService.DoorHold> doorHolds = currentUser.account().map(UserAccount::getId)
+                .filter(viewer -> !outsiders.isOutsiderAccount(viewer)).isPresent() ? doorHolds(page.bookings()) : Map.of();
         List<ApiParticipation> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();

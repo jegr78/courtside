@@ -109,7 +109,7 @@ tags:
   - name: attendance
     description: Checking in for one's own booking where the club records attendance.
   - name: door-hold
-    description: Holding a booking's doors open while a responsible person is checked in.
+    description: Holding a booking's doors open while somebody on it is checked in.
   - name: emergency-codes
     description: Asking for the emergency code of a booking's door when its own code is missing.
   - name: admin-courts
@@ -1964,7 +1964,7 @@ components:
           description: Whether bookings made with this card count as occupied in the court occupancy signal. Never true for the closure card.
         holdsDoorsOpen:
           type: boolean
-          description: Whether the booker, an administrator or a managing role may hold the doors of a booking made with this card open while checked in. Never true for the closure card.
+          description: Whether the booker, a member named as a player, an administrator or a managing role may hold the doors of a booking made with this card open while checked in; an external player only on their own booking. Never true for the closure card.
         active: { type: boolean }
 
     BookingCardRequest:
