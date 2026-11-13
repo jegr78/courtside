@@ -448,6 +448,17 @@ class CreditLedgerTest extends AbstractIntegrationTest {
         assertThat(entries(johnAccount)).as("the refused request leaves no entry").isZero();
     }
 
+    @Test
+    void givenAKeyNoClientMaySend_whenTheLedgerIsAskedToRecordIt_thenItRefusesBeforeAnythingElse() {
+        // when / then
+        assertThatThrownBy(() -> ledger.record(johnAccount, CreditEntryKind.CREDIT, 1500, "Cash at the clubhouse",
+                "two words"))
+                .as("the web layer admits only visible ASCII keys, so another one is a caller's bug")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The idempotency key must be 1 to 128 visible ASCII characters");
+        assertThat(entries(johnAccount)).isZero();
+    }
+
     private int recordedStatus(UUID account) {
         try {
             return record("miles.richard", account, "CREDIT", 1500, "Cash at the clubhouse", true, "entry-race")
