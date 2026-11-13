@@ -24,6 +24,10 @@ public record AgeBanding(Map<String, List<AgeBand>> splits, int year) {
         splits = Map.copyOf(splits);
     }
 
+    public boolean splitsAny() {
+        return !splits.isEmpty();
+    }
+
     public boolean splits(String category) {
         return category != null && splits.containsKey(category);
     }

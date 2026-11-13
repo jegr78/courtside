@@ -49,7 +49,7 @@ public final class SnapshotParser {
         String text = decoded(content, chosen);
         try (CSVParser parser = format(separator).parse(new StringReader(text))) {
             List<String> headerNames = parser.getHeaderNames();
-            Map<String, CanonicalField> header = headerOf(headerNames, columns);
+            Map<String, CanonicalField> header = headerOf(headerNames, columns, requiredFields(banding));
             String categoryColumn = keyOf(header, CanonicalField.MEMBERSHIP_TYPE);
             return read(parser, header, headerNames.size(), ignoredColumns(headerNames, columns),
                     categoryColumn == null ? -1 : headerNames.indexOf(categoryColumn), leftOutCategories, banding);
@@ -234,8 +234,17 @@ public final class SnapshotParser {
         return values;
     }
 
+    private static Set<CanonicalField> requiredFields(AgeBanding banding) {
+        Set<CanonicalField> required = EnumSet.copyOf(REQUIRED_FIELDS);
+        if (banding.splitsAny()) {
+            required.add(CanonicalField.BIRTH_DATE);
+        }
+        return required;
+    }
+
     private static Map<String, CanonicalField> headerOf(List<String> headerNames,
-                                                        Map<String, CanonicalField> columns) {
+                                                        Map<String, CanonicalField> columns,
+                                                        Set<CanonicalField> required) {
         if (headerNames.isEmpty()) {
             throw new SnapshotHeaderInvalidException("import.snapshot.header.missing", Map.of());
         }
@@ -255,7 +264,7 @@ public final class SnapshotParser {
             }
             header.put(name, field);
         }
-        Set<CanonicalField> missing = EnumSet.copyOf(REQUIRED_FIELDS);
+        Set<CanonicalField> missing = EnumSet.copyOf(required);
         missing.removeAll(claimed);
         if (!missing.isEmpty()) {
             throw new SnapshotHeaderInvalidException("import.snapshot.header.missingField",

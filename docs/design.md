@@ -1281,7 +1281,8 @@ it, neither in the change set, the stored preview, the fingerprint, the audit no
 without a readable date in `DD.MM.YYYY`, `YYYY-MM-DD` or `YYYY` form takes the value's own mapping
 and is counted in the preview, which marks a type that came from a band and never shows an age. A
 split requires the source to own `MEMBERSHIP_TYPE`, because otherwise it would act only when a
-person is created.
+person is created. A file read by header that lacks the mapped birth date column is refused before a preview
+exists, because every row of a split value would otherwise fall back to the value's own mapping.
 
 A source reads its files in one of two modes. By header, the default, the first row names the
 columns and each field is found by the header mapped to it. By position, for an export without a
