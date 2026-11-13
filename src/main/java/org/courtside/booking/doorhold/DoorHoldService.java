@@ -3,6 +3,7 @@ package org.courtside.booking.doorhold;
 import lombok.RequiredArgsConstructor;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingParticipant;
 import org.courtside.booking.BookingStatus;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.doorhold.DoorHoldRows.Hold;
@@ -19,7 +20,10 @@ import org.courtside.config.BookingGridSettings;
 import org.courtside.facility.AccessPoint;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Outsiders;
+import org.courtside.identity.Person;
 import org.courtside.identity.Role;
+import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesMoved;
@@ -41,7 +45,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Holds a booking's doors open while a responsible person is checked in. */
+/** Holds a booking's doors open while somebody on it is checked in: its booker, a named player or a manager. */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -62,11 +66,11 @@ public class DoorHoldService {
     private final BookingGridSettings bookingGrid;
     private final FacilityService facility;
     private final Outsiders outsiders;
+    private final UserAccountRepository accounts;
 
     public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
-        accessControl.requireManagementAccess(booking, actor, actorRoles);
-        outsiders.refuse(actor, actorRoles);
+        requireHoldAccess(booking, actor, actorRoles);
         if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
             throw new DoorHoldNotOfferedException();
         }
@@ -79,19 +83,20 @@ public class DoorHoldService {
         Optional<Hold> running = rows.unendedSince(window);
         if (running.isPresent()) {
             if (running.get().heldBy() != null && running.get().heldBy().equals(actor)) {
-                return toDoorHold(window, running, actor);
+                return toDoorHold(window, running, actor, extensible(actor, actorRoles));
             }
             throw new DoorHoldAlreadyRunningException();
         }
         UUID holdId = UUID.randomUUID();
         rows.start(holdId, bookingId, actor, now);
         events.publishEvent(new DoorHoldEvent.Started(bookingId, holdId));
-        return toDoorHold(window, Optional.of(new Hold(holdId, bookingId, now, actor)), actor);
+        return toDoorHold(window, Optional.of(new Hold(holdId, bookingId, now, actor)), actor,
+                extensible(actor, actorRoles));
     }
 
     public void end(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
-        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        requireHoldAccess(booking, actor, actorRoles);
         Hold hold = running(booking).orElseThrow(DoorHoldNotRunningException::new);
         if (!actorRoles.contains(Role.ADMIN) && !actor.equals(hold.heldBy())) {
             throw new DoorHoldNotHolderException();
@@ -104,7 +109,7 @@ public class DoorHoldService {
     public DoorHold extend(UUID bookingId, Instant endsAt, UUID actor, Set<Role> actorRoles) {
         bookingGridCoordination.lock();
         Booking booking = lockedBooking(bookingId);
-        accessControl.requireManagementAccess(booking, actor, actorRoles);
+        requireHoldAccess(booking, actor, actorRoles);
         if (!cards.requireCard(booking.getCardId()).isHoldsDoorsOpen()) {
             throw new DoorHoldNotOfferedException();
         }
@@ -119,7 +124,7 @@ public class DoorHoldService {
             }
             extension.extend(bookingId, endsAt, actor, actorRoles);
         }
-        return toDoorHold(windowOf(lockedBooking(bookingId)), Optional.of(hold), actor);
+        return toDoorHold(windowOf(lockedBooking(bookingId)), Optional.of(hold), actor, extensible(actor, actorRoles));
     }
 
     @EventListener
@@ -159,8 +164,9 @@ public class DoorHoldService {
                 .filter(hold -> confirmed.contains(hold.bookingId()))
                 .filter(hold -> now.isBefore(windows.get(hold.bookingId()).closesAt()))
                 .collect(Collectors.toMap(Hold::bookingId, Function.identity()));
+        boolean extensible = !outsiders.isOutsiderAccount(viewer);
         return windows.values().stream().collect(Collectors.toMap(Window::bookingId,
-                window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer)));
+                window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer, extensible)));
     }
 
     /** Every active access point and whether a running hold keeps it open, valid until {@code expiresAt}. */
@@ -217,10 +223,24 @@ public class DoorHoldService {
         return accessPolicy.accessLead().toDuration();
     }
 
-    private DoorHold toDoorHold(Window window, Optional<Hold> hold, UUID viewer) {
+    private DoorHold toDoorHold(Window window, Optional<Hold> hold, UUID viewer, boolean extensible) {
         boolean heldByMe = hold.map(Hold::heldBy).filter(heldBy -> heldBy.equals(viewer)).isPresent();
         return new DoorHold(window.opensAt(), window.closesAt(), hold.map(Hold::heldAt).orElse(null), heldByMe,
-                heldByMe ? window.closesAt().plus(extensionStep()) : null);
+                heldByMe && extensible ? window.closesAt().plus(extensionStep()) : null);
+    }
+
+    // An outsider may hold the doors of their own booking open, but every extension refuses them.
+    private boolean extensible(UUID actor, Set<Role> actorRoles) {
+        return !outsiders.isOutsider(actor, actorRoles);
+    }
+
+    private void requireHoldAccess(Booking booking, UUID actor, Set<Role> actorRoles) {
+        Optional<UUID> person = accounts.findById(actor).map(UserAccount::getPerson).map(Person::getId);
+        boolean namedPlayer = person.isPresent() && booking.getParticipants().stream()
+                .map(BookingParticipant::getPersonId).anyMatch(person.get()::equals);
+        if (!namedPlayer) {
+            accessControl.requireManagementAccess(booking, actor, actorRoles);
+        }
     }
 
     // The smallest whole number of booking slots that reaches half an hour, so the grid rule accepts it.

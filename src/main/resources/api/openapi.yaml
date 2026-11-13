@@ -3561,9 +3561,9 @@ components:
     DoorHold:
       type: object
       description: |
-        Present on a booking whose card lets a responsible person hold its doors open. The booker, an
-        administrator or a role that manages the card checks in from `opensAt`, the access lead time
-        before the start, until `closesAt`, the booking's end. `heldSince` names when the running
+        Present on a booking whose card lets the people on it hold its doors open. The booker, a member
+        named as a player, an administrator or a role that manages the card checks in from `opensAt`,
+        the access lead time before the start, until `closesAt`, the booking's end. `heldSince` names when the running
         hold began and is absent while nobody holds the doors open; a hold ends at check-out or at
         the booking's end, and a moved or cancelled booking holds nothing open. The person running
         the hold may extend the booking, which moves `closesAt` with it.
@@ -3578,7 +3578,9 @@ components:
         extensionEndsAt:
           type: string
           format: date-time
-          description: The end an extension would give the booking; present only on the caller's own running hold.
+          description: |
+            The end an extension would give the booking; present only on the caller's own running hold,
+            and never for an external player, whom every extension refuses.
 
     BookingExtensionRequest:
       type: object
@@ -3702,6 +3704,8 @@ components:
         status: { $ref: "#/components/schemas/BookingStatus" }
         access:
           $ref: "#/components/schemas/AccessGrant"
+        doorHold:
+          $ref: "#/components/schemas/DoorHold"
 
     ParticipationPage:
       type: object
@@ -8453,13 +8457,13 @@ paths:
       operationId: holdDoorsOpen
       summary: Hold a booking's doors open while checked in.
       description: |
-        Starts a door hold on a booking whose card offers one. The booker, an administrator or a role
-        that manages the card may start it from the access lead time before the start until the end.
+        Starts a door hold on a booking whose card offers one. The booker, a member named as a player,
+        an administrator or a role that manages the card may start it from the access lead time before
+        the start until the end. An external player may start it on their own booking.
         A card that offers no hold answers `409` with `urn:courtside:error:door-hold-not-offered`;
         outside the window or on a booking that is not confirmed the answer is `409` with
         `urn:courtside:error:door-hold-closed`; a hold somebody else runs answers `409` with
-        `urn:courtside:error:door-hold-already-running`. An external player gets `403` with
-        `urn:courtside:error:access-denied`. Starting again while one's own hold runs
+        `urn:courtside:error:door-hold-already-running`. Starting again while one's own hold runs
         changes nothing. A booking the caller may not act on answers `404` like one that does not
         exist.
       security:
