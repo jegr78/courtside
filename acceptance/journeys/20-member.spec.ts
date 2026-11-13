@@ -344,6 +344,7 @@ test("given two members on the same slot, when both submit, then the second is r
       await second.goto("/");
       await expect(second.getByTestId("my-messages-unread"), "product: the navigation shows unread messages").toBeVisible();
       await second.getByTestId("my-messages-link").click();
+      await second.getByTestId("notifications-show-unread").click();
       const offer = second.locator('[data-testid="notification-offer"][data-open="true"]').first();
       await expect(offer, "product: the notification centre shows the open offer").toBeVisible();
       await capture(second, "notification-offer", { subject: offer });
