@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0-rc.4](https://github.com/jegr78/courtside/compare/v0.5.0-rc.3...v0.5.0-rc.4) (2026-11-13)
+
+
+### Features
+
+* let guests and named players hold the doors of their booking open ([#1973](https://github.com/jegr78/courtside/issues/1973)) ([f61c685](https://github.com/jegr78/courtside/commit/f61c6858a7b3e430a6b503942aa8f0adc2b6d0ca))
+
+
+### Bug fixes
+
+* clear a closed account's series notes and withdraw a registration link when the board corrects the address ([#1987](https://github.com/jegr78/courtside/issues/1987)) ([1eb3c75](https://github.com/jegr78/courtside/commit/1eb3c75752b50014afb0721053afc1ee0b48d1a0))
+* end a door hold when its card is deactivated, its booking displaced or its holder closed ([#1988](https://github.com/jegr78/courtside/issues/1988)) ([d43f2d9](https://github.com/jegr78/courtside/commit/d43f2d921d2c08205c51b54f369eba1b080a9fb1))
+* read PayPal orders with the credentials they were created with and refuse an order after the hold expired ([#1984](https://github.com/jegr78/courtside/issues/1984)) ([0b1a5bd](https://github.com/jegr78/courtside/commit/0b1a5bd24ece3e5d57020d3ce09935b914a2252f))
+* refuse an age-banded import whose file lacks the birth date column ([#1985](https://github.com/jegr78/courtside/issues/1985)) ([1d992a8](https://github.com/jegr78/courtside/commit/1d992a889bd90a02d686af0a620f1fe0c265d910)), closes [#1977](https://github.com/jegr78/courtside/issues/1977)
+* state the guest fee report's amount format and leave anonymised bookers out ([#1986](https://github.com/jegr78/courtside/issues/1986)) ([b1ff110](https://github.com/jegr78/courtside/commit/b1ff110644e4ca44ff232971b1cae17017dc4d34)), closes [#1980](https://github.com/jegr78/courtside/issues/1980)
+* tell the board when Loxone refuses Remote Connect, and stop recommending the serial ([#1990](https://github.com/jegr78/courtside/issues/1990)) ([638e8b1](https://github.com/jegr78/courtside/commit/638e8b12684f55339f82ae21dc40de05fcfedbe1))
+
+
+### Documentation
+
+* close a held door through the HTTP input's online status in the Loxone recipe ([#1993](https://github.com/jegr78/courtside/issues/1993)) ([0ca39b6](https://github.com/jegr78/courtside/commit/0ca39b658ce02afcaf11e1c24a43d16c6de4a030))
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
