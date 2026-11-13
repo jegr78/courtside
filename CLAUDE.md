@@ -25,6 +25,14 @@ export JAVA_HOME=/path/to/temurin-25
 
 Docker must be running for Testcontainers.
 
+**At most two agents build at the same time.** A Maven build with its Testcontainers database and
+a frontend lint or build each hold about a gigabyte, and the shared development box gives a
+session 6 GB in total. Four agents building in parallel pushed it past that limit; the machine
+then spent its time rereading evicted code from disk and every session on it stalled. A session
+that dispatches agents in parallel lets at most two of them run Maven, `npm`, Playwright or
+`check` at once, and the others edit, review or wait. This applies to subagents too, so every
+prompt that dispatches one carries the rule.
+
 The application reads `build-info.properties` and `git.properties`, both written by Maven, so it
 starts only after a Maven build has run — an IDE that compiles on its own produces a context that
 fails on the missing `BuildProperties` bean.
