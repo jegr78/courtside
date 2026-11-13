@@ -11,13 +11,15 @@ export function suiteDuration(report) {
   return { name: `${name.replaceAll(".", "/")}.java`, seconds: Math.round(Number(time.replaceAll(",", "")) * 10) / 10 };
 }
 
+// Across several builds the shortest time wins: the longer ones carry a Spring context start that
+// lands on whichever class of a shard first needs that context.
 export function durationsOf(directories) {
   const durations = {};
   for (const directory of directories) {
     for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !/^TEST-.+\.xml$/.test(entry.name)) continue;
       const duration = suiteDuration(readFileSync(join(entry.parentPath, entry.name), "utf8"));
-      if (duration) durations[duration.name] = duration.seconds;
+      if (duration) durations[duration.name] = Math.min(durations[duration.name] ?? Infinity, duration.seconds);
     }
   }
   return Object.fromEntries(Object.entries(durations).toSorted(([left], [right]) => (left < right ? -1 : 1)));

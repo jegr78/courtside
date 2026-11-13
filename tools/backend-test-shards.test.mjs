@@ -161,6 +161,21 @@ test("given report directories, when the durations are collected, then every cla
     [["org/example/AlphaTest.java", 2], ["org/example/ZetaTest.java", 1234.5]]);
 });
 
+test("given one class reported by two builds, when the durations are collected, then the shorter time is kept", () => {
+  // given
+  const reports = sourceTree({
+    "first/TEST-org.example.WaitlistTest.xml": '<testsuite name="org.example.WaitlistTest" time="82.1">',
+    "second/TEST-org.example.WaitlistTest.xml": '<testsuite name="org.example.WaitlistTest" time="42.3">'
+  });
+
+  // when
+  const durations = durationsOf([join(reports, "first"), join(reports, "second")]);
+
+  // then
+  assert.deepEqual(durations, { "org/example/WaitlistTest.java": 42.3 },
+    "the longer run paid for a context start that follows the shard cut, not the class");
+});
+
 test("given the checked-in durations, when the repository's tests are sharded, then each shard holds about an even share of the measured time", () => {
   // given
   const root = new URL("../src/test/java", import.meta.url).pathname;
