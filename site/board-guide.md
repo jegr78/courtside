@@ -297,6 +297,14 @@ stellt einen neuen Schlüssel aus und fragt nur noch über HTTPS mit Zertifikats
 Antwort unterwegs verändern kann, hält die Tür sonst offen. Die Codes funktionieren auch ohne dieses
 Signal.
 
+Erreicht Courtside den Miniserver nicht, um Codes anzulegen, öffnet das Einchecken allein die Türen.
+Dafür bleibt `COURTSIDE_ACCESS_CONTROL_CONNECTOR` auf `none`, an allen Buchungskarten ist *Buchungen
+erhalten den Zugangscode* aus und *Türen dürfen beim Einchecken offen gehalten werden* an, auch für
+Mitgliederspiel und Gastbuchung. Dann checkt ein Spieler der Buchung ab 15 Minuten vor Beginn ein,
+und die Tür seiner Plätze bleibt bis zum Auschecken oder zum Ende der Buchung offen. Ein Zugang für
+alle Mitglieder bleibt offen, solange irgendwer eingecheckt ist, an einem vollen Abend also
+durchgehend. Courtside prüft nicht, ob jemand vor Ort ist: Einchecken geht auch von unterwegs.
+
 Wer den Schlüssel kennt, erfährt Belegung und Minuten je Platz und welche Türen gerade offen gehalten
 werden, nie wer gebucht hat oder mit welcher Karte. Der Schlüssel steht in der Adresse und kann deshalb im Protokoll eines Routers oder
 Proxys auftauchen. Ersetze ihn, wenn er in falsche Hände geraten ist.
@@ -448,7 +456,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 | **Buchungen erhalten den Zugangscode** | Buchungen mit dieser Karte gehören zu den Buchungen, für die der Code der Zugänge ihrer Plätze gilt. Die Karte *Platz gesperrt* bietet das nicht an |
 | **Buchungen gelten für die Gebäudesteuerung als belegt** | Buchungen mit dieser Karte melden ihren Platz der Gebäudesteuerung als belegt, siehe *Gebäudesteuerung* unter *Zugänge*. Neue Karten tragen es, die Karte *Platz gesperrt* bietet es nicht an |
-| **Türen dürfen beim Einchecken offen gehalten werden** | Bucher, Administration oder eine verwaltende Rolle der Karte checkt in *Meine Buchungen* oder im verwalteten Termin ein, und Courtside führt die Türen der Buchung als offen gehalten, bis zum Auschecken oder zum Ende der Buchung. Wer eingecheckt hat, kann die Buchung in Schritten von 30 Minuten verlängern, bei längeren Slots um einen Slot, solange diese Zeit frei ist. Neue Karten tragen es nicht, die Karte *Platz gesperrt* bietet es nicht an |
+| **Türen dürfen beim Einchecken offen gehalten werden** | Wer gebucht hat, ein eingetragener Mitspieler, die Administration oder eine verwaltende Rolle der Karte checkt in *Meine Buchungen* oder im verwalteten Termin ein, und Courtside führt die Türen der Buchung als offen gehalten, bis zum Auschecken oder zum Ende der Buchung. Gäste checken bei ihrer eigenen Buchung ein. Wer eingecheckt hat, kann die Buchung in Schritten von 30 Minuten verlängern, bei längeren Slots um einen Slot, solange diese Zeit frei ist. Gäste verlängern nicht. Neue Karten tragen es nicht, die Karte *Platz gesperrt* bietet es nicht an |
 
 Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
 gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf

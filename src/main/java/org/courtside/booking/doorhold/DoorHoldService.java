@@ -236,8 +236,8 @@ public class DoorHoldService {
 
     private void requireHoldAccess(Booking booking, UUID actor, Set<Role> actorRoles) {
         Optional<UUID> person = accounts.findById(actor).map(UserAccount::getPerson).map(Person::getId);
-        boolean namedPlayer = person.isPresent() && booking.getParticipants().stream()
-                .map(BookingParticipant::getPersonId).anyMatch(person.get()::equals);
+        boolean namedPlayer = person.isPresent() && !outsiders.isOutsider(actor, actorRoles)
+                && booking.getParticipants().stream().map(BookingParticipant::getPersonId).anyMatch(person.get()::equals);
         if (!namedPlayer) {
             accessControl.requireManagementAccess(booking, actor, actorRoles);
         }

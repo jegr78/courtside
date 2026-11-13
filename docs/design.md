@@ -321,7 +321,7 @@ they signal occupancy and whether their doors may be held open. The access attri
 refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
 refuses it below the service. The last, `signalsOccupancy`, decides whether its bookings count as
 occupied for building automation; it is on by default and off for the closure card the same way.
-`holdsDoorsOpen` lets a responsible person hold a booking's doors open; it is off by default and
+`holdsDoorsOpen` lets the people on a booking hold its doors open; it is off by default and
 never on for the closure card, refused with `card.closure.holdsNoDoors` and by the
 `booking_card_closure_holds_no_doors` CHECK.
 
@@ -697,12 +697,14 @@ repeating it returns the same result.
 
 ### Holding doors open
 
-On a booking whose card has `holdsDoorsOpen`, the booker, an administrator or a role the card names
-as managing checks in to hold its doors open, from `access_lead_minutes` before the start until the
-end. This check-in is separate from attendance and works whether the club records attendance or
-not. The booker acts from My bookings, a managing role from the managed appointment. An external
-player cannot start a hold. A caller who
-may not manage the booking gets the same `404` as for a booking that does not exist; a card without
+On a booking whose card has `holdsDoorsOpen`, the booker, a member named as a player, an
+administrator or a role the card names as managing checks in to hold its doors open, from
+`access_lead_minutes` before the start until the end. This check-in is separate from attendance and
+works whether the club records attendance or not, and it needs no access-control connector, so a
+club whose Miniserver Courtside cannot reach runs on holds alone. The booker acts from My bookings,
+a named player from the participation listed there, a managing role from the managed appointment.
+An external player holds the doors of their own booking open but is never offered an extension. A
+caller who is none of these gets the same `404` as for a booking that does not exist; a card without
 the switch, a closed window and a hold somebody else runs are refused by their own codes.
 
 A hold ends at check-out by the person who started it or by an administrator, at a cancellation

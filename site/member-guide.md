@@ -332,6 +332,16 @@ niemand checkt bis dahin ein, storniert Courtside die Buchung und gibt den Platz
 dann als freigegeben unter deinen stornierten Buchungen. Du und alle Mitspieler der Buchung bekommen
 darüber eine Nachricht. Einchecken kann nur, wer gebucht hat.
 
+### Türen offen halten
+
+Erlaubt die Buchungskarte es, hältst du unter *Meine Buchungen* mit **Türen offen halten** die Türen
+deiner Plätze ab 15 Minuten vor Beginn offen, bis du mit **Offenhalten beenden** auscheckst oder die
+Buchung endet. Das geht auch, wenn du nur als Mitspieler eingetragen bist: Die Schaltfläche steht
+dann bei der Buchung unter *Als Mitspieler eingetragen*. Hält schon jemand anderes die Türen offen, siehst du
+seit wann. Solange du eingecheckt bist, verlängerst du die Buchung mit **Verlängern**, wenn die Zeit
+danach frei ist. Als Gast hältst du die Türen deiner eigenen Buchung offen, verlängern kannst du sie
+nicht.
+
 ## Auf einen belegten Platz warten
 
 Ist ein Platz zu deiner Wunschzeit belegt, kannst du dich auf seine Warteliste setzen.

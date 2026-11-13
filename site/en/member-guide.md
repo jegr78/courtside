@@ -319,6 +319,15 @@ checks in by then, Courtside cancels the booking and frees the court. It then sh
 your cancelled bookings. You and every player of the booking receive a message about it. Only the
 member who booked can check in.
 
+### Holding the doors open
+
+If the booking card allows it, **Hold doors open** under *My bookings* keeps the doors of your
+courts open from 15 minutes before the start until you check out with **End door hold** or the
+booking ends. This works when you are only named as a player too: the button then sits on the
+booking under *Recorded as a co-player*. If someone else already holds the doors open, you see since
+when. While you are checked in, **Extend** lengthens the booking when the time after it is free. As
+a guest you hold the doors of your own booking open, but you cannot extend it.
+
 ## Waiting for a taken court
 
 If a court is taken at the time you want, you can join its waitlist.

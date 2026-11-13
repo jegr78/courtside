@@ -517,6 +517,23 @@ class DoorHoldControllerTest extends AbstractIntegrationTest {
         assertThat(unendedHoldsOf(booking)).isEqualTo(1L);
     }
 
+    @Test
+    @WithMockUser(username = "roe.richard", roles = "EXTERNAL")
+    void givenAnExternalPlayerNamedOnAMemberBooking_whenTheyHoldItsDoorsOpen_thenTheBookingIsNotFoundForThem()
+            throws Exception {
+        // given
+        UUID external = identity.createPerson("Richard", "Roe", "roe@example.org");
+        identity.createEnabledAccount(external, "roe.richard", Set.of(Role.EXTERNAL));
+        UUID booking = memberBookingWithPlayer();
+        bookings.nameMemberAsPlayer(booking, external);
+
+        // when / then
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
+        assertThat(unendedHoldsOf(booking)).as("a guest holds the doors of their own booking only").isZero();
+    }
+
     private UUID guestBooking() {
         UUID external = identity.createEnabledAccount(identity.createPerson("Richard", "Roe", "roe@example.org"),
                 "roe.richard", Set.of(Role.EXTERNAL));
