@@ -1,21 +1,10 @@
 # Changelog
 
-## [0.5.0-rc.5](https://github.com/jegr78/courtside/compare/v0.5.0-rc.4...v0.5.0-rc.5) (2026-11-14)
-
-
-### Features
-
-* let groundskeepers and admins read every door's fixed and emergency code ([#2000](https://github.com/jegr78/courtside/issues/2000)) ([8d8d520](https://github.com/jegr78/courtside/commit/8d8d52033d3bca019809ee7311723311eb162e44))
-
-
-### Bug fixes
-
-* update the frontend, build and deployment dependencies ([#1998](https://github.com/jegr78/courtside/issues/1998)) ([a804552](https://github.com/jegr78/courtside/commit/a804552fe25c740258d41bc7b0469dd10472533b))
-
 ## 0.5.0 (2026-11-09)
 
 ### Features
 
+* let groundskeepers and admins read every door's fixed and emergency code ([#2000](https://github.com/jegr78/courtside/issues/2000)) ([8d8d520](https://github.com/jegr78/courtside/commit/8d8d52033d3bca019809ee7311723311eb162e44))
 * let guests and named players hold the doors of their booking open ([#1973](https://github.com/jegr78/courtside/issues/1973)) ([f61c685](https://github.com/jegr78/courtside/commit/f61c6858a7b3e430a6b503942aa8f0adc2b6d0ca))
 * collapse read messages and delete them after a club-set period ([#1950](https://github.com/jegr78/courtside/issues/1950)) ([6ea3503](https://github.com/jegr78/courtside/commit/6ea35036322244c5a714ef28e367f535ab15b03c)), closes [#1868](https://github.com/jegr78/courtside/issues/1868)
 * extend a held booking while its doors are held open ([#1964](https://github.com/jegr78/courtside/issues/1964)) ([c05cc5b](https://github.com/jegr78/courtside/commit/c05cc5bbcc0285229bd8dc095bd60242264be1ae))
@@ -41,6 +30,7 @@
 
 ### Bug fixes
 
+* update the frontend, build and deployment dependencies ([#1998](https://github.com/jegr78/courtside/issues/1998)) ([a804552](https://github.com/jegr78/courtside/commit/a804552fe25c740258d41bc7b0469dd10472533b))
 * clear a closed account's series notes and withdraw a registration link when the board corrects the address ([#1987](https://github.com/jegr78/courtside/issues/1987)) ([1eb3c75](https://github.com/jegr78/courtside/commit/1eb3c75752b50014afb0721053afc1ee0b48d1a0))
 * end a door hold when its card is deactivated, its booking displaced or its holder closed ([#1988](https://github.com/jegr78/courtside/issues/1988)) ([d43f2d9](https://github.com/jegr78/courtside/commit/d43f2d921d2c08205c51b54f369eba1b080a9fb1))
 * read PayPal orders with the credentials they were created with and refuse an order after the hold expired ([#1984](https://github.com/jegr78/courtside/issues/1984)) ([0b1a5bd](https://github.com/jegr78/courtside/commit/0b1a5bd24ece3e5d57020d3ce09935b914a2252f))
