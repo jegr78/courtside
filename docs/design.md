@@ -1772,7 +1772,7 @@ Verified TLS to PostgreSQL and between Caddy and the application is optional har
 fails closed on inconsistent certificates, keys, authorities or transport settings. The standard
 single-host installation remains supported without these optional components.
 
-The self-hosted mail recipe uses Stalwart. An update from the pinned 0.16.27 image to 1.0.x can
+The self-hosted mail recipe uses Stalwart. An update from the pinned 0.16.27 image to 1.x can
 explicitly initialize a new store pair while retaining the originals and a complete recovery unit.
 It does not carry old mail state into the new server. Without that explicit option, incompatible
 store transitions are refused before mutation. The launcher configures the new stores and verifies

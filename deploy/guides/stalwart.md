@@ -22,13 +22,13 @@ peer. Public reputation and third-party acceptance remain outside Courtside's co
 
 ## Upgrading older mail stores
 
-Stalwart 1.0 uses a different store format from 0.16. A fresh installation uses the new format
+Stalwart 1 uses a different store format from 0.16. A fresh installation uses the new format
 directly. An existing installation using the pinned 0.16.27 image can explicitly initialize new
-stores when updating to a verified release using 1.0.x. This path serves development and test
+stores when updating to a verified release using 1.x. This path serves development and test
 installations that do not need to carry their mail state into the new server.
 
 Only 0.16.27 is accepted as the source, and Courtside 0.3.0 is the release that ships it. Courtside
-0.1.0 and 0.2.0 run Stalwart 0.16.24 and 0.16.26, and the 1.0 launcher refuses both. Update such an
+0.1.0 and 0.2.0 run Stalwart 0.16.24 and 0.16.26, and the launcher refuses both. Update such an
 installation to 0.3.0 with that release's own archive first, then follow this procedure.
 
 Reinitialization does not copy messages, queued deliveries, manually created accounts or settings.

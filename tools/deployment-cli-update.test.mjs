@@ -839,6 +839,22 @@ test("given an unsupported source image, when reinitialization is requested, the
   });
 });
 
+test("given a target outside Stalwart 1, when reinitialization is requested, then it refuses before backup", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    mailVersion(next, "v2.0.0");
+    // when
+    const result = run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /only the pinned 0\.16\.27 to 1\.x transition is supported/);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+  });
+});
+
 test("given a target volume belongs to another attempt, when it is allocated, then target setup never starts", () => {
   fixture((context) => {
     // given
