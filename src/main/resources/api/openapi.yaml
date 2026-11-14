@@ -8903,6 +8903,9 @@ paths:
         who reaches a closed court, ordered by name. Read-only; the codes are changed on the access
         point administration. Each read is recorded in the audit log under the reading account, which
         is why reading is a POST.
+      security:
+        - sessionCookie: []
+          csrfToken: []
       responses:
         "200":
           description: The doors, possibly none.
