@@ -12,14 +12,15 @@ eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer
 ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
 buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
 eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten. Konten mit der
-Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*.
+Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*. Konten
+mit der Rolle **Platzwart** sehen dort die *Türcodes*, auch wenn ihnen keine Karte etwas gibt.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
 | Bereich | Inhalt |
 |---|---|
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
-| **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
+| **Anlage** | Plätze, Zugänge, Türcodes, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten, Import und Guthaben |
 | **Nachweise** | Statistik, Nutzung, Datenexport, Aufbewahrung, Änderungsprotokoll und Nachrichtenprotokoll |
 
@@ -222,6 +223,12 @@ Bucher und Mitspieler fragen ihn in *Meine Buchungen* ab, wenn ihr eigener Code 
 funktioniert, und nur, solange der Zugangscode ihrer Buchung gilt. Jede Abfrage steht im Protokoll
 mit dem Konto, der Buchung und dem Zugang, nie mit dem Code. Wer ihn einmal abgefragt hat, kennt ihn,
 bis du ihn änderst. Ändere ihn deshalb von Zeit zu Zeit und nach einem Missbrauch.
+
+Eine Platzsperre gibt keinen Code aus und hält keine Tür offen. Damit der Platzwart trotzdem auf
+einen gesperrten Platz kommt, findet er unter *Verwaltung* die Seite **Türcodes**. Sie zeigt jeden
+aktiven Zugang mit seinem festen Code und seinem Notfallcode. Ändern kann er dort nichts. Jeder Aufruf
+steht im Protokoll mit seinem Konto, nie mit den Codes. Nimmst du einem Konto die Rolle *Platzwart*,
+endet seine Sitzung, und die Seite ist ab der nächsten Anmeldung verschlossen.
 
 Ist ein Loxone Miniserver als Zutrittssystem angebunden, wählst du für jeden Zugang ohne festen Code
 eine **Loxone-Gruppe**. Der Miniserver-Benutzer einer Buchung tritt dieser Gruppe bei, die Gruppe

@@ -467,6 +467,38 @@ describe("AppRoutes", () => {
     expect(screen.queryByTestId("admin-configuration-link")).not.toBeInTheDocument();
   });
 
+  it("given a groundskeeper who manages no appointments, when opening the administration, then the door codes are served", async () => {
+    // given
+    vi.spyOn(api, "accessPointCodes").mockResolvedValue([]);
+
+    // when
+    render(<RoutedShell initialEntries={["/admin"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "GROUNDSKEEPER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-access-codes-view")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-access-codes-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("admin-guest-fees-link")).not.toBeInTheDocument();
+  });
+
+  it("given a groundskeeper, when opening the guest fees, then the door codes are served instead", async () => {
+    // given
+    vi.spyOn(api, "accessPointCodes").mockResolvedValue([]);
+    const guestFees = vi.spyOn(api, "guestFees");
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/guest-fees"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "GROUNDSKEEPER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-access-codes-view")).toBeInTheDocument();
+    expect(guestFees, "a groundskeeper never asks for the treasury").not.toHaveBeenCalled();
+  });
+
   it("given a treasurer no active card lets book or manage, when opening club appointments, then the guest fees are served instead", async () => {
     // given
     vi.spyOn(api, "guestFees").mockResolvedValue({ from: "2026-01-01", to: "2026-12-31", sources: [], members: [], unassignedGuestPlaces: 0 });

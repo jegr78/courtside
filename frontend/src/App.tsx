@@ -17,7 +17,7 @@ import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
   clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberState
 } from "./offlineBookings";
-import { reachesAdministration, readsGuestFees } from "./navigation/administrationAccess";
+import { reachesAdministration, readsAccessCodes, readsGuestFees } from "./navigation/administrationAccess";
 import { lazySurface } from "./navigation/lazySurface";
 import { adminPageLoader } from "./views/adminPages";
 import { currentSignInPath, returnQuery, returnSearch, returnTargetIn, signInPath } from "./navigation/returnTarget";
@@ -128,6 +128,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/admin/*" element={!session.authenticated ? signInFirst : reachesAdministration(session)
       ? <Suspense fallback={<LoadingStatus />}>
         <AdminRoutes administrator={administrator} treasurer={readsGuestFees(session)}
+          groundskeeper={readsAccessCodes(session)}
           managesAppointments={administrator || Boolean(session.managesAppointments)}
           createsSeries={administrator || Boolean(session.createsSeries)}
           configurationChanged={(changed) => configurationChanged?.(changed)} />

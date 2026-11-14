@@ -58,6 +58,30 @@ describe("AdminNavigation", () => {
     expect(screen.queryByTestId("admin-group-club")).not.toBeInTheDocument();
   });
 
+  it("given a groundskeeper without administration rights, when the navigation is read, then only the door codes are offered", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/access-codes"]}>
+      <AdminNavigation administrator={false} groundskeeper appointmentsShown={false} />
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-access-codes-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("admin-guest-fees-link"), "a groundskeeper reads no treasury").not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-access-points-link"), "a groundskeeper edits no access point").not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-group-facility")).not.toBeInTheDocument();
+  });
+
+  it("given an administrator, when the navigation is read, then the door codes sit beside the access points", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin"]}>
+      <AdminNavigation administrator groundskeeper />
+    </MemoryRouter>);
+
+    // then
+    expect(within(screen.getByTestId("admin-group-facility")).getByTestId("admin-access-codes-link")).toBeInTheDocument();
+    expect(screen.getAllByTestId("admin-access-codes-link"), "the link is offered once").toHaveLength(1);
+  });
+
   it("given a treasurer without administration rights, when the navigation is read, then guest fees are offered and appointments are not", () => {
     // when
     render(<MemoryRouter initialEntries={["/admin/guest-fees"]}>

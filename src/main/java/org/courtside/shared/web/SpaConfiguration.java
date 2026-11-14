@@ -83,6 +83,7 @@ class SpaConfiguration {
             "/admin/operational-logs",
             "/admin/access-grants",
             "/admin/operator-health",
+            "/admin/access-codes",
             "/admin/guest-fees",
             "/admin/credit",
             "/admin/paypal");

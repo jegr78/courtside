@@ -1158,6 +1158,37 @@
       ]
     },
     {
+      "id": "groundskeeper-door-codes",
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "entryPoints": "The read-only list of every active door's codes under /api/groundskeeping.",
+      "operationIds": [
+        "listAccessPointCodes"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "Each read records one whole-instance audit entry naming the reading account and the access points, never a code."
+      ],
+      "alternatePaths": [
+        "An access point without a static or emergency code is listed with an empty value; a deactivated one is left out."
+      ],
+      "failurePaths": [
+        "Members, trainers, treasurers, outsiders and an account that must still change its password are refused, and a refused read records nothing.",
+        "Removing the groundskeeper role ends the session, so the next read is refused."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/facility/web/GroundskeepingController.java",
+        "src/main/java/org/courtside/facility/FacilityService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenAGroundskeeper_whenReadingTheCodes_thenEveryActiveDoorComesWithItsFixedAndEmergencyCode",
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenEveryOtherProductRole_whenReadingTheCodes_thenEachIsRefusedWithoutARecord",
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenASignedInGroundskeeper_whenTheRoleIsRemoved_thenTheNextReadIsRefused"
+      ]
+    },
+    {
       "id": "personal-data-retention",
       "actors": [
         "ADMIN"

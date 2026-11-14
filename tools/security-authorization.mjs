@@ -143,6 +143,11 @@ function operationExpectations(path, method, operationId, security) {
     expectations.ADMIN = "allow";
     return expectations;
   }
+  if (path.startsWith("/api/groundskeeping")) {
+    expectations.GROUNDSKEEPER = "allow";
+    expectations.ADMIN = "allow";
+    return expectations;
+  }
   if (path.startsWith("/api/treasury")) {
     expectations.TREASURER = "allow";
     expectations.ADMIN = "allow";

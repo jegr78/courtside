@@ -200,6 +200,7 @@ public class SecurityConfiguration {
                                 "/admin/operational-logs",
                                 "/admin/access-grants",
                                 "/admin/operator-health",
+                                "/admin/access-codes",
                                 "/admin/guest-fees",
                                 "/admin/credit",
                                 "/admin/paypal",
@@ -229,6 +230,13 @@ public class SecurityConfiguration {
                                 new AuthorizationDecision((hasAuthority(authentication.get(),
                                         "ROLE_" + Role.ADMIN.name())
                                         || hasAuthority(authentication.get(), "ROLE_" + Role.TREASURER.name()))
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                "(?i)^/api/groundskeeping(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
+                                new AuthorizationDecision((hasAuthority(authentication.get(),
+                                        "ROLE_" + Role.ADMIN.name())
+                                        || hasAuthority(authentication.get(), "ROLE_" + Role.GROUNDSKEEPER.name()))
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .anyRequest().access((authentication, context) -> new AuthorizationDecision(

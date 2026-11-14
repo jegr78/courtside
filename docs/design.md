@@ -994,6 +994,17 @@ urn:courtside:error:emergency-code-refused` with `booking.emergencyCode.notParti
 `booking.emergencyCode.requested` with the booking and the access points, never the code. The code
 stays valid until the board changes it.
 
+A court closure grants no code and holds no door, so the groundskeeper reaches a closed court with a
+door's own codes. `POST /api/groundskeeping/access-codes` lists every active access point with its
+static and emergency code, ordered by name, to GROUNDSKEEPER and ADMIN; `SecurityConfiguration`
+refuses every other role and an account that must still change its password below
+`/api/groundskeeping`, as it does below `/api/treasury`. The list changes no access point; it is a `POST` because each read is recorded, and the service
+worker never caches it, and removing the role ends the account's sessions, so a revoked groundskeeper is
+refused at the next request. Each read is audited as `facility.accessPoint.codesRead` without a
+subject, naming the reading account and the access points, never a code. The administration shows it
+as *Door codes*, beside the access points for a board. A groundskeeper whom no card gives club
+appointments lands there, and one whom a card does finds it beside the appointments.
+
 The configuration holds three access settings beside the deadlines: how many minutes before a
 booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
 length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps

@@ -85,6 +85,18 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     EXTERNAL: "deny-forbidden",
     INITIAL_PASSWORD: "deny-forbidden"
   });
+  assert.deepEqual(matrix.find((entry) => entry.operationId === "listAccessPointCodes").expectations, {
+    ANONYMOUS: "deny-unauthenticated",
+    MEMBER: "deny-forbidden",
+    TRAINER: "deny-forbidden",
+    SPORT_DIRECTOR: "deny-forbidden",
+    YOUTH_DIRECTOR: "deny-forbidden",
+    GROUNDSKEEPER: "allow",
+    TREASURER: "deny-forbidden",
+    ADMIN: "allow",
+    EXTERNAL: "deny-forbidden",
+    INITIAL_PASSWORD: "deny-forbidden"
+  });
   for (const operationId of ["changeOwnPassword", "listOwnSessions",
     "endOwnSessions", "endOwnSession"]) {
     assert.deepEqual(matrix.find((entry) => entry.operationId === operationId).expectations, {

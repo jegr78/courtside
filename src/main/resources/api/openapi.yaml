@@ -116,6 +116,8 @@ tags:
     description: Administering courts.
   - name: door-codes
     description: The codes of the doors open to every member.
+  - name: groundskeeping
+    description: Reading the fixed and emergency codes of every door, for the groundskeeper.
   - name: admin-access-points
     description: Administering the doors and gates that lead to the courts.
   - name: occupancy
@@ -3544,6 +3546,22 @@ components:
           type: string
           description: The new key. It is shown this once and cannot be read back.
         createdAt: { type: string, format: date-time }
+
+    AccessPointCodes:
+      type: object
+      description: The codes a groundskeeper needs to reach a court through one access point.
+      required: [id, name, staticCode, emergencyCode]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        staticCode:
+          type: [string, "null"]
+          pattern: "^[0-9]{4,8}$"
+          description: The code the keypad accepts, or `null` when the board keeps none.
+        emergencyCode:
+          type: [string, "null"]
+          pattern: "^[0-9]{4,8}$"
+          description: The emergency code kept on the keypad, or `null` without one.
 
     AccessCode:
       type: object
@@ -10144,6 +10162,34 @@ paths:
       responses:
         "204":
           description: Revoked, or there was none.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/groundskeeping/access-codes:
+    post:
+      tags: [groundskeeping]
+      operationId: listAccessPointCodes
+      summary: The static and emergency code of every active access point.
+      description: |
+        Every active access point with its static code and emergency code, ordered by name, for
+        ADMIN and GROUNDSKEEPER. Nothing here changes an access point. Each read is recorded in the
+        audit log with the reading account, never with the codes, which is why it is a `POST`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: The access points with their codes.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1000
+                items: { $ref: "#/components/schemas/AccessPointCodes" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

@@ -10,6 +10,7 @@ function page<P extends object>(load: () => Promise<ComponentType<P>>): () => Pa
 export const adminPages = {
   "/admin": page(() => import("./AdminOverviewView").then((module) => module.AdminOverviewView)),
   "/admin/appointments": page(() => import("./AdminManagedAppointmentsView").then((module) => module.AdminManagedAppointmentsView)),
+  "/admin/access-codes": page(() => import("./AdminAccessCodesView").then((module) => module.AdminAccessCodesView)),
   "/admin/guest-fees": page(() => import("./AdminGuestFeesView").then((module) => module.AdminGuestFeesView)),
   "/admin/credit": page(() => import("./AdminCreditView").then((module) => module.AdminCreditView)),
   "/admin/paypal": page(() => import("./AdminPayPalView").then((module) => module.AdminPayPalView)),

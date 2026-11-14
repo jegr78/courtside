@@ -32,7 +32,8 @@ const METHOD_BEFORE = new RegExp("(?:method:\\s*\"([A-Za-z]+)\"|http\\.(get|post
 
 const PREFIX_PREDICATES = new Map([
   ["/api/admin", "decides which operations the matrix expects only an administrator to reach"],
-  ["/api/treasury", "decides which operations the matrix expects only a treasurer or an administrator to reach"]
+  ["/api/treasury", "decides which operations the matrix expects only a treasurer or an administrator to reach"],
+  ["/api/groundskeeping", "decides which operations the matrix expects only a groundskeeper or an administrator to reach"]
 ]);
 
 const NO_METHOD_BESIDE_IT = new Map([
@@ -143,9 +144,12 @@ test("given the prefix the matrix reads an admin-only expectation from, "
   // given
   const matrix = buildOperationAuthorizationMatrix(api);
   const adminOnly = matrix.filter(({ expectations }) => expectations.ADMIN === "allow"
-    && expectations.MEMBER === "deny-forbidden" && expectations.TREASURER === "deny-forbidden");
+    && expectations.MEMBER === "deny-forbidden" && expectations.TREASURER === "deny-forbidden"
+    && expectations.GROUNDSKEEPER === "deny-forbidden");
   const treasury = matrix.filter(({ expectations }) =>
     expectations.TREASURER === "allow" && expectations.MEMBER === "deny-forbidden");
+  const groundskeeping = matrix.filter(({ expectations }) =>
+    expectations.GROUNDSKEEPER === "allow" && expectations.MEMBER === "deny-forbidden");
 
   // when / then
   assert.ok(adminOnly.length > 0,
@@ -158,6 +162,9 @@ test("given the prefix the matrix reads an admin-only expectation from, "
       + " the boundary then reads as passed.");
   assert.deepEqual(treasury.filter(({ path }) => !path.startsWith("/api/treasury")).map(({ path }) => path), [],
     "an operation the matrix expects only a treasurer or an administrator to reach lies outside /api/treasury");
+  assert.ok(groundskeeping.length > 0, "a contract without a groundskeeping operation leaves its prefix unfalsifiable");
+  assert.deepEqual(groundskeeping.filter(({ path }) => !path.startsWith("/api/groundskeeping")).map(({ path }) => path),
+    [], "an operation the matrix expects only a groundskeeper or an administrator to reach lies outside /api/groundskeeping");
 });
 
 test("given a listed exception, when the runtime stops naming it, then the list stops carrying it", () => {

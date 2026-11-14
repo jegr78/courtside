@@ -22,6 +22,7 @@ export type AdminAccessGrant = components["schemas"]["AdminAccessGrant"];
 export type AdminAccessGrantStatus = components["schemas"]["AdminAccessGrantStatus"];
 export type AccessControlProbeOutcome = components["schemas"]["AccessControlProbeOutcome"];
 export type AccessPoint = components["schemas"]["AccessPoint"];
+export type AccessPointCodes = components["schemas"]["AccessPointCodes"];
 export type AccessPointRequest = components["schemas"]["AccessPointRequest"];
 export type AccessControlGroups = components["schemas"]["AccessControlGroups"];
 export type AccessControlCheck = components["schemas"]["AccessControlCheck"];
@@ -779,6 +780,7 @@ export const api = {
   guestFees: (period?: GuestFeePeriod) => request<GuestFeeReport>(
     period ? `/api/treasury/guest-fees?${new URLSearchParams(period).toString()}` : "/api/treasury/guest-fees",
     { method: "POST" }),
+  accessPointCodes: () => request<AccessPointCodes[]>("/api/groundskeeping/access-codes", { method: "POST" }),
   creditHolders: (query?: string) => query ? api.searchCreditAccounts(query) : api.listCreditHolders(),
   listCreditHolders: () => request<CreditHolder[]>("/api/treasury/credit/accounts"),
   searchCreditAccounts: (query: string) => request<CreditHolder[]>("/api/treasury/credit/account-search", {

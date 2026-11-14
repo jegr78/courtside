@@ -12,13 +12,15 @@ list. The list shows
 what the managing roles cover, the series form what the booking roles allow. An account no card
 grants either cannot enter, not even by typing the address directly. Board members change this on
 the booking cards. Accounts with the **Treasurer** role also see *Guest fees* and *Credit* in the administration.
+Accounts with the **Groundskeeper** role see *Door codes* there, even when no card grants them
+anything.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
 | Area | Contents |
 |---|---|
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
-| **Facility** | Courts, opening hours, booking cards and slot fillers |
+| **Facility** | Courts, access points, door codes, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types, imports and credit |
 | **Records** | Statistics, usage, data exports, retention, change log and message log |
 
@@ -212,6 +214,12 @@ co-players ask for it in *My bookings* when their own code is missing or does no
 while their booking's access code is valid. Every request is in the audit log with the account, the
 booking and the access point, never the code. Whoever asked for it once knows it until you change
 it. Change it from time to time, and after any misuse.
+
+A court closure hands out no code and holds no door open. So that the groundskeeper still reaches a
+closed court, they find the **Door codes** page under *Administration*. It lists every active access
+point with its static code and its emergency code. Nothing can be changed there. Every visit is in
+the audit log with their account, never with the codes. When you take the *Groundskeeper* role from
+an account, its session ends and the page stays closed from the next sign-in on.
 
 When a Loxone Miniserver is the connected access-control system, you pick a **Loxone group** for each
 access point without a static code. A booking's Miniserver user joins that group, so the group

@@ -122,6 +122,28 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
+    /** A groundskeeper or board read the codes of these access points; never the codes. */
+    record AccessPointCodesRead(List<UUID> accessPointIds) implements FacilityEvent {
+
+        static final String TYPE = "facility.accessPoint.codesRead";
+
+        public AccessPointCodesRead {
+            accessPointIds = List.copyOf(accessPointIds);
+        }
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        // The read concerns every door at once, so the entry names no single subject.
+        @Override
+        public @Nullable UUID subjectId() {
+            return null;
+        }
+
+    }
+
     record MembersDoorCodeChanged(UUID accessPointId) implements FacilityEvent {
 
         static final String TYPE = "facility.accessPoint.membersDoorCodeChanged";

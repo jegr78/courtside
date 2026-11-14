@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "abb0db160da26726382166293d62a51ae64cd2c80ce4fadb1c3f27226ca06547",
-  "protectedFieldInventorySha256": "bba653fd32465525cc1239f5f745cac7e5eb7bb9f74685dd16ab7e75b5adacce",
-  "productionAuthorizationSha256": "b805770e130acd3f0f62634817f7316a9fc861c1534f0c846cbfc229c0a34776",
+  "openApiFieldInventorySha256": "82ea71ea89f1382deacc0d555950893b0cf1cc63e02c7d66c9b0ea8b182e3d28",
+  "protectedFieldInventorySha256": "8d4b1bc0ecc48b4f441aeb5ce7938ba8ca8b982b21cbde392608fd16e9672798",
+  "productionAuthorizationSha256": "4346fff6d35140485f65418c883673c42407b5b9a84d3c22335e8bf2db6cdfdd",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1890,6 +1890,16 @@
     "listAccessGrants:response:Violation.code",
     "listAccessGrants:response:Violation.params",
     "listAccessGrants:response:Violation.params.*",
+    "listAccessPointCodes:response:$response.header.Retry-After",
+    "listAccessPointCodes:response:AccessPointCodes.id",
+    "listAccessPointCodes:response:AccessPointCodes.name",
+    "listAccessPointCodes:response:FieldError.code",
+    "listAccessPointCodes:response:FieldError.field",
+    "listAccessPointCodes:response:FieldError.params",
+    "listAccessPointCodes:response:FieldError.params.*",
+    "listAccessPointCodes:response:Violation.code",
+    "listAccessPointCodes:response:Violation.params",
+    "listAccessPointCodes:response:Violation.params.*",
     "listAccessPoints:response:$response.header.Retry-After",
     "listAccessPoints:response:AccessPoint.active",
     "listAccessPoints:response:AccessPoint.courtIds",
@@ -4924,6 +4934,20 @@
       ]
     },
     {
+      "id": "groundskeeping",
+      "description": "The door codes list requires an enabled permanent account carrying GROUNDSKEEPER or ADMIN; it names every active access point with its static and emergency code, changes nothing, and every read is recorded without the codes.",
+      "operationIds": [
+        "listAccessPointCodes"
+      ],
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "groundskeeping-gate"
+      ]
+    },
+    {
       "id": "treasury-credit-ledger",
       "description": "The credit ledger administration requires an enabled permanent account carrying TREASURER or ADMIN; it names accounts with their email addresses and balances, shows one account's entries with their reasons and says whether each of its PayPal payments can be returned.",
       "operationIds": [
@@ -6178,6 +6202,28 @@
         "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused",
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAMember_whenReadingOrChangingTheSettings_thenTheyAreRefused"
+      ]
+    },
+    {
+      "id": "groundskeeping-gate",
+      "title": "Groundskeeping gate",
+      "rule": "Every route below /api/groundskeeping requires GROUNDSKEEPER or ADMIN and rejects anonymous, initial-password and every other product role before the operation runs.",
+      "attributes": [
+        "route",
+        "role",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenAGroundskeeper_whenReadingTheCodes_thenEveryActiveDoorComesWithItsFixedAndEmergencyCode",
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenAnAdministrator_whenReadingTheCodes_thenTheyAreServedAndRecorded"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenEveryOtherProductRole_whenReadingTheCodes_thenEachIsRefusedWithoutARecord",
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenAGroundskeeperWhoMustStillChangeTheirPassword_whenReadingTheCodes_thenTheyAreRefused",
+        "src/test/java/org/courtside/facility/web/AccessPointCodesTest.java#givenASignedInGroundskeeper_whenTheRoleIsRemoved_thenTheNextReadIsRefused"
       ]
     },
     {
@@ -8338,6 +8384,29 @@
       ],
       "decisions": [
         "members-door-code-projection"
+      ]
+    },
+    {
+      "id": "access-point-codes-read",
+      "access": "read",
+      "description": "Every active access point's static and emergency code reaches only a groundskeeper or administrator, and each read is recorded with the reading account.",
+      "fields": [
+        "AccessPointCodes.staticCode",
+        "AccessPointCodes.emergencyCode"
+      ],
+      "operationIds": [
+        "listAccessPointCodes"
+      ],
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "route",
+        "role"
+      ],
+      "decisions": [
+        "groundskeeping-gate"
       ]
     },
     {

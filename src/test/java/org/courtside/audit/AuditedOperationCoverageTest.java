@@ -113,6 +113,7 @@ class AuditedOperationCoverageTest {
             "FacilityService#findUnbookableCourts",
             "FacilityService#openingPeriods",
             "FacilityService#openingSchedule",
+            "FacilityService#readAccessPointCodes",
             "FacilityService#removeCourtClosure",
             "FacilityService#removeOpeningPeriod",
             "FacilityService#removeScheduledOpeningHours",

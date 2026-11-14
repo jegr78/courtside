@@ -129,6 +129,13 @@ public class FacilityService {
         return accessPoints.findAllByOrderByNameAsc();
     }
 
+    @Transactional
+    public List<AccessPoint> readAccessPointCodes() {
+        List<AccessPoint> active = accessPoints.findByActiveTrueOrderByNameAsc();
+        events.publishEvent(new FacilityEvent.AccessPointCodesRead(active.stream().map(AccessPoint::getId).toList()));
+        return active;
+    }
+
     public List<AccessPoint> activeAccessPointsWithCodes() {
         return accessPoints.findByActiveTrueAndStaticCodeIsNotNullOrderByNameAsc();
     }
