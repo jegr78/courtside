@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0-rc.5](https://github.com/jegr78/courtside/compare/v0.5.0-rc.4...v0.5.0-rc.5) (2026-11-14)
+
+
+### Features
+
+* let groundskeepers and admins read every door's fixed and emergency code ([#2000](https://github.com/jegr78/courtside/issues/2000)) ([8d8d520](https://github.com/jegr78/courtside/commit/8d8d52033d3bca019809ee7311723311eb162e44))
+
+
+### Bug fixes
+
+* update the frontend, build and deployment dependencies ([#1998](https://github.com/jegr78/courtside/issues/1998)) ([a804552](https://github.com/jegr78/courtside/commit/a804552fe25c740258d41bc7b0469dd10472533b))
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
