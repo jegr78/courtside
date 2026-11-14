@@ -13,8 +13,12 @@ gh attestation verify courtside-deployment-<version>.zip --repo jegr78/courtside
 shasum -a 256 -c courtside-deployment-<version>.zip.sha256
 ```
 
-Docker with Compose 2.33.1 or newer is required. Courtside does not install host packages, change
-DNS or firewall rules, upload diagnostics or enable scheduled jobs.
+Docker Engine 27 or newer with Compose 2.33.1 or newer is required. Courtside does not install host
+packages, change DNS or firewall rules, upload diagnostics or enable scheduled jobs. `courtside
+doctor` asks `api.pwnedpasswords.com` over IPv6 from the host and from the application container.
+It shows whether the application has IPv6 egress, which an IPv6-only address such as a Miniserver
+behind DS-Lite needs. Rootful Docker provides it as is; rootless Docker needs the pasta setup under
+"IPv6 egress" in `guides/operations.md`.
 
 ## Choose a recipe
 

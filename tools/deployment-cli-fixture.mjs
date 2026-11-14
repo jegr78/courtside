@@ -57,7 +57,9 @@ export function fixture(use, releaseVersion = "0.1.0") {
   writeFileSync(join(bin, "docker"), `#!/bin/sh
 if [ "$1 $2" = "compose version" ]; then echo 'Docker Compose version v2.33.1'; exit 0; fi
 if [ "$1" = "info" ]; then printf '%s\\n' "\${FAKE_DOCKER_SECURITY:-[]}"; exit 0; fi
+if [ "$1" = "version" ]; then cat "${join(root, "docker-engine-version")}" 2>/dev/null || echo 29.9.3; exit 0; fi
 printf '%s\\n' "$*" >> "${dockerLog}"
+case "$*" in *' exec -T app curl '*) [ ! -f "${join(root, "docker-app-no-ipv6")}" ] || exit 7 ;; esac
 env | grep -E '^COURTSIDE_(LOXONE_SIMULATOR|ACCESS_CONTROL)_' | sort | sed 's/^/environment /' >> "${dockerLog}"
 previous=''
 for argument in "$@"; do
@@ -160,6 +162,7 @@ esac
   writeFileSync(join(bin, "curl"), `#!/bin/sh
 printf '%s\\n' "$*" >> "${join(root, "curl.log")}"
 [ ! -f "${join(root, "curl-fail")}" ] || exit 22
+case "$*" in *' --ipv6 '*) [ ! -f "${join(root, "curl-no-ipv6")}" ] || exit 7 ;; esac
 [ "\${HTTP_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTP_PROXY' >> "${join(root, "curl.log")}"
 [ "\${HTTPS_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTPS_PROXY' >> "${join(root, "curl.log")}"
 [ "\${ALL_PROXY+x}" != x ] || printf '%s\\n' 'leaked ALL_PROXY' >> "${join(root, "curl.log")}"

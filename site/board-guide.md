@@ -361,13 +361,15 @@ Passwort des technischen Benutzers in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` und
 
 Die feste Adresse hat die Form `https://192-168-1-47.<Seriennummer>.dyndns.loxonecloud.com:<Port>`,
 mit der lokalen Adresse des Miniservers in Bindestrichen. Die Instanz muss sie über HTTPS erreichen,
-per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Den Weg über die
-Seriennummer in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` lehnt die Loxone Cloud seit November 2026
-für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet das dann. Eine
-Relay-Adresse aus der Loxone App oder dem Browser taugt nicht als feste Adresse: Loxone vergibt ihren
-Port neu, sobald der Miniserver sich neu verbindet, und dann kann sie zu einem fremden Miniserver führen.
-Kommt keine Verbindung zustande, öffnet auf Karten, die die Türen offen halten, das Einchecken allein
-die Türen, wie unter *Gebäudesteuerung* beschrieben.
+per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Hat das Clubhaus nur eine
+IPv6-Adresse, wie bei DS-Lite, braucht die Instanz IPv6 nach außen. Die Betriebsanleitung beschreibt
+das unter *IPv6 egress*, und `courtside doctor` zeigt, ob Server und Anwendung IPv6 erreichen. Den
+Weg über die Seriennummer in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` lehnt die Loxone Cloud seit
+November 2026 für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet
+das dann. Eine Relay-Adresse aus der Loxone App oder dem Browser taugt nicht als feste Adresse:
+Loxone vergibt ihren Port neu, sobald der Miniserver sich neu verbindet, und dann kann sie zu einem
+fremden Miniserver führen. Kommt keine Verbindung zustande, öffnet auf Karten, die die Türen offen
+halten, das Einchecken allein die Türen, wie unter *Gebäudesteuerung* beschrieben.
 
 Drücke dann unter *Nachweise → Zugangsberechtigungen* auf **Verbindung prüfen**. Courtside prüft
 beim nächsten Durchgang fünf Punkte und liest dabei die Gruppen neu. Lade die Seite kurz danach neu,
