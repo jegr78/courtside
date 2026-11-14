@@ -22,8 +22,10 @@ images, the source revision and the release workflow that attests it, and carrie
 every file beside it. Unpack the archive, configure `.env` and adapt the deployment to your
 infrastructure.
 
-You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
-versions cannot select the dedicated egress networks safely. The file also lists every supported
+You need Docker Engine 27 or newer with Compose 2.33.1 or newer. `compose.yaml` declares the Compose
+minimum because older versions cannot select the dedicated egress networks safely. An older engine
+cannot give the application network an IPv6 address pool and refuses to create it, so `up` and
+`update` refuse such an engine before they touch the running instance, and `doctor` reports it. The file also lists every supported
 production component and overlay under `x-courtside-production-overlays`; repository checks keep
 that list in sync with the architecture map.
 
@@ -299,8 +301,7 @@ imposes. After `locked-user` the connector waits five minutes before it signs in
 
 While the setting is on, the launcher replaces the four `COURTSIDE_ACCESS_CONTROL_LOXONE_*`
 values and the connector from `.env` with the simulator's. The component is applied after
-`config/local.override.yaml`, so an override cannot change it. Its trust-store mount needs Docker
-Engine 26 or later.
+`config/local.override.yaml`, so an override cannot change it.
 
 The simulator keeps its users and grants in memory. A restart of the simulator loses them, and the
 hourly reconciliation reinstalls the grants it finds missing, so they can be absent for up to an
@@ -466,6 +467,39 @@ cosign verify \
 Resolve `nightly` to a digest once and use that digest for the whole acceptance run. The moving tag
 may advance after the run starts. The repository package must be public before an anonymous
 installation can pull it.
+
+## IPv6 egress
+
+The application reaches the internet over IPv4 and, where the host has an IPv6 route, over IPv6 as
+well. An address that resolves only to IPv6 needs the second, such as a Miniserver behind a DS-Lite
+connection, where the clubhouse has no public IPv4 address. `doctor` asks the host and the
+application container for `https://api.pwnedpasswords.com/` over IPv6, the breach-check service the
+application has to reach anyway. A host that does not reach it over IPv6 passes and keeps running on
+IPv4 exactly as before. A container that misses the IPv6 its host has is a warning, and so is a host
+without `curl`, where nothing can be probed.
+
+With rootful Docker nothing is to be done: the engine gives the `app-egress` network a unique local
+IPv6 subnet and translates it to the host's address.
+
+Rootless Docker keeps the containers in a network namespace of its own, and that namespace has no
+IPv6 route until rootlesskit runs with `--ipv6` on the pasta network driver. Put this into a drop-in
+for the user's `docker.service`, for example `~/.config/systemd/user/docker.service.d/ipv6.conf`,
+then run `systemctl --user daemon-reload` and `systemctl --user restart docker`:
+
+```ini
+[Service]
+Environment=DOCKERD_ROOTLESS_ROOTLESSKIT_NET=pasta
+Environment=DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=implicit
+Environment=DOCKERD_ROOTLESS_ROOTLESSKIT_FLAGS=--ipv6
+```
+
+pasta refuses the default `builtin` port driver, and rootlesskit 3.3.0 still logs the pasta driver as
+experimental. The default slirp4netns driver gives the namespace no IPv6 default route, and with its
+65520-byte MTU a TLS handshake over IPv6 stalls, so a rootless installation that needs IPv6 moves
+to pasta.
+
+Run `courtside doctor` afterwards. Its `ipv6-egress` check passes once the application container
+reaches IPv6.
 
 ## Plain HTTP clients
 
@@ -1284,7 +1318,7 @@ default.
 | `COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE` | `15s` | How long one call to the access-control system may take, all its requests included. A call without an answer by then counts as applied, so a grant it may have installed is revoked later if the booking no longer wants it. |
 | `COURTSIDE_ACCESS_CONTROL_CONNECTOR` | `none` | The access-control system that installs a code per booking. `none` installs nothing and records no access grant. `simulated` keeps grants in memory for development and demonstrations; its codes open no door, so the instance refuses to start with it when `COURTSIDE_ENVIRONMENT` is `PRODUCTION` outside the demo profile. `loxone` manages one user per booking on a Loxone Miniserver with firmware V14.2.5.16 or later and needs the four `COURTSIDE_ACCESS_CONTROL_LOXONE_*` variables below; an acceptance installation with `loxone_simulator=true` gets all five values from the launcher instead. Any other value is refused at startup. Switching to `none` or to another system while grants are installed leaves them on the old system until their window ends; the access grants page lists what is installed. |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` | unset | With `loxone`, the Miniserver's serial of 12 hexadecimal digits. Courtside asks `connect.loxonecloud.com` for the Miniserver's current relay address and asks again after the relay moves. Since November 2026 Loxone Cloud answers this lookup for third-party clients with 403 or 418, so prefer `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`; the connection check names the refusal. Set this or `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, not both. |
-| `COURTSIDE_ACCESS_CONTROL_LOXONE_URL` | unset | With `loxone`, a fixed `https://` address of the Miniserver whose host name matches its certificate, for a local Miniserver `https://192-168-1-47.{serial}.dyndns.loxonecloud.com:{port}`, with the Miniserver's local address in dashes. The instance must reach that address over HTTPS, through port forwarding at the club or a tunnel into the club network. A relay address under `dyndns.loxonecloud.com` with a Loxone server's IP does not qualify: Loxone reassigns its port when the Miniserver reconnects. A bare IP address fails the certificate check, and `http://` is refused at startup. |
+| `COURTSIDE_ACCESS_CONTROL_LOXONE_URL` | unset | With `loxone`, a fixed `https://` address of the Miniserver whose host name matches its certificate, for a local Miniserver `https://192-168-1-47.{serial}.dyndns.loxonecloud.com:{port}`, with the Miniserver's local address in dashes. The instance must reach that address over HTTPS, through port forwarding at the club or a tunnel into the club network. A relay address under `dyndns.loxonecloud.com` with a Loxone server's IP does not qualify: Loxone reassigns its port when the Miniserver reconnects. A bare IP address fails the certificate check, and `http://` is refused at startup. An address that resolves only to IPv6 needs [IPv6 egress](#ipv6-egress). |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` | unset | With `loxone`, the Miniserver user Courtside signs in as. Its token needs two rights, user management (`0x800`) and changing other users' codes (`0x20`), and Courtside checks each on its own; the user must not be an administrator. The connection check on the access grants page reports a missing right. |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD` | unset | With `loxone`, that user's password. It stays in the deployment environment and never appears in a log, a startup message or the access grants page. |
 | `COURTSIDE_ADMISSION_ACCOUNT_BURST` | `200` | Request tokens a signed-in account holds when idle. Every handled request spends its operation's cost, from 1 for ordinary work to 20 for exports and imports; a request beyond the remaining tokens receives `429` `urn:courtside:error:request-rate-limited` with `Retry-After` before it reaches a service. |

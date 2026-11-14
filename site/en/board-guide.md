@@ -346,7 +346,9 @@ name and password in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` and
 
 The fixed address reads `https://192-168-1-47.<serial number>.dyndns.loxonecloud.com:<port>`, with
 the Miniserver's local address in dashes. The instance must reach it over HTTPS, through port
-forwarding at the clubhouse or a tunnel into the club network. Since November 2026 Loxone Cloud
+forwarding at the clubhouse or a tunnel into the club network. When the clubhouse has only an IPv6
+address, as behind DS-Lite, the instance needs IPv6 egress. The operations guide describes it under
+*IPv6 egress*, and `courtside doctor` reports when it is missing. Since November 2026 Loxone Cloud
 refuses the way through the serial number in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` to programs
 other than the Loxone app and Loxone Config, and the connection check then says so. A relay
 address taken from the Loxone app or a browser is no fixed address: Loxone assigns its port anew

@@ -389,6 +389,118 @@ test("given installation evidence, when doctor emits JSON, then warnings and fai
   });
 });
 
+test("given the host's and the application's IPv6 routes, when doctor probes them, then only an application cut off from a reachable IPv6 is a finding", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const probe = () => {
+      const result = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+      const check = JSON.parse(result.stdout).checks.find(({ name }) => name === "ipv6-egress");
+      return { status: result.status, check };
+    };
+
+    // when
+    const reachable = probe();
+    writeFileSync(join(context.root, "docker-app-no-ipv6"), "yes\n");
+    const cutOff = probe();
+    writeFileSync(join(context.root, "curl-no-ipv6"), "yes\n");
+    const ipv4Host = probe();
+    rmSync(join(context.root, "curl-no-ipv6"));
+    writeFileSync(join(context.root, "docker-components"), "app=exited\n");
+    const stopped = probe();
+
+    // then
+    assert.equal(reachable.status, 0);
+    assert.equal(reachable.check.state, "PASS");
+    assert.match(reachable.check.detail, /application container reaches an IPv6 address/);
+    assert.equal(cutOff.status, 1, "an application cut off from IPv6 the host has is a warning");
+    assert.equal(cutOff.check.state, "WARN");
+    assert.match(cutOff.check.detail, /IPv6-only Miniserver or relay address stays unreachable/);
+    assert.equal(ipv4Host.status, 0, "a host without IPv6 runs exactly as before");
+    assert.equal(ipv4Host.check.state, "PASS");
+    assert.match(ipv4Host.check.detail, /uses IPv4 only/);
+    assert.equal(stopped.check.state, "WARN");
+    assert.match(stopped.check.detail, /not running/);
+    assert.match(readFileSync(context.dockerLog, "utf8"),
+      /exec -T app curl -q --noproxy \* --ipv6 --silent --output \/dev\/null --max-time 5 https:\/\/api\.pwnedpasswords\.com\//);
+  });
+});
+
+test("given a host without curl or an application still starting, when doctor probes IPv6, then it never passes unmeasured", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const withoutCurl = join(context.root, "path-without-curl");
+    mkdirSync(withoutCurl);
+    for (const directory of context.environment.PATH.split(":")) {
+      if (!existsSync(directory)) continue;
+      for (const name of readdirSync(directory)) {
+        if (name === "curl" || existsSync(join(withoutCurl, name))) continue;
+        symlinkSync(join(directory, name), join(withoutCurl, name));
+      }
+    }
+    const probe = (environment) => JSON.parse(run(context.archive, context.target, ["doctor", "--json"], environment)
+      .stdout).checks.find(({ name }) => name === "ipv6-egress");
+
+    // when
+    const missingCurl = probe({ ...context.environment, PATH: withoutCurl });
+    writeFileSync(join(context.root, "docker-components"), "app=starting\n");
+    const starting = probe(context.environment);
+
+    // then
+    assert.equal(missingCurl.state, "WARN");
+    assert.match(missingCurl.detail, /curl is missing/);
+    assert.equal(starting.state, "PASS", "a starting container already answers exec");
+  });
+});
+
+test("given a Docker Engine older than 27, when a maintenance command would start a container, then it is refused first", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    writeFileSync(join(context.root, "docker-engine-version"), "26.1.4\n");
+    const exportDirectory = join(context.root, "export");
+    mkdirSync(exportDirectory, { mode: 0o700 });
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const results = [
+      ["rotate-secret", "postgres", "--yes"],
+      ["seed-bookings", "--confirm", "seed"],
+      ["mfa-rotate-keys"],
+      ["mfa-export-keys", "--output", join(exportDirectory, "keys")],
+    ].map((command) => [command[0], run(context.archive, context.target, command, context.environment)]);
+
+    // then
+    for (const [command, result] of results) {
+      assert.equal(result.status, 2, `${command}: ${result.stderr}`);
+      assert.match(result.stderr, /Courtside needs Docker Engine 27 or newer/, command);
+    }
+    assert.doesNotMatch(existsSync(context.dockerLog) ? readFileSync(context.dockerLog, "utf8") : "", / up | run | exec /);
+  });
+});
+
+test("given a Docker Engine older than 27, when doctor or up runs, then it is refused before anything starts", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    writeFileSync(join(context.root, "docker-engine-version"), "26.1.4\n");
+
+    // when
+    const doctor = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+    const up = run(context.archive, context.target, ["up"], context.environment);
+
+    // then
+    assert.equal(doctor.status, 2);
+    const engine = JSON.parse(doctor.stdout).checks.find(({ name }) => name === "engine");
+    assert.equal(engine.state, "FAIL");
+    assert.match(engine.detail, /Docker Engine 26\.1\.4 cannot give the application network an IPv6 address pool/);
+    assert.equal(up.status, 2);
+    assert.match(up.stderr, /Courtside needs Docker Engine 27 or newer/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / up -d/);
+  });
+});
+
 test("given a forwarded-ingress installation with a stopped proxy, when doctor runs, then it reports the missing listener", () => {
   fixture((context) => {
     // given

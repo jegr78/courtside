@@ -185,6 +185,7 @@ services:
       start_period: 5s
 networks:
   app-egress:
+    enable_ipv6: true
   database:
     internal: true
   log-collection:
