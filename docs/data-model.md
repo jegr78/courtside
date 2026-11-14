@@ -550,7 +550,7 @@ own rows with it. `domain_event` keeps its entries, which then name an identifie
 `domain_event.subject_id` names the entity an entry concerns. It is empty only for an activity about
 the whole instance: `dataexchange.log.exported`, which records an export of the audit log or the
 message log, `booking.occupancyKey.created` and `booking.occupancyKey.revoked`, which record a
-board creating or revoking the occupancy key and never carry the key, and
+board creating or revoking the occupancy key and never carry the key,
 `access.control.checkRequested`, which records a board asking for a connection check of the
 access-control system, `dataexchange.guestFees.read`, which records a read of the guest fee report,
 and `facility.doorCodes.read`, which records a read of every door's code and names the doors, never a

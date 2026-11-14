@@ -12,13 +12,15 @@ list. The list shows
 what the managing roles cover, the series form what the booking roles allow. An account no card
 grants either cannot enter, not even by typing the address directly. Board members change this on
 the booking cards. Accounts with the **Treasurer** role also see *Guest fees* and *Credit* in the administration.
+Accounts with the **Groundskeeper** role see *Door codes* there, even when no card grants them
+anything.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
 | Area | Contents |
 |---|---|
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
-| **Facility** | Courts, opening hours, booking cards and slot fillers |
+| **Facility** | Courts, access points, door codes, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types, imports and credit |
 | **Records** | Statistics, usage, data exports, retention, change log and message log |
 

@@ -12,14 +12,15 @@ eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer
 ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
 buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
 eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten. Konten mit der
-Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*.
+Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*. Konten
+mit der Rolle **Platzwart** sehen dort die *Türcodes*, auch wenn ihnen keine Karte etwas gibt.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
 | Bereich | Inhalt |
 |---|---|
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
-| **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
+| **Anlage** | Plätze, Zugänge, Türcodes, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten, Import und Guthaben |
 | **Nachweise** | Statistik, Nutzung, Datenexport, Aufbewahrung, Änderungsprotokoll und Nachrichtenprotokoll |
 
