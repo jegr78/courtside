@@ -346,13 +346,15 @@ name and password in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` and
 
 The fixed address reads `https://192-168-1-47.<serial number>.dyndns.loxonecloud.com:<port>`, with
 the Miniserver's local address in dashes. The instance must reach it over HTTPS, through port
-forwarding at the clubhouse or a tunnel into the club network. Since November 2026 Loxone Cloud
-refuses the way through the serial number in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` to programs
-other than the Loxone app and Loxone Config, and the connection check then says so. A relay
-address taken from the Loxone app or a browser is no fixed address: Loxone assigns its port anew
-whenever the Miniserver reconnects, and it may then lead to somebody else's Miniserver. Without a
-connection, checking in alone opens the doors on cards that hold doors open, as described under
-*Building automation*.
+forwarding at the clubhouse or a tunnel into the club network. When the clubhouse has only an IPv6
+address, as behind DS-Lite, the instance needs IPv6 egress. The operations guide describes it under
+*IPv6 egress*, and `courtside doctor` shows whether the host and the application reach IPv6. Since
+November 2026 Loxone Cloud refuses the way through the serial number in
+`COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` to programs other than the Loxone app and Loxone Config,
+and the connection check then says so. A relay address taken from the Loxone app or a browser is no
+fixed address: Loxone assigns its port anew whenever the Miniserver reconnects, and it may then lead
+to somebody else's Miniserver. Without a connection, checking in alone opens the doors on cards that
+hold doors open, as described under *Building automation*.
 
 Then press **Check connection** under *Records → Access grants*. In its next pass Courtside checks
 five points and reads the groups again. Reload the page a moment later, and each point is listed

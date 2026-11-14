@@ -128,6 +128,30 @@ test("given the old application cannot stop after restore, when the major update
   });
 });
 
+test("given the stopped application cannot be removed, when the major update exits, then the old release stays selected and the target volume goes", () => {
+  fixture((context) => {
+    // given
+    usePostgres17(context.archive);
+    const initialized = initialize(context);
+    assert.equal(initialized.status, 0, initialized.stderr);
+    const next = releaseArchive(context.root, "0.1.1");
+    writeFileSync(join(context.root, "docker-fail-match"), "rm -f app");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(next, context.target,
+      ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /update could not remove the stopped application; recovery unit .* is ready/);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"),
+      /^release=0\.1\.0$/m);
+    assert.match(readFileSync(context.dockerLog, "utf8"),
+      /volume rm example-club_db-pg18-0\.1\.1/);
+  });
+});
+
 test("given PostgreSQL 18 health fails after selection, when update runs, then it restores the PostgreSQL 17 release automatically", () => {
   fixture((context) => {
     // given
@@ -470,6 +494,27 @@ test("given activation failed after store selection, when update is retried, the
     const calls = readFileSync(context.dockerLog, "utf8");
     assert.doesNotMatch(calls, /volume create|run --rm mail-bootstrap/);
     assert.match(calls, /run --rm --no-deps mail-ready/);
+  });
+});
+
+test("given an interrupted mail transition and an engine older than 27, when update is retried, then it is refused before the transition resumes", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    writeFileSync(join(context.root, "docker-fail-mail-activation"), "once");
+    const args = ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"];
+    assert.equal(run(next, context.target, args, context.environment).status, 2);
+    writeFileSync(join(context.root, "docker-engine-version"), "26.1.4\n");
+    writeFileSync(context.dockerLog, "");
+
+    // when
+    const result = run(next, context.target, args, context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Courtside needs Docker Engine 27 or newer/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / up | run /);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
   });
 });
 
@@ -836,6 +881,45 @@ test("given an unsupported source image, when reinitialization is requested, the
     assert.match(result.stderr, /unsupported Stalwart store migration/);
     assert.equal(readFileSync(context.dockerLog, "utf8"), "");
     assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+  });
+});
+
+test("given a stopped application container, when the new release starts, then Compose creates it afresh on the release's networks", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(context.archive, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(context.dockerLog, "utf8").split("\n");
+    const stop = calls.findIndex((line) => line.endsWith(" stop app"));
+    const removal = calls.findIndex((line) => line.endsWith(" rm -f app"));
+    const start = calls.findLastIndex((line) => line.endsWith(" up -d --wait"));
+    assert.ok(stop >= 0 && stop < removal && removal < start,
+      "a reused container keeps a recreated network's old id and Compose 2.33 cannot start it");
+  });
+});
+
+test("given a Docker Engine older than 27, when an update is requested, then it is refused before backup", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    writeFileSync(join(context.root, "docker-engine-version"), "26.1.4\n");
+
+    // when
+    const result = run(context.archive, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /Docker Engine 26\.1\.4 cannot give the application network an IPv6 address pool/);
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
   });
 });
 
