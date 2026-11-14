@@ -2,7 +2,7 @@ name: courtside-mail-smoke
 
 services:
   mail:
-    image: stalwartlabs/stalwart:v1.0.3@sha256:73c684a84c24f5b4206ec266a8deb8986fe44a9f623997e07f084388d943c8bd
+    image: stalwartlabs/stalwart:v1.1.0@sha256:f772aa6ef8cd8018969fa491640f1436b0270eb14e2c219b5f37f1a77020837e
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -97,14 +97,14 @@ services:
       retries: 2
 
   sink:
-    image: axllent/mailpit:v1.33@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+    image: axllent/mailpit:v1.33@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     security_opt:
       - no-new-privileges:true
     ports:
       - "127.0.0.1::8025"
 
   plan:
-    image: alpine:3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+    image: alpine:3@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     security_opt:
       - no-new-privileges:true
     cap_drop:
