@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "abb0db160da26726382166293d62a51ae64cd2c80ce4fadb1c3f27226ca06547",
-  "protectedFieldInventorySha256": "bba653fd32465525cc1239f5f745cac7e5eb7bb9f74685dd16ab7e75b5adacce",
-  "productionAuthorizationSha256": "b805770e130acd3f0f62634817f7316a9fc861c1534f0c846cbfc229c0a34776",
+  "openApiFieldInventorySha256": "8d7a40ffbac5a7125dd543cbc301b753319c90eef11feb812c761dcd7ecc27c6",
+  "protectedFieldInventorySha256": "b6eee19a6a1ab96a40f359d3f33c29264682efdbd4715ee1df2f885ad5aa0e97",
+  "productionAuthorizationSha256": "b77f70fee667c85981d59f1006d4ca1eae5dc18f9783c15fa13f9918f9a2af58",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2918,6 +2918,16 @@
     "readBookingStatistics:response:Violation.code",
     "readBookingStatistics:response:Violation.params",
     "readBookingStatistics:response:Violation.params.*",
+    "readDoorCodes:response:$response.header.Retry-After",
+    "readDoorCodes:response:DoorCode.accessPointId",
+    "readDoorCodes:response:DoorCode.accessPointName",
+    "readDoorCodes:response:FieldError.code",
+    "readDoorCodes:response:FieldError.field",
+    "readDoorCodes:response:FieldError.params",
+    "readDoorCodes:response:FieldError.params.*",
+    "readDoorCodes:response:Violation.code",
+    "readDoorCodes:response:Violation.params",
+    "readDoorCodes:response:Violation.params.*",
     "readImportPreview:parameter:$parameter.path.id",
     "readImportPreview:response:$response.header.Retry-After",
     "readImportPreview:response:FieldError.code",
@@ -5385,6 +5395,20 @@
         "treasury-gate",
         "recent-authentication"
       ]
+    },
+    {
+      "id": "grounds",
+      "description": "The door codes a groundskeeper needs on the grounds require an enabled permanent account carrying GROUNDSKEEPER or ADMIN; every active door's static and emergency code is answered read-only and every read is recorded.",
+      "operationIds": [
+        "readDoorCodes"
+      ],
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "grounds-gate"
+      ]
     }
   ],
   "decisions": [
@@ -6511,6 +6535,25 @@
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoStoredSecret_whenSwitchingPayPalOnWithoutOne_thenTheSecretIsRequired",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNothingStored_whenChecking_thenThereIsNothingToCheck"
+      ]
+    },
+    {
+      "id": "grounds-gate",
+      "title": "Grounds gate",
+      "rule": "Every route below /api/grounds requires GROUNDSKEEPER or ADMIN and rejects anonymous, initial-password and every other product role before the operation runs.",
+      "attributes": [
+        "route",
+        "role",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenActiveAndRetiredDoors_whenTheGroundskeeperReadsTheCodes_thenEveryActiveDoorShowsItsCodes"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenAnAccountWithoutTheGroundskeeperRole_whenItReadsTheCodes_thenItIsRefusedAndNothingIsRecorded"
       ]
     }
   ],
@@ -8435,6 +8478,28 @@
       "decisions": [
         "request-boundary",
         "credential-write-only"
+      ]
+    },
+    {
+      "id": "door-code-grounds-read",
+      "access": "read",
+      "description": "A static or emergency access code opens a door on its own, so outside the administrative projection only the grounds door code list carries it, to a groundskeeper or an administrator.",
+      "fields": [
+        "DoorCode.staticCode",
+        "DoorCode.emergencyCode"
+      ],
+      "operationIds": [
+        "readDoorCodes"
+      ],
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "role"
+      ],
+      "decisions": [
+        "grounds-gate"
       ]
     }
   ]

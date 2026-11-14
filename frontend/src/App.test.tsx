@@ -482,6 +482,21 @@ describe("AppRoutes", () => {
     expect(screen.queryByTestId("managed-appointments-page")).not.toBeInTheDocument();
   });
 
+  it("given a groundskeeper, when opening the administration, then the door codes are served and the access points are not", async () => {
+    // given
+    vi.spyOn(api, "groundsDoorCodes").mockResolvedValue([]);
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/facility/access-points"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "GROUNDSKEEPER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-door-codes-view")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-door-codes-link")).toHaveAttribute("aria-current", "page");
+  });
+
   it("given a treasurer, when opening the credit accounts, then they are served", async () => {
     // given
     vi.spyOn(api, "creditHolders").mockResolvedValue([]);

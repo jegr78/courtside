@@ -600,6 +600,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static boolean isPrivileged(String pattern) {
         return pattern.startsWith("/api/admin/") || pattern.startsWith("/api/treasury/")
+                || pattern.startsWith("/api/grounds/")
                 || pattern.equals(INITIAL_PASSWORD_PATH);
     }
 

@@ -141,6 +141,13 @@ public class FacilityService {
         return accessPoints.findByActiveTrueAndOpenToMembersTrueAndStaticCodeIsNotNullOrderByNameAsc();
     }
 
+    @Transactional
+    public List<AccessPoint> readDoorCodes() {
+        List<AccessPoint> doors = accessPoints.findByActiveTrueOrderByNameAsc();
+        events.publishEvent(new FacilityEvent.DoorCodesRead(doors.stream().map(AccessPoint::getId).toList()));
+        return doors;
+    }
+
     public AccessPoint requireAccessPoint(UUID accessPointId) {
         return accessPoints.findById(accessPointId)
                 .orElseThrow(() -> new AccessPointNotFoundException("No access point with id " + accessPointId));

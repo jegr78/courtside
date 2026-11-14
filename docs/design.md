@@ -960,9 +960,21 @@ included, and an active flag takes an access point out of use without losing it.
 only. A new or changed code has exactly the club's access code length, which `FacilityService`
 checks where the code is stored and refuses with `facility.accessPoint.codeLength`; a code stored
 before the length changed keeps working. The admin projection under `/api/admin/access-points` is
-the only administrative response that carries a code. The audit entries of an access point name its
-id, its courts and the fields that changed, never a code, and no error message or log line carries
-one either.
+the only administrative response that writes or carries a code beside the door code list below. The
+audit entries of an access point name its id, its courts and the fields that changed, never a code,
+and no error message or log line carries one either.
+
+A court closure holds no door open and grants no code, so a groundskeeper reaches a closed court with
+a door's fixed code. `POST /api/grounds/door-codes` lists every active access point by name with its
+static and emergency code, either of them `null` when the board keeps none, to an account carrying
+`GROUNDSKEEPER` or `ADMIN`; every other role is refused with `403
+urn:courtside:error:access-denied` before anything is read. The list is read-only and the
+administration's door codes page shows it. A groundskeeper reaches the administration for that page
+and, when a card names the role as managing, for the club appointments; every other administration
+page stays closed to the role.
+Each read is audited as `facility.doorCodes.read` under the reading account with the ids of the
+doors shown, never a code. The installed app never keeps the answer, so a groundskeeper whose role
+the board withdraws is signed out and sees no code from the next request on.
 
 A board may open an access point with a static code to every member, for a clubhouse door that is
 not tied to a court. `GET /api/my/door-codes` lists the name and code of every active access point

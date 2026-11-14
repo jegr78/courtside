@@ -20,6 +20,7 @@ interface Group {
 
 const overview: Destination = { to: "/admin", testId: "admin-overview-link", label: "nav.adminOverview" };
 const appointments: Destination = { to: "/admin/appointments", testId: "admin-appointments-link", label: "nav.adminAppointments" };
+const doorCodes: Destination = { to: "/admin/door-codes", testId: "admin-door-codes-link", label: "nav.adminDoorCodes" };
 const guestFees: Destination = { to: "/admin/guest-fees", testId: "admin-guest-fees-link", label: "nav.adminGuestFees" };
 const credit: Destination = { to: "/admin/credit", testId: "admin-credit-link", label: "nav.adminCredit" };
 const payPal: Destination = { to: "/admin/paypal", testId: "admin-paypal-link", label: "nav.adminPayPal" };
@@ -42,6 +43,7 @@ const groups: Group[] = [
     destinations: [
       { to: "/admin/facility/courts", testId: "admin-courts-link", label: "nav.adminCourts" },
       { to: "/admin/facility/access-points", testId: "admin-access-points-link", label: "nav.adminAccessPoints" },
+      doorCodes,
       { to: "/admin/facility/opening-hours", testId: "admin-opening-hours-link", label: "nav.adminOpeningHours" },
       { to: "/admin/facility/booking-cards", testId: "admin-booking-cards-link", label: "nav.adminBookingCards" },
       { to: "/admin/facility/slot-fillers", testId: "admin-slot-fillers-link", label: "nav.adminSlotFillers" }
@@ -82,13 +84,13 @@ function isCurrent(destination: Destination, pathname: string): boolean {
 }
 
 function currentLabel(pathname: string): string | undefined {
-  return [overview, appointments, guestFees, credit, payPal, ...groups.flatMap((group) => group.destinations)]
+  return [overview, appointments, doorCodes, guestFees, credit, payPal, ...groups.flatMap((group) => group.destinations)]
     .find((destination) => isCurrent(destination, pathname))
     ?.label;
 }
 
-export function AdminNavigation({ administrator = true, treasurer = false, appointmentsShown = true }: {
-  administrator?: boolean; treasurer?: boolean; appointmentsShown?: boolean;
+export function AdminNavigation({ administrator = true, treasurer = false, groundskeeper = false, appointmentsShown = true }: {
+  administrator?: boolean; treasurer?: boolean; groundskeeper?: boolean; appointmentsShown?: boolean;
 }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -151,6 +153,7 @@ export function AdminNavigation({ administrator = true, treasurer = false, appoi
         {t("nav.courts")}
       </Link>
       {appointmentsShown && <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
+      {groundskeeper && !administrator && <NavigationLink destination={doorCodes} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {treasurer && !administrator && <NavigationLink destination={guestFees} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {treasurer && !administrator && <NavigationLink destination={credit} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {treasurer && !administrator && <NavigationLink destination={payPal} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}

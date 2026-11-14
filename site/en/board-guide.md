@@ -12,13 +12,15 @@ list. The list shows
 what the managing roles cover, the series form what the booking roles allow. An account no card
 grants either cannot enter, not even by typing the address directly. Board members change this on
 the booking cards. Accounts with the **Treasurer** role also see *Guest fees* and *Credit* in the administration.
+Accounts with the **Groundskeeper** role see *Door codes* there, even when no card grants them
+anything.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
 | Area | Contents |
 |---|---|
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
-| **Facility** | Courts, opening hours, booking cards and slot fillers |
+| **Facility** | Courts, access points, door codes, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types, imports and credit |
 | **Records** | Statistics, usage, data exports, retention, change log and message log |
 
@@ -200,6 +202,14 @@ bookings*, with or without a booking, for example for the clubhouse door. The ma
 while it is set the code cannot be cleared. When you change the code, set the mark or activate the
 access point again, every current member receives a message with the code. Somebody who is no
 longer a member no longer sees the code but knows it until you change it.
+
+A court closure opens no door and grants no code. So that the groundskeeper still reaches a closed
+court, *Facility → Door codes* shows the fixed code and the emergency code of every active door. With
+the groundskeeper role they open the administration there and see this page, and the club
+appointments when a booking card names the groundskeeper as a managing role. They cannot change
+anything; you keep changing the codes here under *Access points*. Every visit to the door codes is
+recorded with their account in the log. When you take the role away, they are signed out and no
+longer see the codes, but know them until you change them.
 
 ![The access times and code digits, the form for a new access point and an access point with its courts and code.](../screenshots/en/access-points.png)
 

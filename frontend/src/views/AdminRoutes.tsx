@@ -6,6 +6,7 @@ import { adminPages } from "./adminPages";
 
 const AdminOverviewView = lazySurface(adminPages["/admin"]);
 const AdminManagedAppointmentsView = lazySurface(adminPages["/admin/appointments"]);
+const AdminDoorCodesView = lazySurface(adminPages["/admin/door-codes"]);
 const AdminGuestFeesView = lazySurface(adminPages["/admin/guest-fees"]);
 const AdminCreditView = lazySurface(adminPages["/admin/credit"]);
 const AdminPayPalView = lazySurface(adminPages["/admin/paypal"]);
@@ -35,20 +36,24 @@ const AdminOperationalLogsView = lazySurface(adminPages["/admin/operational-logs
 const AdminAccessGrantsView = lazySurface(adminPages["/admin/access-grants"]);
 const AdminOperatorHealthView = lazySurface(adminPages["/admin/operator-health"]);
 
-export default function AdminRoutes({ configurationChanged, administrator, treasurer = administrator, managesAppointments, createsSeries }: {
+export default function AdminRoutes({ configurationChanged, administrator, treasurer = administrator,
+  groundskeeper = administrator, managesAppointments, createsSeries }: {
   configurationChanged: (config: ClubConfig) => void;
   administrator: boolean;
   treasurer?: boolean;
+  groundskeeper?: boolean;
   managesAppointments: boolean;
   createsSeries: boolean;
 }) {
   const appointmentsShown = administrator || managesAppointments || createsSeries;
-  const landing = appointmentsShown ? "/admin/appointments" : "/admin/guest-fees";
+  const landing = appointmentsShown ? "/admin/appointments" : treasurer ? "/admin/guest-fees" : "/admin/door-codes";
   return <Routes>
-    <Route element={<AdminShell administrator={administrator} treasurer={treasurer} appointmentsShown={appointmentsShown} />}>
+    <Route element={<AdminShell administrator={administrator} treasurer={treasurer} groundskeeper={groundskeeper}
+      appointmentsShown={appointmentsShown} />}>
       <Route index element={administrator ? <AdminOverviewView /> : <Navigate to={landing} replace />} />
       <Route path="appointments" element={appointmentsShown ? <AdminManagedAppointmentsView managesAppointments={managesAppointments}
         createsSeries={createsSeries} administrator={administrator} /> : <Navigate to={landing} replace />} />
+      {groundskeeper && <Route path="door-codes" element={<AdminDoorCodesView />} />}
       {treasurer && <Route path="guest-fees" element={<AdminGuestFeesView />} />}
       {treasurer && <Route path="credit" element={<AdminCreditView />} />}
       {treasurer && <Route path="paypal" element={<AdminPayPalView />} />}

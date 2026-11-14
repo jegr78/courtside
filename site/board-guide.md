@@ -12,14 +12,15 @@ eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer
 ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
 buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
 eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten. Konten mit der
-Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*.
+Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*. Konten
+mit der Rolle **Platzwart** sehen dort die *Türcodes*, auch wenn ihnen keine Karte etwas gibt.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
 | Bereich | Inhalt |
 |---|---|
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
-| **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
+| **Anlage** | Plätze, Zugänge, Türcodes, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten, Import und Guthaben |
 | **Nachweise** | Statistik, Nutzung, Datenexport, Aufbewahrung, Änderungsprotokoll und Nachrichtenprotokoll |
 
@@ -210,6 +211,13 @@ einen Zugang deaktivieren verschickt nichts.
 und solange es gesetzt ist, lässt sich der Code nicht leeren. Änderst du den Code, setzt du das
 Häkchen oder aktivierst du den Zugang wieder, bekommt jedes aktuelle Mitglied eine Nachricht mit dem
 Code. Wer nicht mehr Mitglied ist, sieht den Code nicht mehr, kennt ihn aber, bis du ihn änderst.
+
+Eine Platzsperre öffnet keine Tür und vergibt keinen Code. Damit der Platzwart trotzdem auf einen
+gesperrten Platz kommt, zeigt ihm *Anlage → Türcodes* den festen Code und den Notfallcode jeder
+aktiven Tür. Mit der Rolle Platzwart öffnet er dort die Verwaltung und sieht diese Seite, dazu die Vereinstermine, wenn eine Buchungskarte den Platzwart als verwaltende Rolle nennt. Ändern
+kann er nichts, die Codes änderst du weiter hier unter *Zugänge*. Jeder Aufruf der Türcodes steht
+mit seinem Konto im Protokoll. Nimmst du ihm die Rolle, wird er abgemeldet und sieht die Codes nicht
+mehr, kennt sie aber, bis du sie änderst.
 
 ![Die Zugangszeiten und die Stellen eines Codes, das Formular für einen neuen Zugang und ein Zugang mit seinen Plätzen und seinem Code.](screenshots/de/access-points.png)
 
