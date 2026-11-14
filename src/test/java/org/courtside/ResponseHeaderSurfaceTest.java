@@ -59,6 +59,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     // The outbound clients build java.net.http requests, so the names they set travel away from this
     // application rather than back to a caller.
     private static final List<String> OUTBOUND = List.of(
+            "org/courtside/access/internal/LoxoneClient.java",
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
             "org/courtside/payment/internal/PayPalClient.java");
 

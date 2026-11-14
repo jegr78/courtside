@@ -943,6 +943,7 @@ loxone_simulator_environment() {
     "COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL="
     "COURTSIDE_ACCESS_CONTROL_LOXONE_USER=${loxone_simulator_account%%:*}"
     "COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD=${loxone_simulator_account#*:}"
+    "COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT="
     "$docker_path")
 }
 

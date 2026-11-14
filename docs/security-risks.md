@@ -272,6 +272,20 @@ log, a startup message, an API response or `last_failure`, and actuator exposes 
 The bound is the deployment's own access control for the host and its secrets. Reconsider when the
 reference deployment moves the other credentials into file-based secrets; this one follows them.
 
+## A configured lookup user agent presents Courtside as another client
+
+Loxone Cloud answers `getip` only to clients whose `User-Agent` names its own app, and refuses every
+other client with 403 or 418. `COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT` lets an operator send
+such a value with that one lookup, so the lookup succeeds although Loxone means to refuse it; the
+relay and the Miniserver still require the technical user's token. Loxone can tell the requests
+apart by the serial and may restrict or end Remote Connect for that Miniserver, and it can stop
+recognising the header at any time, which turns the lookup back into the refusal the access grants
+page already names. Courtside ships no value, and the variable is empty by default.
+
+The bound is the operator's decision for its own Miniserver. The club test installation uses it
+until Loxone answers how a third-party client should reach a Miniserver. Reconsider when Loxone
+answers or when the club runs Courtside in the network of its Miniserver, which needs no lookup.
+
 ## The Loxone group list is per instance and as old as the last probe
 
 A board picks an access point's group from the normal groups the last successful probe read. The
