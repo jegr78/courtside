@@ -89,7 +89,7 @@ test -n "$archive_root"
 grep -qx "recipe=$recipe" "$root/answers.conf"
 "$archive_root/courtside" --directory "$installation" init --answers "$root/answers.conf" --yes </dev/null
 "$installation/current/courtside" up </dev/null
-"$installation/current/courtside" doctor --json </dev/null
+"$installation/current/courtside" doctor --json </dev/null || [ $? -eq 1 ]
 "$installation/current/courtside" status </dev/null
 "$installation/current/courtside" backup --retain 2 </dev/null
 recovery=$(find "$installation/backups" -mindepth 1 -maxdepth 1 -type d -name 'recovery-*' -print | sort | tail -n 1)

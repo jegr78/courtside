@@ -93,6 +93,29 @@ prepare_docker_command() {
 
 prepare_executables
 
+readonly minimum_engine_major=27
+readonly ipv6_probe_url=https://api.pwnedpasswords.com/
+
+engine_version() {
+  "${docker_command[@]}" version --format '{{.Server.Version}}' 2>/dev/null || true
+}
+
+engine_problem() {
+  local version
+  version=$(engine_version)
+  [[ "$version" =~ ^([0-9]+)\. ]] || { printf 'the Docker Engine version could not be read'; return; }
+  [ "${BASH_REMATCH[1]}" -ge "$minimum_engine_major" ] \
+    || printf 'Docker Engine %s cannot give the application network an IPv6 address pool; Courtside needs Docker Engine %s or newer' \
+      "$version" "$minimum_engine_major"
+}
+
+require_supported_engine() {
+  local problem
+  prepare_docker_command
+  problem=$(engine_problem)
+  [ -z "$problem" ] || refuse "$problem"
+}
+
 cleanup() {
   local result=$?
   if [ "$mail_source_resume_required" = true ] && [ "${#mail_source_compose[@]}" -gt 0 ]; then
@@ -1481,6 +1504,7 @@ command_mfa_maintenance() {
     [ -z "$email_file" ] || refuse "this action accepts no email file"
   fi
   acquire_lock
+  require_supported_engine
   compose_command
   local -a arguments=("--courtside.maintenance.action=$action")
   if [ -n "$account_id" ]; then
@@ -1515,6 +1539,7 @@ command_mfa_export_keys() {
     && [ "$(path_owner "$parent")" = "$(id -u)" ] \
     || refuse "MFA key export requires an operator-owned mode-0700 directory"
   acquire_lock
+  require_supported_engine
   compose_command
   grep -q 'COURTSIDE_MFA_KEY_ROOT:' "$installation_directory/current/compose.yaml" \
     || refuse "the installed release keeps no MFA keys"
@@ -1552,6 +1577,7 @@ command_seed_bookings() {
     esac
   done
   acquire_lock
+  require_supported_engine
   compose_command
   [ "$config_synthetic_mail" = true ] \
     || [ "$(environment_value "$installation_directory/config/.env" COURTSIDE_ENVIRONMENT)" = UAT ] \
@@ -2350,6 +2376,7 @@ command_update() {
   target_digest=$manifest_digest
   target_manifest_sha=$manifest_sha256
   [ -f "$archive/README.md" ] || refuse "release archive has no upgrade notes"
+  require_supported_engine
   [ "$config_loxone_simulator" = false ] || [ -n "$manifest_booking_seed_image" ] \
     || refuse "loxone_simulator needs a release that provides a booking-seed image"
   prepare_mail_store_transition "$archive" "$mail_mode"
@@ -2389,6 +2416,9 @@ command_update() {
   if ! "${old_compose[@]}" stop app; then
     refuse "update could not stop the old application; recovery unit $created_recovery is ready and database rollback was not attempted"
   fi
+  # Compose 2.33.1 restarts a reused container against the id of a network it has just recreated.
+  "${old_compose[@]}" rm -f app \
+    || refuse "update could not remove the stopped application; recovery unit $created_recovery is ready and database rollback was not attempted"
   manifest_version=$target_release
   manifest_revision=$target_revision
   manifest_image=$target_image
@@ -2717,6 +2747,7 @@ command_rotate_secret() {
     *) refuse "unknown rotatable secret $name" ;;
   esac
   acquire_lock
+  require_supported_engine
   load_configuration
   case "$name:$config_recipe" in
     postgres:existing-infrastructure) refuse "postgres rotation is available only for the bundled database" ;;
@@ -2961,13 +2992,19 @@ command_doctor() {
   fi
   if [ -n "$docker_path" ] && "${docker_command[@]}" compose version >/dev/null 2>&1; then
     doctor_result PASS compose "Docker Compose is available"
+    problem=$(engine_problem)
+    if [ -z "$problem" ]; then
+      doctor_result PASS engine "Docker Engine $(engine_version) gives the application network an IPv6 address pool"
+    else
+      doctor_result FAIL engine "$problem"
+    fi
     if (compose_command && "${compose[@]}" config --quiet >/dev/null 2>&1); then
       doctor_result PASS model "the selected Compose model renders"
     else
       doctor_result FAIL model "the selected Compose model does not render"
     fi
     if [ "$config_recipe" = funnel ] || [ "$config_recipe" = existing-infrastructure ]; then
-      state=$(docker_components 2>/dev/null || true)
+      state=$(docker_components 2>/dev/null) || state=""
       if grep -Eq '^proxy=(running|healthy)$' <<< "$state"; then
         port=$(environment_value "$installation_directory/config/.env" COURTSIDE_PORT)
         port=${port:-8080}
@@ -2988,6 +3025,7 @@ command_doctor() {
     else
       doctor_result PASS local-listener "the selected recipe has no forwarded loopback listener"
     fi
+    ipv6_egress_check
   else
     doctor_result FAIL compose "Docker with Compose is unavailable"
   fi
@@ -3001,6 +3039,32 @@ command_doctor() {
     fi
   fi
   emit_doctor "$format"
+}
+
+ipv6_reaches() {
+  "$@" -q --noproxy '*' --ipv6 --silent --output /dev/null --max-time 5 "$ipv6_probe_url" >/dev/null 2>&1
+}
+
+ipv6_egress_check() {
+  local state
+  [ -n "$curl_path" ] || {
+    doctor_result WARN ipv6-egress "curl is missing, so IPv6 egress could not be probed"
+    return
+  }
+  ipv6_reaches "$env_path" -i "PATH=$PATH" "$curl_path" || {
+    doctor_result PASS ipv6-egress "the host does not reach IPv6, so the application uses IPv4 only"
+    return
+  }
+  state=$(docker_components 2>/dev/null) || state=""
+  grep -Eq '^app=(running|healthy|starting|unhealthy)$' <<< "$state" || {
+    doctor_result WARN ipv6-egress "the application is not running, so its IPv6 egress could not be probed"
+    return
+  }
+  if (compose_command && ipv6_reaches "${compose[@]}" exec -T app curl); then
+    doctor_result PASS ipv6-egress "the application container reaches an IPv6 address"
+  else
+    doctor_result WARN ipv6-egress "the host reaches IPv6 but the application container does not, so an IPv6-only Miniserver or relay address stays unreachable; see IPv6 egress in the operations guide"
+  fi
 }
 
 docker_ps() {
@@ -3049,6 +3113,7 @@ latest_backup_age() {
 command_up() {
   [ $# -eq 0 ] || refuse "up accepts no options"
   acquire_lock
+  require_supported_engine
   compose_command
   "${compose[@]}" up -d
 }

@@ -54,6 +54,8 @@ test("given an exact namespace confirmation, when the SSH command is built, then
   assert.equal(invocation.script.match(/"\$installation\/current\/courtside" up/g)?.length, 2);
   assert.ok(invocation.script.indexOf('"$installation/current/courtside" up')
     < invocation.script.indexOf('"$installation/current/courtside" doctor --json'));
+  assert.match(invocation.script, /doctor --json <\/dev\/null \|\| \[ \$\? -eq 1 \]\n/,
+    "a doctor warning about the qualification host's own network must not end the lifecycle run");
   assert.doesNotMatch(invocation.script, /(?:apt|dnf|yum|apk)\s+(?:install|remove)/);
   assert.doesNotMatch(invocation.script, /docker\s+(?:system|volume|image|container)\s+prune/);
   assert.doesNotMatch(invocation.script, /(?:ufw|iptables|firewall-cmd)/);

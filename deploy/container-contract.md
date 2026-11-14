@@ -57,6 +57,7 @@ define.
   that cannot complete refuses the change with `503`. That includes the first administrator, who has
   to replace the bootstrap password before doing anything else. With `COURTSIDE_ENVIRONMENT` at
   `PRODUCTION`, `COURTSIDE_PASSWORD_BREACH_ENDPOINT` cannot point anywhere else.
+- A door-control address that resolves only to IPv6 needs IPv6 egress on the container's network.
 - With `COURTSIDE_OTLP_ENABLED` set to `true`, it also sends traces and metrics to
   `COURTSIDE_OTLP_TRACES_ENDPOINT` and `COURTSIDE_OTLP_METRICS_ENDPOINT`.
 

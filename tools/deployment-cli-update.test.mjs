@@ -839,6 +839,45 @@ test("given an unsupported source image, when reinitialization is requested, the
   });
 });
 
+test("given a stopped application container, when the new release starts, then Compose creates it afresh on the release's networks", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(context.archive, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(context.dockerLog, "utf8").split("\n");
+    const stop = calls.findIndex((line) => line.endsWith(" stop app"));
+    const removal = calls.findIndex((line) => line.endsWith(" rm -f app"));
+    const start = calls.findLastIndex((line) => line.endsWith(" up -d --wait"));
+    assert.ok(stop >= 0 && stop < removal && removal < start,
+      "a reused container keeps a recreated network's old id and Compose 2.33 cannot start it");
+  });
+});
+
+test("given a Docker Engine older than 27, when an update is requested, then it is refused before backup", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    writeFileSync(join(context.root, "docker-engine-version"), "26.1.4\n");
+
+    // when
+    const result = run(context.archive, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /Docker Engine 26\.1\.4 cannot give the application network an IPv6 address pool/);
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+  });
+});
+
 test("given a target outside Stalwart 1, when reinitialization is requested, then it refuses before backup", () => {
   fixture((context) => {
     // given

@@ -439,6 +439,7 @@ test("given the reference deployment networks, when reachability changes, then l
     ({ name, internal, members, egressGatewayFor })), composeNetworkSegments(posture));
   assert.equal(compose["x-courtside-compose-version"], ">=2.33.1");
   assert.match(deploymentDocumentation, /Compose 2\.33\.1 or newer/);
+  assert.match(deploymentDocumentation, /Docker Engine 27 or newer/);
   for (const segment of segments) {
     assert.ok(segment.purpose.length > 0, `${segment.name} has no classified purpose`);
     assert.ok(segment.boundaryIds.length > 0, `${segment.name} has no trust boundary`);
@@ -477,6 +478,8 @@ test("given the reference deployment networks, when reachability changes, then l
   assert.equal(gateway("app", "app-egress"), 1);
   assert.equal(gateway("mail", "mail-delivery"), 1);
   assert.equal(gateway("proxy", "proxy-egress"), 1);
+  assert.deepEqual(Object.entries(composeNetworks()).filter(([, definition]) => definition?.enable_ipv6 === true)
+    .map(([name]) => name), ["app-egress"], "only the application's egress reaches an IPv6-only Miniserver or relay");
 });
 
 test("given reference mail delivery, when its MX route is mapped, then software bounds and external assumptions stay distinct", () => {

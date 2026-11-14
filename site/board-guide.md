@@ -361,7 +361,9 @@ Passwort des technischen Benutzers in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` und
 
 Die feste Adresse hat die Form `https://192-168-1-47.<Seriennummer>.dyndns.loxonecloud.com:<Port>`,
 mit der lokalen Adresse des Miniservers in Bindestrichen. Die Instanz muss sie über HTTPS erreichen,
-per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Den Weg über die
+per Portweiterleitung im Clubhaus oder über einen Tunnel ins Vereinsnetz. Hat das Clubhaus nur
+eine IPv6-Adresse, wie bei DS-Lite, braucht die Instanz IPv6 nach außen. Die Betriebsanleitung
+beschreibt das unter *IPv6 egress*, und `courtside doctor` meldet, wenn es fehlt. Den Weg über die
 Seriennummer in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` lehnt die Loxone Cloud seit November 2026
 für Programme außer der Loxone App und Loxone Config ab. Die Verbindungsprüfung meldet das dann. Eine
 Relay-Adresse aus der Loxone App oder dem Browser taugt nicht als feste Adresse: Loxone vergibt ihren
