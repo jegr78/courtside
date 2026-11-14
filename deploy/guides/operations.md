@@ -1584,7 +1584,7 @@ on its untouched volume and reports the rollback. The new target volume is remov
 old installation is healthy again.
 
 A full-self-hosted installation using Stalwart 0.16.27 can explicitly initialize fresh mail stores
-when updating to 1.0.x. This requires `--mail-store-transition reinitialize`; `--yes` alone is
+when updating to 1.x. This requires `--mail-store-transition reinitialize`; `--yes` alone is
 insufficient. It retains the old stores and recovery unit, configures new stores and checks local
 TLS and sender authentication before application startup. It does not copy old mail state and
 requires new DKIM DNS records. Follow the [Stalwart procedure](stalwart.md#upgrading-older-mail-stores),
