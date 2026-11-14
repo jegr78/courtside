@@ -138,6 +138,27 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
+    // A read over every door concerns no single subject.
+    record DoorCodesRead(List<UUID> accessPointIds) implements FacilityEvent {
+
+        static final String TYPE = "facility.doorCodes.read";
+
+        public DoorCodesRead {
+            accessPointIds = List.copyOf(accessPointIds);
+        }
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public @Nullable UUID subjectId() {
+            return null;
+        }
+
+    }
+
     /** From {@code effectiveFrom} until the day before {@code until}; a null bound is open. */
     record OpeningHoursSet(UUID openingHoursId, int dayOfWeek, LocalTime opensAt, LocalTime closesAt,
                            UUID versionId, @Nullable LocalDate effectiveFrom, @Nullable LocalDate until)

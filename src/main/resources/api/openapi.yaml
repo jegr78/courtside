@@ -168,6 +168,8 @@ tags:
     description: How the courts were used, cancelled, missed and refused over a period, as counts that name nobody.
   - name: treasury
     description: What members owe the club, for the treasurer and the administration.
+  - name: grounds
+    description: What the groundskeeper needs on the grounds, for the groundskeeper and the administration.
   - name: credit
     description: Money the club holds for an account, and how that balance came about.
   - name: payment
@@ -3544,6 +3546,20 @@ components:
           type: string
           description: The new key. It is shown this once and cannot be read back.
         createdAt: { type: string, format: date-time }
+
+    DoorCode:
+      type: object
+      description: An active door and the codes its keypad keeps, as a groundskeeper reads them.
+      required: [accessPointId, accessPointName, staticCode, emergencyCode]
+      properties:
+        accessPointId: { type: string, format: uuid }
+        accessPointName: { type: string }
+        staticCode:
+          type: [string, "null"]
+          description: The code the keypad accepts, or `null` when the board keeps none.
+        emergencyCode:
+          type: [string, "null"]
+          description: The emergency code of a door without a static code, or `null`.
 
     AccessCode:
       type: object
@@ -8874,6 +8890,30 @@ paths:
                 items: { $ref: "#/components/schemas/ReservedSlot" }
         "400":
           $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/grounds/door-codes:
+    get:
+      tags: [grounds]
+      operationId: listDoorCodes
+      summary: The codes kept on every active door's keypad.
+      description: |
+        Every active access point with its static code and its emergency code, for a groundskeeper
+        who reaches a closed court, ordered by name. Read-only; the codes are changed on the access
+        point administration. Each read is recorded in the audit log under the reading account.
+      responses:
+        "200":
+          description: The doors, possibly none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DoorCode" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 

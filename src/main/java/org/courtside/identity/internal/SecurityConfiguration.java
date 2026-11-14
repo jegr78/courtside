@@ -225,6 +225,13 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                "(?i)^/api/grounds(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
+                                new AuthorizationDecision((hasAuthority(authentication.get(),
+                                        "ROLE_" + Role.ADMIN.name())
+                                        || hasAuthority(authentication.get(), "ROLE_" + Role.GROUNDSKEEPER.name()))
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
                                 "(?i)^/api/treasury(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
                                 new AuthorizationDecision((hasAuthority(authentication.get(),
                                         "ROLE_" + Role.ADMIN.name())
