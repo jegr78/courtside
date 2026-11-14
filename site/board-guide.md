@@ -213,7 +213,7 @@ Code. Wer nicht mehr Mitglied ist, sieht den Code nicht mehr, kennt ihn aber, bi
 
 Eine Platzsperre öffnet keine Tür und vergibt keinen Code. Damit der Platzwart trotzdem auf einen
 gesperrten Platz kommt, zeigt ihm *Anlage → Türcodes* den festen Code und den Notfallcode jeder
-aktiven Tür. Mit der Rolle Platzwart öffnet er dort die Verwaltung und sieht nur diese Seite. Ändern
+aktiven Tür. Mit der Rolle Platzwart öffnet er dort die Verwaltung und sieht diese Seite, dazu die Vereinstermine, wenn eine Buchungskarte den Platzwart als verwaltende Rolle nennt. Ändern
 kann er nichts, die Codes änderst du weiter hier unter *Zugänge*. Jeder Aufruf der Türcodes steht
 mit seinem Konto im Protokoll. Nimmst du ihm die Rolle, wird er abgemeldet und sieht die Codes nicht
 mehr, kennt sie aber, bis du sie änderst.

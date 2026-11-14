@@ -149,7 +149,7 @@
         "listGuardianRelationships",
         "listManagedAppointments",
         "listMembersDoorCodes",
-        "listDoorCodes",
+        "readDoorCodes",
         "listMembershipPeriods",
         "listMessageTemplates",
         "listNoShows",

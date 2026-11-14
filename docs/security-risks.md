@@ -167,7 +167,8 @@ any shared code, it cannot be withdrawn from somebody who has read it: a grounds
 keeps knowing every door's code until the board changes it at the keypad. Withdrawing the role signs the
 account out and refuses its next read, the installed app keeps no copy, and the audit log records each
 read with the account, so a board can see who looked. Reading needs a signed-in account carrying the
-groundskeeper or the admin role. Reconsider if a club needs a closed court reachable without a shared
+groundskeeper or the admin role whose initial password has been changed; the audit entry names the
+doors shown, never a code. Reconsider if a club needs a closed court reachable without a shared
 code, which only a per-closure dynamic code can do.
 
 ## The occupancy key travels in the query string

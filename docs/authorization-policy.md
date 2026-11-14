@@ -136,7 +136,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `paypal-availability` | `getPayPalAvailability` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL` | `permanent-account-gate` |
 | `treasury-paypal-credentials` | `savePayPalSettings`, `removePayPalCredentials` | `TREASURER`, `ADMIN` | `treasury-gate`, `recent-authentication`, `paypal-secret-write-only` |
 | `treasury-paypal-refund` | `refundPayPalPayment` | `TREASURER`, `ADMIN` | `treasury-gate`, `recent-authentication` |
-| `grounds` | `listDoorCodes` | `GROUNDSKEEPER`, `ADMIN` | `grounds-gate` |
+| `grounds` | `readDoorCodes` | `GROUNDSKEEPER`, `ADMIN` | `grounds-gate` |
 
 ## Authorization decisions
 
@@ -690,6 +690,6 @@ Negative tests: `src/test/java/org/courtside/facility/web/DoorCodeReadController
 | `emergency-code-read` | read | `EmergencyAccess.codes` | `requestEmergencyCode`, `requestParticipationEmergencyCode` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`; `booking-owner`, `participant-person`, `current-account` |
 | `external-registration-request` | never-read | `RegistrationRequest.firstName`, `RegistrationRequest.lastName`, `RegistrationRequest.username`, `RegistrationRequest.password`, `RegistrationRequest.email`, `RegistrationRequest.language` | `registerExternalAccount` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD`; `route`, `request-field` |
 | `external-registration-code` | never-read | `RegistrationVerificationRequest.code` | `verifyRegistration` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD`; `route`, `request-field` |
-| `door-code-grounds-read` | read | `DoorCode.staticCode`, `DoorCode.emergencyCode` | `listDoorCodes` | `GROUNDSKEEPER`, `ADMIN`; `role` |
+| `door-code-grounds-read` | read | `DoorCode.staticCode`, `DoorCode.emergencyCode` | `readDoorCodes` | `GROUNDSKEEPER`, `ADMIN`; `role` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

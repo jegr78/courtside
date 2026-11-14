@@ -8896,7 +8896,7 @@ paths:
   /api/grounds/door-codes:
     post:
       tags: [grounds]
-      operationId: listDoorCodes
+      operationId: readDoorCodes
       summary: The codes kept on every active door's keypad.
       description: |
         Every active access point with its static code and its emergency code, for a groundskeeper

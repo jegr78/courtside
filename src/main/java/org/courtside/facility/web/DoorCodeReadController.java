@@ -16,7 +16,7 @@ class DoorCodeReadController implements GroundsApi {
     private final FacilityService facility;
 
     @Override
-    public ResponseEntity<List<ApiDoorCode>> listDoorCodes() {
+    public ResponseEntity<List<ApiDoorCode>> readDoorCodes() {
         return ResponseEntity.ok(facility.readDoorCodes().stream()
                 .map(door -> new ApiDoorCode(door.getId(), door.getName(), door.getStaticCode(),
                         door.getEmergencyCode()))

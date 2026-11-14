@@ -969,7 +969,9 @@ a door's fixed code. `POST /api/grounds/door-codes` lists every active access po
 static and emergency code, either of them `null` when the board keeps none, to an account carrying
 `GROUNDSKEEPER` or `ADMIN`; every other role is refused with `403
 urn:courtside:error:access-denied` before anything is read. The list is read-only and the
-administration's door codes page shows it, the only administration page a groundskeeper reaches.
+administration's door codes page shows it. A groundskeeper reaches the administration for that page
+and, when a card names the role as managing, for the club appointments; every other administration
+page stays closed to the role.
 Each read is audited as `facility.doorCodes.read` under the reading account with the ids of the
 doors shown, never a code. The installed app never keeps the answer, so a groundskeeper whose role
 the board withdraws is signed out and sees no code from the next request on.

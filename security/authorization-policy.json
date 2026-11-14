@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "9022630d4fb3ddd817613282a75ab8e46da3a6d8e9476c5183944cb53107008a",
-  "protectedFieldInventorySha256": "a8b449fcfb0bf9f7a156c75bb7524a467eb76cb33a48d1be1761a72e62b6b574",
+  "openApiFieldInventorySha256": "8d7a40ffbac5a7125dd543cbc301b753319c90eef11feb812c761dcd7ecc27c6",
+  "protectedFieldInventorySha256": "b6eee19a6a1ab96a40f359d3f33c29264682efdbd4715ee1df2f885ad5aa0e97",
   "productionAuthorizationSha256": "b77f70fee667c85981d59f1006d4ca1eae5dc18f9783c15fa13f9918f9a2af58",
   "ordinaryFields": [
     "Problem.detail",
@@ -2150,16 +2150,6 @@
     "listDependants:response:Violation.code",
     "listDependants:response:Violation.params",
     "listDependants:response:Violation.params.*",
-    "listDoorCodes:response:$response.header.Retry-After",
-    "listDoorCodes:response:DoorCode.accessPointId",
-    "listDoorCodes:response:DoorCode.accessPointName",
-    "listDoorCodes:response:FieldError.code",
-    "listDoorCodes:response:FieldError.field",
-    "listDoorCodes:response:FieldError.params",
-    "listDoorCodes:response:FieldError.params.*",
-    "listDoorCodes:response:Violation.code",
-    "listDoorCodes:response:Violation.params",
-    "listDoorCodes:response:Violation.params.*",
     "listExternalReferences:parameter:$parameter.path.sourceId",
     "listExternalReferences:parameter:$parameter.query.cursor",
     "listExternalReferences:parameter:$parameter.query.limit",
@@ -2928,6 +2918,16 @@
     "readBookingStatistics:response:Violation.code",
     "readBookingStatistics:response:Violation.params",
     "readBookingStatistics:response:Violation.params.*",
+    "readDoorCodes:response:$response.header.Retry-After",
+    "readDoorCodes:response:DoorCode.accessPointId",
+    "readDoorCodes:response:DoorCode.accessPointName",
+    "readDoorCodes:response:FieldError.code",
+    "readDoorCodes:response:FieldError.field",
+    "readDoorCodes:response:FieldError.params",
+    "readDoorCodes:response:FieldError.params.*",
+    "readDoorCodes:response:Violation.code",
+    "readDoorCodes:response:Violation.params",
+    "readDoorCodes:response:Violation.params.*",
     "readImportPreview:parameter:$parameter.path.id",
     "readImportPreview:response:$response.header.Retry-After",
     "readImportPreview:response:FieldError.code",
@@ -5400,7 +5400,7 @@
       "id": "grounds",
       "description": "The door codes a groundskeeper needs on the grounds require an enabled permanent account carrying GROUNDSKEEPER or ADMIN; every active door's static and emergency code is answered read-only and every read is recorded.",
       "operationIds": [
-        "listDoorCodes"
+        "readDoorCodes"
       ],
       "actors": [
         "GROUNDSKEEPER",
@@ -8489,7 +8489,7 @@
         "DoorCode.emergencyCode"
       ],
       "operationIds": [
-        "listDoorCodes"
+        "readDoorCodes"
       ],
       "actors": [
         "GROUNDSKEEPER",

@@ -1165,7 +1165,7 @@
       ],
       "entryPoints": "The read-only door code list under /api/grounds.",
       "operationIds": [
-        "listDoorCodes"
+        "readDoorCodes"
       ],
       "backgroundEntryPoints": [],
       "stateTransitions": [
