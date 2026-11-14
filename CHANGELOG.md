@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-rc.5](https://github.com/jegr78/courtside/compare/v0.5.0-rc.4...v0.5.0-rc.5) (2026-11-14)
+
+
+### Features
+
+* give the application container IPv6 egress in the reference deployment ([#2003](https://github.com/jegr78/courtside/issues/2003)) ([0514d18](https://github.com/jegr78/courtside/commit/0514d188b5a61b3489da157204c79de6725faa9d)), closes [#1989](https://github.com/jegr78/courtside/issues/1989)
+* let groundskeepers and admins read every door's fixed and emergency code ([#2000](https://github.com/jegr78/courtside/issues/2000)) ([8d8d520](https://github.com/jegr78/courtside/commit/8d8d52033d3bca019809ee7311723311eb162e44))
+* send a configured user agent with the Loxone address lookup ([#2004](https://github.com/jegr78/courtside/issues/2004)) ([ee6bae7](https://github.com/jegr78/courtside/commit/ee6bae74b5eeaeb6dce9f076db77289952b8145b))
+
+
+### Bug fixes
+
+* update the frontend, build and deployment dependencies ([#1998](https://github.com/jegr78/courtside/issues/1998)) ([a804552](https://github.com/jegr78/courtside/commit/a804552fe25c740258d41bc7b0469dd10472533b))
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
