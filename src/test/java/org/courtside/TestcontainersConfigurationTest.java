@@ -31,6 +31,6 @@ class TestcontainersConfigurationTest {
         String configuration = Files.readString(Path.of("src/test/resources/application-test.yaml"));
 
         // when / then
-        assertThat(configuration).contains("maximum-pool-size: 4", "minimum-idle: 0");
+        assertThat(configuration).contains("maximum-pool-size: 6", "minimum-idle: 0");
     }
 }
