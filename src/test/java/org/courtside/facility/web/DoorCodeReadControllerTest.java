@@ -31,7 +31,6 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -84,7 +83,7 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
     @Test
     void givenActiveAndRetiredDoors_whenTheGroundskeeperReadsTheCodes_thenEveryActiveDoorShowsItsCodes() throws Exception {
         // when / then
-        mockMvc.perform(get(DOOR_CODES).with(user(as("miles.richard"))))
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("miles.richard"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[*].accessPointName").value(contains("Clubhouse", "Gate", "Shed")))
@@ -102,7 +101,7 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
     @Test
     void givenAnAdministrator_whenTheCodesAreRead_thenTheSameDoorsAreShown() throws Exception {
         // when / then
-        mockMvc.perform(get(DOOR_CODES).with(user(as("major.mary"))))
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("major.mary"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].accessPointName").value(contains("Clubhouse", "Gate", "Shed")));
     }
@@ -117,7 +116,7 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
                 Set.of(role));
 
         // when / then
-        mockMvc.perform(get(DOOR_CODES).with(user(as("doe.jane"))))
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("doe.jane"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value(ACCESS_DENIED));
         assertThat(readsRecorded()).as("a refused read shows no code").isZero();
@@ -134,7 +133,7 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value(ACCESS_DENIED));
-        mockMvc.perform(get(DOOR_CODES).with(user(as("miles.richard"))))
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("miles.richard"))))
                 .andExpect(jsonPath("$[1].staticCode").value("471123"));
     }
 
@@ -142,8 +141,8 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
     void givenAGroundskeeper_whenItReadsTheCodesTwice_thenEachReadIsRecordedUnderItsAccountWithoutTheCodes()
             throws Exception {
         // when
-        mockMvc.perform(get(DOOR_CODES).with(user(as("miles.richard")))).andExpect(status().isOk());
-        mockMvc.perform(get(DOOR_CODES).with(user(as("miles.richard")))).andExpect(status().isOk());
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("miles.richard")))).andExpect(status().isOk());
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).with(user(as("miles.richard")))).andExpect(status().isOk());
 
         // then
         List<RecordedRead> reads = jdbc.sql("""
@@ -166,13 +165,13 @@ class DoorCodeReadControllerTest extends AbstractIntegrationTest {
     void givenASignedInGroundskeeper_whenTheBoardWithdrawsTheRole_thenTheNextReadIsRefused() throws Exception {
         // given
         MockHttpSession session = signIn("miles.richard");
-        mockMvc.perform(get(DOOR_CODES).session(session)).andExpect(status().isOk());
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).session(session)).andExpect(status().isOk());
 
         // when
         roster.changeRoles(groundskeeperPerson, Set.of(Role.MEMBER));
 
         // then
-        mockMvc.perform(get(DOOR_CODES).session(session))
+        mockMvc.perform(post(DOOR_CODES).with(csrf()).session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }

@@ -965,7 +965,7 @@ audit entries of an access point name its id, its courts and the fields that cha
 and no error message or log line carries one either.
 
 A court closure holds no door open and grants no code, so a groundskeeper reaches a closed court with
-a door's fixed code. `GET /api/grounds/door-codes` lists every active access point by name with its
+a door's fixed code. `POST /api/grounds/door-codes` lists every active access point by name with its
 static and emergency code, either of them `null` when the board keeps none, to an account carrying
 `GROUNDSKEEPER` or `ADMIN`; every other role is refused with `403
 urn:courtside:error:access-denied` before anything is read. The list is read-only and the

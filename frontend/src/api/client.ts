@@ -929,7 +929,7 @@ export const api = {
   ).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
   ownCredit: (options: CreditPageOptions = {}) => request<CreditLedgerPage>(`/api/my/credit?${creditPageQuery(options)}`),
   doorCodes: () => request<AccessCode[]>("/api/my/door-codes"),
-  groundsDoorCodes: () => request<DoorCode[]>("/api/grounds/door-codes"),
+  groundsDoorCodes: () => request<DoorCode[]>("/api/grounds/door-codes", { method: "POST" }),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
   ),

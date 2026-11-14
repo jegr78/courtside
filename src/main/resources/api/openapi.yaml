@@ -8894,14 +8894,15 @@ paths:
           $ref: "#/components/responses/RateLimited"
 
   /api/grounds/door-codes:
-    get:
+    post:
       tags: [grounds]
       operationId: listDoorCodes
       summary: The codes kept on every active door's keypad.
       description: |
         Every active access point with its static code and its emergency code, for a groundskeeper
         who reaches a closed court, ordered by name. Read-only; the codes are changed on the access
-        point administration. Each read is recorded in the audit log under the reading account.
+        point administration. Each read is recorded in the audit log under the reading account, which
+        is why reading is a POST.
       responses:
         "200":
           description: The doors, possibly none.
