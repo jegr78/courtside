@@ -325,6 +325,8 @@ test("given the door codes request, when the service worker routes it, then the 
   assert.equal(doorCodes.routes("/api/my/door-codes"), true, "a member sees a changed code at once while online");
   assert.equal(bookings.routes("/api/my/door-codes"), false, "a stale code would outlive the message announcing its successor");
   assert.equal(doorCodes.routes("/api/admin/access-points"), false, "the board's codes never reach the offline copy");
+  assert.equal(doorCodes.routes("/api/grounds/door-codes"), false, "a groundskeeper whose role ends keeps no copy of every door's code");
+  assert.equal(bookings.routes("/api/grounds/door-codes"), false, "a groundskeeper whose role ends keeps no copy of every door's code");
   assert.equal(doorCodes.cache, "courtside-personal-bookings", "sign-out deletes this cache");
   assert.equal(doorCodes.plugins, bookings.plugins, "the same generation and seven-day age bound both");
   assert.match(viteConfiguration, /Array\.isArray\(body\) \? body\.map\(\(door[^)]*\) => \(\{\s+accessPointName: door\.accessPointName,\s+code: door\.code\s+\}\)\)/,

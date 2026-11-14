@@ -201,6 +201,13 @@ while it is set the code cannot be cleared. When you change the code, set the ma
 access point again, every current member receives a message with the code. Somebody who is no
 longer a member no longer sees the code but knows it until you change it.
 
+A court closure opens no door and grants no code. So that the groundskeeper still reaches a closed
+court, *Facility → Door codes* shows the fixed code and the emergency code of every active door. With
+the groundskeeper role they open the administration there and see only this page. They cannot change
+anything; you keep changing the codes here under *Access points*. Every visit to the door codes is
+recorded with their account in the log. When you take the role away, they are signed out and no
+longer see the codes, but know them until you change them.
+
 ![The access times and code digits, the form for a new access point and an access point with its courts and code.](../screenshots/en/access-points.png)
 
 Whether a booking's players receive the code is decided by its booking card.

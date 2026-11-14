@@ -32,7 +32,8 @@ const METHOD_BEFORE = new RegExp("(?:method:\\s*\"([A-Za-z]+)\"|http\\.(get|post
 
 const PREFIX_PREDICATES = new Map([
   ["/api/admin", "decides which operations the matrix expects only an administrator to reach"],
-  ["/api/treasury", "decides which operations the matrix expects only a treasurer or an administrator to reach"]
+  ["/api/treasury", "decides which operations the matrix expects only a treasurer or an administrator to reach"],
+  ["/api/grounds", "decides which operations the matrix expects only a groundskeeper or an administrator to reach"]
 ]);
 
 const NO_METHOD_BESIDE_IT = new Map([
@@ -143,7 +144,10 @@ test("given the prefix the matrix reads an admin-only expectation from, "
   // given
   const matrix = buildOperationAuthorizationMatrix(api);
   const adminOnly = matrix.filter(({ expectations }) => expectations.ADMIN === "allow"
-    && expectations.MEMBER === "deny-forbidden" && expectations.TREASURER === "deny-forbidden");
+    && expectations.MEMBER === "deny-forbidden" && expectations.TREASURER === "deny-forbidden"
+    && expectations.GROUNDSKEEPER === "deny-forbidden");
+  const grounds = matrix.filter(({ expectations }) =>
+    expectations.GROUNDSKEEPER === "allow" && expectations.MEMBER === "deny-forbidden");
   const treasury = matrix.filter(({ expectations }) =>
     expectations.TREASURER === "allow" && expectations.MEMBER === "deny-forbidden");
 
@@ -158,6 +162,9 @@ test("given the prefix the matrix reads an admin-only expectation from, "
       + " the boundary then reads as passed.");
   assert.deepEqual(treasury.filter(({ path }) => !path.startsWith("/api/treasury")).map(({ path }) => path), [],
     "an operation the matrix expects only a treasurer or an administrator to reach lies outside /api/treasury");
+  assert.ok(grounds.length > 0, "a contract declaring no groundskeeper operation makes the grounds predicate unfalsifiable");
+  assert.deepEqual(grounds.filter(({ path }) => !path.startsWith("/api/grounds")).map(({ path }) => path), [],
+    "an operation the matrix expects only a groundskeeper or an administrator to reach lies outside /api/grounds");
 });
 
 test("given a listed exception, when the runtime stops naming it, then the list stops carrying it", () => {

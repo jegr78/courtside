@@ -201,6 +201,7 @@ public class SecurityConfiguration {
                                 "/admin/access-grants",
                                 "/admin/operator-health",
                                 "/admin/guest-fees",
+                                "/admin/door-codes",
                                 "/admin/credit",
                                 "/admin/paypal",
                                 "/index.html",

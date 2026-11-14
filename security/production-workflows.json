@@ -1158,6 +1158,38 @@
       ]
     },
     {
+      "id": "grounds-door-codes",
+      "actors": [
+        "GROUNDSKEEPER",
+        "ADMIN"
+      ],
+      "entryPoints": "The read-only door code list under /api/grounds.",
+      "operationIds": [
+        "listDoorCodes"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "Each read records one whole-instance audit entry under the reading account naming the doors shown, never their codes."
+      ],
+      "alternatePaths": [
+        "A door without a static or emergency code is listed with neither."
+      ],
+      "failurePaths": [
+        "Members, treasurers and every other role are refused before any code is read.",
+        "A groundskeeper who loses the role is signed out and refused at the next request."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/facility/web/DoorCodeReadController.java",
+        "src/main/java/org/courtside/facility/FacilityService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenActiveAndRetiredDoors_whenTheGroundskeeperReadsTheCodes_thenEveryActiveDoorShowsItsCodes",
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenAnAccountWithoutTheGroundskeeperRole_whenItReadsTheCodes_thenItIsRefusedAndNothingIsRecorded",
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenAGroundskeeper_whenItReadsTheCodesTwice_thenEachReadIsRecordedUnderItsAccountWithoutTheCodes",
+        "src/test/java/org/courtside/facility/web/DoorCodeReadControllerTest.java#givenASignedInGroundskeeper_whenTheBoardWithdrawsTheRole_thenTheNextReadIsRefused"
+      ]
+    },
+    {
       "id": "personal-data-retention",
       "actors": [
         "ADMIN"

@@ -169,6 +169,7 @@ export type BookingHours = components["schemas"]["BookingHours"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
 export type AccessGrant = components["schemas"]["AccessGrant"];
 export type AccessCode = components["schemas"]["AccessCode"];
+export type DoorCode = components["schemas"]["DoorCode"];
 export type EmergencyAccess = components["schemas"]["EmergencyAccess"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
 export type PersonalBookingView = components["schemas"]["PersonalBookingView"];
@@ -928,6 +929,7 @@ export const api = {
   ).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
   ownCredit: (options: CreditPageOptions = {}) => request<CreditLedgerPage>(`/api/my/credit?${creditPageQuery(options)}`),
   doorCodes: () => request<AccessCode[]>("/api/my/door-codes"),
+  groundsDoorCodes: () => request<DoorCode[]>("/api/grounds/door-codes"),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
   ),

@@ -159,6 +159,17 @@ issued to some booking, though not to which one; trying numbers that way needs t
 request per number. Reconsider if a club needs the emergency path to stop working for one member, which only
 a per-booking fallback code can do, or if the audit shows the code asked for without a failing grant.
 
+## A groundskeeper knows every door's code
+
+A groundskeeper reads the static and emergency code of every active access point in the app, because a
+court closure grants no code of its own and the groundskeeper still has to reach the closed court. Like
+any shared code, it cannot be withdrawn from somebody who has read it: a groundskeeper whose role ends
+keeps knowing every door's code until the board changes it at the keypad. Withdrawing the role signs the
+account out and refuses its next read, the installed app keeps no copy, and the audit log records each
+read with the account, so a board can see who looked. Reading needs a signed-in account carrying the
+groundskeeper or the admin role. Reconsider if a club needs a closed court reachable without a shared
+code, which only a per-closure dynamic code can do.
+
 ## The occupancy key travels in the query string
 
 Building automation reads `GET /api/public/occupancy?key=<key>`, with the key in the URL because a
