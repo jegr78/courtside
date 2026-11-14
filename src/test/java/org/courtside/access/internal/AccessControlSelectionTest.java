@@ -3,6 +3,8 @@ package org.courtside.access.internal;
 import org.courtside.access.AccessControlConnector;
 import org.courtside.shared.InstanceAddress;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.mock.env.MockEnvironment;
@@ -13,6 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,6 +72,41 @@ class AccessControlSelectionTest {
         assertThat(((LoxoneAccessControl) selected).address())
                 .isEqualTo(LoxoneAddress.Serial.throughLoxoneCloud("504F94A0EE01"));
         ((LoxoneAccessControl) selected).close();
+    }
+
+    @Test
+    void givenLoxoneWithASerialAndAUserAgent_whenItIsChosen_thenTheLookupIsAskedUnderThatUserAgent() {
+        // when
+        AccessControlConnector selected = select("loxone", "PRODUCTION",
+                loxone().withProperty("courtside.access-control.loxone.serial", "504F94A0EE01")
+                        .withProperty("courtside.access-control.loxone.user-agent", " Example/1.0 (test) "));
+
+        // then
+        assertThat(((LoxoneAccessControl) selected).address())
+                .isEqualTo(LoxoneAddress.Serial.throughLoxoneCloud("504F94A0EE01", "Example/1.0 (test)"));
+        ((LoxoneAccessControl) selected).close();
+    }
+
+    @Test
+    void givenLoxoneWithAUrlAndAUserAgent_whenItIsChosen_thenStartupRefusesTheUserAgent() {
+        // when / then
+        assertRefused(loxone().withProperty("courtside.access-control.loxone.url", "https://miniserver.example.org")
+                        .withProperty("courtside.access-control.loxone.user-agent", "Example/1.0"),
+                "COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT applies only to the address lookup by "
+                        + "COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL");
+    }
+
+    @ParameterizedTest
+    @MethodSource("unusableUserAgents")
+    void givenLoxoneWithAnUnusableUserAgent_whenItIsChosen_thenStartupRefusesIt(String userAgent) {
+        // when / then
+        assertRefused(loxone().withProperty("courtside.access-control.loxone.serial", "504F94A0EE01")
+                        .withProperty("courtside.access-control.loxone.user-agent", userAgent),
+                "COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT must be printable ASCII of at most 256 characters");
+    }
+
+    static Stream<String> unusableUserAgents() {
+        return Stream.of("Example/1.0\r\nX-Injected: yes", "Exa\u00e4mple/1.0", "Example\t1.0", "E".repeat(257));
     }
 
     @Test

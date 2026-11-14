@@ -16,10 +16,19 @@ sealed interface LoxoneAddress {
     record Relay(String domain, int lowestPort, int highestPort) {
     }
 
-    record Serial(String serial, URI resolver, List<Relay> relays) implements LoxoneAddress {
+    /** {@code userAgent} is sent with the address lookup only, empty for the HTTP client's own. */
+    record Serial(String serial, URI resolver, List<Relay> relays, String userAgent) implements LoxoneAddress {
+
+        Serial(String serial, URI resolver, List<Relay> relays) {
+            this(serial, resolver, relays, "");
+        }
 
         static Serial throughLoxoneCloud(String serial) {
-            return new Serial(serial, CLOUD_RESOLVER, LOXONE_RELAYS);
+            return throughLoxoneCloud(serial, "");
+        }
+
+        static Serial throughLoxoneCloud(String serial, String userAgent) {
+            return new Serial(serial, CLOUD_RESOLVER, LOXONE_RELAYS, userAgent);
         }
 
         boolean admits(URI address) {
