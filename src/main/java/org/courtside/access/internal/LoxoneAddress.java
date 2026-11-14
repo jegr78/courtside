@@ -19,6 +19,10 @@ sealed interface LoxoneAddress {
     /** {@code userAgent} is sent with the address lookup only, empty for the HTTP client's own. */
     record Serial(String serial, URI resolver, List<Relay> relays, String userAgent) implements LoxoneAddress {
 
+        public Serial {
+            userAgent = userAgent == null ? "" : userAgent;
+        }
+
         Serial(String serial, URI resolver, List<Relay> relays) {
             this(serial, resolver, relays, "");
         }
