@@ -27,7 +27,8 @@ spring:
       enabled: false
   datasource:
     hikari:
-      maximum-pool-size: 4
+      # A closure cancelling a paid booking holds four connections on one thread; two more keep a background pass from starving it.
+      maximum-pool-size: 6
       minimum-idle: 0
 
 logging:
