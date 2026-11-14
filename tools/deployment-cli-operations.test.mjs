@@ -15,6 +15,7 @@ const simulatorEnvironment = [
   `environment COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL=`,
   `environment COURTSIDE_ACCESS_CONTROL_LOXONE_URL=https://loxone-miniserver`,
   `environment COURTSIDE_ACCESS_CONTROL_LOXONE_USER=courtside-service`,
+  `environment COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT=`,
   `environment COURTSIDE_LOXONE_SIMULATOR_IMAGE=ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`,
 ];
 

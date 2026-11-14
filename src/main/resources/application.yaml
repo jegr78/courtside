@@ -169,6 +169,7 @@ courtside:
       url: ${COURTSIDE_ACCESS_CONTROL_LOXONE_URL:}
       user: ${COURTSIDE_ACCESS_CONTROL_LOXONE_USER:}
       password: ${COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD:}
+      user-agent: ${COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT:}
     insert-page-size: 100
   booking:
     series-horizon-months: 12

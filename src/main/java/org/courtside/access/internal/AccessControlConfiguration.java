@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 class AccessControlConfiguration {
 
     private static final Pattern SERIAL = Pattern.compile("[0-9A-Fa-f]{12}");
+    private static final Pattern USER_AGENT = Pattern.compile("[\\x20-\\x7E]{1,256}");
 
     @Bean
     AccessControlConnector accessControlConnector(@Value("${courtside.access-control.connector}") String connector,
@@ -68,6 +69,7 @@ class AccessControlConfiguration {
         String password = required(environment, "password", "COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD");
         String serial = loxoneProperty(environment, "serial");
         String url = loxoneProperty(environment, "url");
+        String userAgent = loxoneProperty(environment, "user-agent");
         if (!serial.isEmpty() && !url.isEmpty()) {
             throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL and "
                     + "COURTSIDE_ACCESS_CONTROL_LOXONE_URL exclude each other; set one");
@@ -78,8 +80,16 @@ class AccessControlConfiguration {
                 throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL must be the Miniserver's "
                         + "serial of 12 hexadecimal digits");
             }
-            address = LoxoneAddress.Serial.throughLoxoneCloud(serial.toUpperCase(Locale.ROOT));
+            if (!userAgent.isEmpty() && !USER_AGENT.matcher(userAgent).matches()) {
+                throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT must be printable ASCII "
+                        + "of at most 256 characters");
+            }
+            address = LoxoneAddress.Serial.throughLoxoneCloud(serial.toUpperCase(Locale.ROOT), userAgent);
         } else if (!url.isEmpty()) {
+            if (!userAgent.isEmpty()) {
+                throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_LOXONE_USER_AGENT applies only to the "
+                        + "address lookup by COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL");
+            }
             address = new LoxoneAddress.Fixed(httpsUrl(url));
         } else {
             throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone needs "

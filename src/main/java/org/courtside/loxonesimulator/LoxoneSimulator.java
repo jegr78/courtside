@@ -61,7 +61,8 @@ public final class LoxoneSimulator implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    public record Request(String server, String command, List<String> arguments, boolean authenticated) {
+    public record Request(String server, String command, List<String> arguments, boolean authenticated,
+                          String userAgent) {
 
         public boolean mutating() {
             return MUTATING.contains(command);
@@ -470,7 +471,7 @@ public final class LoxoneSimulator implements AutoCloseable {
     private void cloud(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
         record(new Request("cloud", uri.getPath().replace("/", ""), List.of(String.valueOf(uri.getQuery())),
-                false));
+                false, userAgent(exchange)));
         Integer code;
         URI target;
         String body;
@@ -490,11 +491,17 @@ public final class LoxoneSimulator implements AutoCloseable {
         }
     }
 
+    private static String userAgent(HttpExchange exchange) {
+        String agent = exchange.getRequestHeaders().getFirst("User-Agent");
+        return agent == null ? "" : agent;
+    }
+
     private void miniserver(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
         synchronized (this) {
             if (offline || exchange.getLocalAddress().getPort() == brokenPort) {
-                record(new Request(offline ? "offline" : "broken relay", uri.getPath(), List.of(), false));
+                record(new Request(offline ? "offline" : "broken relay", uri.getPath(), List.of(), false,
+                        userAgent(exchange)));
                 respond(exchange, 502, "<html><body>502 Bad Gateway</body></html>");
                 return;
             }
@@ -513,7 +520,7 @@ public final class LoxoneSimulator implements AutoCloseable {
         String command = segments.getFirst();
         List<String> arguments = segments.subList(1, segments.size());
         boolean authenticated = query.containsKey("autht");
-        record(new Request("miniserver", command, arguments, authenticated));
+        record(new Request("miniserver", command, arguments, authenticated, userAgent(exchange)));
         awaitIfHanging(command);
         Integer bareStatus;
         String rawBody;

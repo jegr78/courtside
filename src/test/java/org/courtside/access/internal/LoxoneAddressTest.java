@@ -42,6 +42,42 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAUserAgentForTheLookup_whenTheAddressIsResolvedBeforeAndAfterARelayMove_thenOnlyTheLookupsCarryIt()
+            throws IOException {
+        // given
+        LoxoneAccessControl named = connectorFor(SimulatedMiniserver.settingsBySerial(simulator, DEADLINE,
+                "Example/1.0 (test)"));
+        named.probe();
+        simulator.moveRelay();
+
+        // when
+        Throwable failed = catchThrowable(() -> named.grant(instruction(UUID.randomUUID())));
+        ProbeOutcome probed = named.probe();
+
+        // then
+        assertThat(failed).as("the old relay is gone").isInstanceOf(LoxoneFailure.class);
+        assertThat(probed).isEqualTo(new ProbeOutcome.Answered());
+        assertThat(simulator.requests()).filteredOn(request -> request.command().equals("getip"))
+                .extracting(LoxoneSimulator.Request::userAgent)
+                .containsExactly("Example/1.0 (test)", "Example/1.0 (test)");
+        assertThat(simulator.requests()).filteredOn(request -> request.server().equals("miniserver"))
+                .as("the Miniserver is asked under the client's own user agent").isNotEmpty()
+                .extracting(LoxoneSimulator.Request::userAgent).allMatch(agent -> agent.startsWith("Java-http-client"));
+    }
+
+    @Test
+    void givenNoUserAgentForTheLookup_whenACallResolvesTheAddress_thenTheLookupKeepsTheClientsOwn() {
+        // when
+        ProbeOutcome probed = bySerial.probe();
+
+        // then
+        assertThat(probed).isEqualTo(new ProbeOutcome.Answered());
+        assertThat(simulator.requests()).filteredOn(request -> request.command().equals("getip"))
+                .extracting(LoxoneSimulator.Request::userAgent).singleElement().asString()
+                .startsWith("Java-http-client");
+    }
+
+    @Test
     void givenARelayMove_whenTheOldHostRefusesConnections_thenTheNextCallResolvesTheAddressAgain()
             throws IOException {
         // given

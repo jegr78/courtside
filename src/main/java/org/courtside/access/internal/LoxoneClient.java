@@ -391,7 +391,7 @@ final class LoxoneClient implements AutoCloseable {
         if (observer != null) {
             observer.request("getip", List.of(), Map.of("snr", serial.serial()));
         }
-        HttpResponse<byte[]> response = transmit(session, "getip", lookup);
+        HttpResponse<byte[]> response = transmit(session, "getip", lookup, serial.userAgent());
         int status = response.statusCode();
         if (status == 400 || status == 404 || status == 504) {
             throw new Unresolved(status);
@@ -445,11 +445,18 @@ final class LoxoneClient implements AutoCloseable {
     }
 
     private HttpResponse<byte[]> transmit(Session session, String command, URI target) {
+        return transmit(session, command, target, "");
+    }
+
+    private HttpResponse<byte[]> transmit(Session session, String command, URI target, String userAgent) {
         Duration remaining = session.remaining(command);
-        HttpRequest request = HttpRequest.newBuilder(target)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(target)
                 .timeout(remaining)
-                .GET()
-                .build();
+                .GET();
+        if (!userAgent.isEmpty()) {
+            builder.header("User-Agent", userAgent);
+        }
+        HttpRequest request = builder.build();
         CompletableFuture<HttpResponse<byte[]>> exchange = http.sendAsync(request,
                 HttpResponse.BodyHandlers.limiting(HttpResponse.BodyHandlers.ofByteArray(), MOST_REPLY_BYTES));
         try {

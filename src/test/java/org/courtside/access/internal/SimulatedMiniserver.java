@@ -53,6 +53,12 @@ final class SimulatedMiniserver {
         return settingsBySerial(simulator, deadline, List.of(new LoxoneAddress.Relay("localhost", 1, 65_535)));
     }
 
+    static LoxoneSettings settingsBySerial(LoxoneSimulator simulator, Duration deadline, String userAgent) {
+        return new LoxoneSettings(new LoxoneAddress.Serial(LoxoneSimulator.SERIAL, simulator.resolver(),
+                List.of(new LoxoneAddress.Relay("localhost", 1, 65_535)), userAgent),
+                LoxoneSimulator.USER, LoxoneSimulator.PASSWORD, deadline);
+    }
+
     static LoxoneSettings settingsBySerial(LoxoneSimulator simulator, Duration deadline,
                                            List<LoxoneAddress.Relay> relays) {
         return new LoxoneSettings(new LoxoneAddress.Serial(LoxoneSimulator.SERIAL, simulator.resolver(), relays),

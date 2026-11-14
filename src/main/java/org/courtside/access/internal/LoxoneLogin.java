@@ -48,7 +48,7 @@ final class LoxoneLogin {
     /** A stable client uuid per namespace, so a token under another namespace never displaces this instance's. */
     static String clientUuid(String namespace, LoxoneAddress address) {
         String identity = switch (address) {
-            case LoxoneAddress.Serial(String serial, var resolver, var relays) ->
+            case LoxoneAddress.Serial(String serial, var resolver, var relays, var userAgent) ->
                     "serial:" + serial.toUpperCase(Locale.ROOT);
             case LoxoneAddress.Fixed(var url) -> "url:" + url;
         };

@@ -36,7 +36,7 @@ class LoxoneDeviceContractTest {
             throw new AssertionError("set exactly one of " + PREFIX + "SERIAL and " + PREFIX + "URL");
         }
         LoxoneAddress address = serial.isEmpty() ? new LoxoneAddress.Fixed(URI.create(url))
-                : LoxoneAddress.Serial.throughLoxoneCloud(serial.toUpperCase(Locale.ROOT));
+                : LoxoneAddress.Serial.throughLoxoneCloud(serial.toUpperCase(Locale.ROOT), optional("USER_AGENT"));
         LoxoneSettings settings = new LoxoneSettings(address, user, password, DEADLINE);
         String code = String.valueOf(10_000_000 + new SecureRandom().nextInt(90_000_000));
         List<String> secrets = new ArrayList<>(List.of(user, password, code));
