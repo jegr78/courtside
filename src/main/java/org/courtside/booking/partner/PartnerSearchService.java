@@ -85,6 +85,7 @@ public class PartnerSearchService {
         }
         return rows.offeredBeyond(accountId, personId, ParticipantCard.LOOKING_FOR_A_PARTNER, clock.instant()).stream()
                 .filter(candidate -> cardEligibility.admits(candidate.cardId(), accountId, roles))
+                .filter(candidate -> !outsiders.isOutsiderAccount(candidate.bookedBy()))
                 .map(candidate -> new OpenPlace(candidate.invitationId(), candidate.cardId(), candidate.courtIds(),
                         candidate.slot()))
                 .toList();
@@ -107,6 +108,7 @@ public class PartnerSearchService {
                 .filter(found -> found.getParticipants().stream()
                         .noneMatch(participant -> personId.equals(participant.getPersonId())))
                 .filter(found -> cardEligibility.admits(found.getCardId(), accountId, roles))
+                .filter(found -> !outsiders.isOutsiderAccount(found.getBookedBy()))
                 .orElseThrow(PartnerInvitationNotFoundException::new);
         if (!booking.fillOpenPlace(invitation.participantId(), personId)) {
             throw new PartnerInvitationNotFoundException();

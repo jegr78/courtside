@@ -5762,7 +5762,7 @@
     {
       "id": "partner-invitation-ownership",
       "title": "Partner invitation holder and taker",
-      "rule": "Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whom the card admits by role or, for a card without roles, by a membership covering today, that neither holds the booking nor already plays in it, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.",
+      "rule": "Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whom the card admits by role or, for a card without roles, by a membership covering today, that neither holds the booking nor already plays in it, on a booking whose holder is no outsider, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -5796,7 +5796,8 @@
         "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberBarredFromBooking_whenAPlaceIsPublished_thenTheyNeitherSeeNorTakeIt",
         "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenADisabledAccount_whenItTriesToTakeAPlace_thenThePlaceIsNotFound",
         "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberAlreadyPlaying_whenAPlaceInTheSameBookingIsPublished_thenTheyAreNotOfferedIt",
-        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenNoSession_whenOpenPlacesAreListed_thenTheRequestIsRefused"
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenNoSession_whenOpenPlacesAreListed_thenTheRequestIsRefused",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAPublishedPlace_whenItsHolderStaysExternalAfterTheMembershipEnds_thenNobodySeesOrTakesIt"
       ]
     },
     {
@@ -6443,7 +6444,7 @@
     {
       "id": "outsider-account-closure",
       "title": "Outsider account closure",
-      "rule": "Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.",
+      "rule": "Only an account that is an outsider and whose person has no membership period, past, running or planned, closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, a person with any other membership period, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.",
       "attributes": [
         "current-account",
         "role",
@@ -6462,7 +6463,8 @@
       "negativeTests": [
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAMember_whenTheyCloseTheirAccount_thenOnlyTheBoardMayEndIt",
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt",
-        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst"
+        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst",
+        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWhoWasOnceAMember_whenTheyCloseTheirAccount_thenTheMembershipRefusesIt"
       ]
     },
     {

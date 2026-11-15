@@ -12,6 +12,7 @@ import org.courtside.booking.series.SeriesPreview;
 import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
@@ -81,6 +82,9 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     @Autowired
     private MemberTestFixture memberships;
+
+    @Autowired
+    private CardTestFixture cards;
 
     @MockitoSpyBean
     private SecurityEventLog securityEvents;
@@ -681,6 +685,29 @@ class WaitlistTest extends AbstractIntegrationTest {
 
         // then
         assertThat(stateOf(firstEntry)).as("an account that cannot sign in cannot hold the court").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAFormerMemberWhoStayedExternal_whenTheSlotFrees_thenTheirEntryIsSkippedForTheNext() {
+        // given
+        configuration.admitExternalBookings(true);
+        UUID openCourt = cards.createBookingCard("Open court", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        UUID person = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        memberships.holdRunningMembership(person);
+        UUID account = identity.createEnabledAccount(person, "major.mary", Set.of(Role.EXTERNAL, Role.MEMBER));
+        UUID booking = book(holder, SLOT);
+        UUID formerEntry = waitlist.join(new JoinWaitlistCommand(court, openCourt, SLOT, account, person,
+                Set.of(Role.EXTERNAL, Role.MEMBER), null, List.of()));
+        UUID secondEntry = join(second, SLOT);
+        memberships.endMembership(person);
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(formerEntry)).as("an outsider cannot see the waitlist, so an offer would only hold the court")
+                .isEqualTo("SKIPPED");
         assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
     }
 

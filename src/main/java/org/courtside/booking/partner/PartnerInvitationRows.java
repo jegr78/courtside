@@ -76,7 +76,7 @@ class PartnerInvitationRows {
     // Candidates only: whether the viewer may book the card is decided by the caller.
     List<Candidate> offeredBeyond(UUID accountId, UUID personId, UUID markerCardId, Instant now) {
         return jdbc.sql("""
-                        SELECT i.id, b.card_id, min(a.starts_at) AS starts_at, max(a.ends_at) AS ends_at,
+                        SELECT i.id, b.card_id, b.booked_by, min(a.starts_at) AS starts_at, max(a.ends_at) AS ends_at,
                                array_agg(a.court_id ORDER BY a.court_id) AS court_ids
                         FROM partner_invitation i
                         JOIN booking b ON b.id = i.booking_id
@@ -85,7 +85,7 @@ class PartnerInvitationRows {
                         WHERE b.status = 'CONFIRMED' AND b.series_id IS NULL AND b.booked_by <> :accountId
                           AND NOT EXISTS (SELECT 1 FROM booking_participant p
                                           WHERE p.booking_id = b.id AND p.person_id = :personId)
-                        GROUP BY i.id, b.card_id
+                        GROUP BY i.id, b.card_id, b.booked_by
                         HAVING min(a.starts_at) > :now
                         ORDER BY min(a.starts_at), i.id
                         """)
@@ -94,7 +94,7 @@ class PartnerInvitationRows {
                 .param("markerCardId", markerCardId)
                 .param("now", Timestamp.from(now))
                 .query((row, number) -> new Candidate(row.getObject("id", UUID.class),
-                        row.getObject("card_id", UUID.class),
+                        row.getObject("card_id", UUID.class), row.getObject("booked_by", UUID.class),
                         new TimeSlot(row.getTimestamp("starts_at").toInstant(), row.getTimestamp("ends_at").toInstant()),
                         uuids(row.getArray("court_ids"))))
                 .list();
@@ -127,6 +127,6 @@ class PartnerInvitationRows {
     record Invitation(UUID id, UUID bookingId, UUID participantId) {
     }
 
-    record Candidate(UUID invitationId, UUID cardId, TimeSlot slot, List<UUID> courtIds) {
+    record Candidate(UUID invitationId, UUID cardId, UUID bookedBy, TimeSlot slot, List<UUID> courtIds) {
     }
 }

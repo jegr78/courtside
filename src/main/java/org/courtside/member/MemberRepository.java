@@ -40,6 +40,12 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     boolean isCurrentMemberAccount(@Param("accountId") UUID accountId, @Param("day") LocalDate day);
 
     @Query(nativeQuery = true, value = """
+            SELECT EXISTS (SELECT 1 FROM user_account a JOIN member m ON m.person_id = a.person_id
+                           WHERE a.id = :accountId)
+            """)
+    boolean hasMembershipOfAccount(@Param("accountId") UUID accountId);
+
+    @Query(nativeQuery = true, value = """
             SELECT a.id FROM user_account a
             WHERE a.enabled AND a.id > :after
               AND EXISTS (SELECT 1 FROM member m WHERE m.person_id = a.person_id

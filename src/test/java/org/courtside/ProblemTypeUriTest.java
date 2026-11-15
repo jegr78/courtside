@@ -93,6 +93,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:access-grant-not-found",
             "urn:courtside:error:account-anonymised",
             "urn:courtside:error:account-closure-blocked-by-booking",
+            "urn:courtside:error:account-closure-blocked-by-membership",
             "urn:courtside:error:account-closure-blocked-by-credit",
             "urn:courtside:error:account-closure-blocked-by-payment",
             "urn:courtside:error:credit-account-not-external",

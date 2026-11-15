@@ -345,7 +345,9 @@ audited as `roster.account.rolesChanged`; `EXTERNAL` stays until the board remov
 writes accepts an anonymised person. The import's membership writes add no role.
 An outsider closes its own account with `DELETE /api/account` after a re-authentication no older
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
-with `identity.account.closureNotOpen` and an outsider holding a confirmed or pending booking of its
+with `identity.account.closureNotOpen`, an outsider whose person has any membership period, a former
+member who leaves through the board like every other, with `identity.account.closureBlockedByMembership`
+read through `identity.MembershipHistory`, and an outsider holding a confirmed or pending booking of its
 own that has not ended, read through `shared.UpcomingBookings`, with
 `identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance
 is refused with `identity.account.closureBlockedByCredit` and asks the treasurer for a payout first.
@@ -819,8 +821,8 @@ reservation and an acceptance has to write a booking, so a module of its own wou
 
 When a cancellation, a cancelled series or a moved series frees the slot, the same transaction
 offers it to the first entry that passes every check a booking of the slot would pass, with the
-card, players and note named on joining. A disabled account or any refused check closes that entry
-as skipped and the next one is asked. The offer reserves the court for the club's offer window, 15
+card, players and note named on joining. A disabled account, an outsider such as a former member who
+stayed external, or any refused check closes that entry as skipped and the next one is asked. The offer reserves the court for the club's offer window, 15
 minutes unless the board changes it, and ends at the slot's start at the latest. While it stands,
 the booking write and a series move refuse the court to every other account, a new series and its
 preview treat that date as taken, and the court plan shows it as reserved without naming anybody.
@@ -855,7 +857,8 @@ A booking offers one place at most, the first slot the marker holds.
 `GET /api/partner-invitations` lists the offered places a member may take: the slot, the courts and
 the card, and nothing that names the holder, another player or the booking. A member sees a place
 only when their account is enabled, their membership type may book, the booking's card admits their
-roles, and they neither hold nor play in the booking. The court plan shows nothing new, because it
+roles, they neither hold nor play in the booking, and its holder is no outsider, so a place a member
+offered before their membership ended reaches nobody. The court plan shows nothing new, because it
 is readable without an account.
 
 Taking a place locks the booking row, checks all of the above again and rewrites the marker's
