@@ -418,8 +418,10 @@ and booking, never the reason. The account holder reads its balance and entries,
 the balance after each, under `/api/my/credit`; the treasury searches external accounts and lists
 every account with a balance under `/api/treasury/credit`. The club currency cannot change while any
 account holds a balance, any booking with an amount above zero has not ended yet or any PayPal
-refund is still `PENDING`, whose refusal would restore credit in the currency it was taken in, which
-`config.currency.creditHeld` reports.
+refund is still `PENDING`, whose refusal would restore credit in the currency it was taken in.
+`config.currency.creditHeld` reports a balance or a booking, `config.currency.refundPending` an open
+refund; one whose order another PayPal account created resolves only once those credentials are
+stored again.
 
 A booking with an amount above zero is paid from the booker's credit in the transaction that writes
 it, or by PayPal when the credit falls short. After the overlap and the rules have passed,

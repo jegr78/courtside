@@ -523,7 +523,7 @@ class PayPalRefundTest extends PayPalIntegrationTest {
     }
 
     @Test
-    void givenARefusedRefundWhileTheOrderListsAnEqualRefundMadeInPayPal_whenReturning_thenTheRefundFailsAndTheCreditReturns()
+    void givenARefusedRefundWhileTheOrderListsAWholeRefundMadeInPayPal_whenReturning_thenThatRefundIsFollowed()
             throws Exception {
         // given
         UUID booking = paidAndCancelled();
@@ -535,11 +535,30 @@ class PayPalRefundTest extends PayPalIntegrationTest {
 
                 // then
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertThat(refundRow()).as("the payer already has the whole payment back").containsEntry("status", "COMPLETED");
+        assertThat(credit.balance(johnAccount)).as("so no credit comes back on top").isZero();
+    }
+
+    @Test
+    void givenAPartRefundedInPayPalOfTheCreditedRest_whenTheRestIsRefused_thenTheCreditComesBack() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "7.50"));
+        capture().andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+        assertThat(credit.balance(johnAccount)).isEqualTo(750);
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FAILED"));
-        assertThat(refundRow()).as("a refund made in the PayPal account is not the one Courtside asked for")
+        assertThat(refundRow()).as("an earlier refund of the same amount made in PayPal is not Courtside's")
                 .containsEntry("status", "FAILED");
-        assertThat(credit.balance(johnAccount)).as("the player's money comes back as credit").isEqualTo(1500);
-        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isEqualTo(1);
+        assertThat(credit.balance(johnAccount)).as("only half the payment went back, so the rest returns as credit")
+                .isEqualTo(750);
     }
 
     @Test

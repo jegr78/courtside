@@ -180,8 +180,8 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         ClubConfiguration configuration = currentEntity();
         Changes changes = changesBetween(configuration, command);
         refuseAConflictingGrid(command, zoneId, changes);
-        if (changes.fields().contains("currency") && moneyIsHeld()) {
-            throw new CurrencyChangeBlockedByCreditException();
+        if (changes.fields().contains("currency")) {
+            refuseACurrencyChangeWhileMoneyIsHeld();
         }
         requireAnAvailableRuleSet(configuration, command.noMembershipTypeRuleSetId());
         apply(configuration, command);
@@ -393,7 +393,12 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 .findFirst();
     }
 
-    private boolean moneyIsHeld() {
-        return heldCredit.heldByAnyone() || upcomingBookings.chargedToAnyone() || paymentsInFlight.refundUnsettledForAnyone();
+    private void refuseACurrencyChangeWhileMoneyIsHeld() {
+        if (heldCredit.heldByAnyone() || upcomingBookings.chargedToAnyone()) {
+            throw CurrencyChangeBlockedByCreditException.creditHeld();
+        }
+        if (paymentsInFlight.refundUnsettledForAnyone()) {
+            throw CurrencyChangeBlockedByCreditException.refundPending();
+        }
     }
 }

@@ -419,6 +419,38 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnUnansweredRefundTheOrderListsAsCourtsides_whenTheJobRuns_thenItIsFollowedWithoutAskingAgain()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND7");
+        assertThat(PAYPAL.seen(REFUND)).as("a refund PayPal lists as Courtside's is not requested again").hasSize(1);
+    }
+
+    @Test
+    void givenAnUnansweredRefundAndAnEqualRefundMadeInPayPal_whenTheJobRuns_thenCourtsideAsksForItsOwnAgain()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedInPayPalOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+        PAYPAL.replaceReply(REFUND, 201, FakePayPal.refund("PENDING", "15.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(REFUND)).as("a refund made in the PayPal account is not taken for Courtside's")
+                .hasSize(2);
+        assertThat(refundRow()).doesNotContainEntry("refund_id", "REFUND7");
+    }
+
+    @Test
     void givenAPendingRefundAnsweredFullyRefunded_whenTheJobRuns_thenItIsCompletedWithoutRestoringCredit()
             throws Exception {
         // given

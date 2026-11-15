@@ -396,7 +396,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 "\"slotMinutes\": 30, \"currency\": \"CHF\","))
                         .with(csrf()))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:currency-change-blocked-by-credit"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:currency-change-blocked-by-credit"))
+                .andExpect(jsonPath("$.violations[0].code").value("config.currency.refundPending"));
         mockMvc.perform(get("/api/public/config")).andExpect(jsonPath("$.currency").value("EUR"));
     }
 
