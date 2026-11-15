@@ -376,6 +376,25 @@ describe("MyMessagesView", () => {
     expect(screen.queryByTestId("notifications-load-more")).toBeNull();
   });
 
+  it("given the entry the next page starts after was deleted meanwhile, when the member asks for more, then the list loads again from the start", async () => {
+    // given
+    const pages = vi.spyOn(api, "ownNotifications")
+      .mockResolvedValueOnce({ items: [confirmed], nextCursor: confirmed.id, unread: 1 })
+      .mockResolvedValueOnce({ items: [], nextCursor: null, unread: 1 })
+      .mockResolvedValueOnce({ items: [confirmed, reminderRead], nextCursor: null, unread: 1 });
+    await showList();
+    await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-load-more"));
+
+    // then
+    expect(await screen.findByTestId(`notification-${reminderRead.id}`), "an older entry is not lost behind a vanished cursor")
+      .toBeInTheDocument();
+    expect(pages).toHaveBeenLastCalledWith(undefined, 50, false);
+    expect(screen.getAllByTestId(/^notification-[0-9a-f-]+$/)).toHaveLength(2);
+  });
+
   it("given unread notifications, when the member marks all read, then the list empties, the count is zero and the focus moves to the unread tab", async () => {
     // given
     const marked = vi.spyOn(api, "markAllNotificationsRead").mockResolvedValue(undefined);

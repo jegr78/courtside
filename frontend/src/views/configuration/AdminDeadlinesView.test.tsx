@@ -85,6 +85,42 @@ describe("AdminDeadlinesView", () => {
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
+  it("given a shorter period for read messages, when saving, then the board confirms the deletion before anything is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, readNotificationDays: 30 });
+    show();
+    await screen.findByTestId("read-notification-days");
+    await userEvent.clear(screen.getByTestId("read-notification-days"));
+    await userEvent.type(screen.getByTestId("read-notification-days"), "30");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-deadlines"));
+
+    // then
+    expect(await screen.findByTestId("read-notification-days-confirm-text")).toHaveTextContent("30 days");
+    expect(changing, "nothing is written before the board confirms").not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("read-notification-days-confirm"));
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    expect(changing).toHaveBeenCalledWith(expect.objectContaining({ readNotificationDays: 30 }));
+  });
+
+  it("given a shorter period for read messages, when the board cancels the confirmation, then nothing is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig");
+    show();
+    await screen.findByTestId("read-notification-days");
+    await userEvent.clear(screen.getByTestId("read-notification-days"));
+    await userEvent.type(screen.getByTestId("read-notification-days"), "1");
+    await userEvent.click(screen.getByTestId("save-deadlines"));
+
+    // when
+    await userEvent.click(await screen.findByTestId("read-notification-days-cancel"));
+
+    // then
+    expect(screen.queryByTestId("read-notification-days-confirm"), "the question closes").toBeNull();
+    expect(changing).not.toHaveBeenCalled();
+  });
+
   it("given another page saved the club's links after this one loaded, when the deadlines are saved, then the newer links survive", async () => {
     // given
     vi.mocked(api.adminConfig)
@@ -243,7 +279,7 @@ describe("AdminDeadlinesView waitlist offer window", () => {
   });
   it("given a changed period for read messages, when saving, then the request carries the days the board chose", async () => {
     // given
-    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, readNotificationDays: 30 });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, readNotificationDays: 180 });
     show();
     const field = await screen.findByTestId("read-notification-days");
     expect(field).toHaveValue(90);
@@ -253,10 +289,10 @@ describe("AdminDeadlinesView waitlist offer window", () => {
 
     // when
     await userEvent.clear(field);
-    await userEvent.type(field, "30");
+    await userEvent.type(field, "180");
     await userEvent.click(screen.getByTestId("save-deadlines"));
 
     // then
-    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ readNotificationDays: 30 })));
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ readNotificationDays: 180 })));
   });
 });
