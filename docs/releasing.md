@@ -308,7 +308,9 @@ ancestor passed every gate, not necessarily the release commit. What verifies th
 a green full `build` of its code, which ran the test suite and every browser group, and the
 candidate's own call of the same gates on its exact digests. That build is the release commit's own
 push build, or, when the release commit changes only release-please's files, the full build of its
-parent, whose code it carries unchanged.
+parent, whose code it carries unchanged. A release branch has no push builds, so a patch release
+commit is verified by the `build` dispatched on its release branch, as the patch section below
+describes.
 
 **A branch has to name the release commit.** GitHub refuses a token without the Workflows
 permission to create a tag at a commit that no ref names when `main` has changed a workflow since,
