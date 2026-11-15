@@ -1,12 +1,5 @@
 # Changelog
 
-## [0.5.0-rc.7](https://github.com/jegr78/courtside/compare/v0.5.0-rc.6...v0.5.0-rc.7) (2026-11-15)
-
-
-### Bug fixes
-
-* offer sign-in once on the public plan ([#2025](https://github.com/jegr78/courtside/issues/2025)) ([40a5076](https://github.com/jegr78/courtside/commit/40a5076865fdeb7dc531b12c057ab9f995aa1407)), closes [#2022](https://github.com/jegr78/courtside/issues/2022)
-
 ## 0.5.0 (2026-11-09)
 
 ### Features
@@ -39,6 +32,7 @@
 
 ### Bug fixes
 
+* offer sign-in once on the public plan ([#2025](https://github.com/jegr78/courtside/issues/2025)) ([40a5076](https://github.com/jegr78/courtside/commit/40a5076865fdeb7dc531b12c057ab9f995aa1407)), closes [#2022](https://github.com/jegr78/courtside/issues/2022)
 * charge no guest fee on an external booking ([#2016](https://github.com/jegr78/courtside/issues/2016)) ([5933c44](https://github.com/jegr78/courtside/commit/5933c443fd2053097f07a7029d2b91d4bb47219f))
 * end a door hold when a closure, a disabled account or a switched-off card takes away its right ([#2015](https://github.com/jegr78/courtside/issues/2015)) ([0a2a386](https://github.com/jegr78/courtside/commit/0a2a386f71a0477caef332227cdc07c91238a00d))
 * keep a former member who stays external out of member features ([#2019](https://github.com/jegr78/courtside/issues/2019)) ([07e2a33](https://github.com/jegr78/courtside/commit/07e2a33eaf6f1810b55c57a5ac6fefc460afcc07))
