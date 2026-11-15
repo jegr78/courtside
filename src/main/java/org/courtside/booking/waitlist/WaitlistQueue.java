@@ -9,6 +9,7 @@ import org.courtside.booking.internal.CourtReservations.Reserved;
 import org.courtside.booking.internal.CourtReservedException;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.WaitlistOfferPolicy;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.TimeSlot;
@@ -35,6 +36,7 @@ class WaitlistQueue implements CourtReservations {
     private final BookingGridCoordination grid;
     private final WaitlistOfferPolicy policy;
     private final UserAccountRepository accounts;
+    private final Outsiders outsiders;
     private final ObjectProvider<BookingDrafts> drafts;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -165,9 +167,10 @@ class WaitlistQueue implements CourtReservations {
         return false;
     }
 
-    // A disabled account cannot sign in to see an offer, so it would only hold the court for nothing.
+    // A disabled account or an outsider cannot see an offer, so it would only hold the court for nothing.
     private boolean eligible(WaitlistEntry entry) {
-        Optional<UserAccount> account = accounts.findById(entry.accountId()).filter(UserAccount::isEnabled);
+        Optional<UserAccount> account = accounts.findById(entry.accountId()).filter(UserAccount::isEnabled)
+                .filter(enabled -> !outsiders.isOutsider(enabled.getId(), enabled.getRoles()));
         return account.isPresent() && drafts.getObject().isBookable(new CreateBookingCommand(List.of(entry.courtId()),
                 entry.cardId(), entry.slot(), entry.accountId(), account.get().getPerson().getId(),
                 account.get().getRoles(), entry.note(), rows.participants(entry.id()), null));

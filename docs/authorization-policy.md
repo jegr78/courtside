@@ -274,7 +274,7 @@ Negative tests: `src/test/java/org/courtside/booking/web/WaitlistControllerTest.
 
 ### Partner invitation holder and taker
 
-Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whom the card admits by role or, for a card without roles, by a membership covering today, that neither holds the booking nor already plays in it, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.
+Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whom the card admits by role or, for a card without roles, by a membership covering today, that neither holds the booking nor already plays in it, on a booking whose holder is no outsider, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.
 
 Attributes: `current-account`, `booking-owner`, `booking-card`, `allowed-role`, `current-membership`.
 
@@ -282,7 +282,7 @@ Production: `src/main/java/org/courtside/booking/partner/PartnerSearchService.ja
 
 Positive tests: `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenABookingLookingForAPartner_whenItsHolderOffersThePlace_thenTheirBookingSaysSo`, `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenAnOfferedPlace_whenAMemberListsOpenPlaces_thenTheEntryNamesNoPersonAndNoBooking`, `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenAnOfferedPlace_whenAMemberTakesIt_thenTheyPlayAndTheListIsEmpty`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAPublishedPlace_whenTheHolderWithdrawsIt_thenNobodySeesOrTakesIt`.
 
-Negative tests: `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenSomebodyElsesBooking_whenAMemberOffersOrWithdrawsItsPlace_thenTheBookingIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenSomebodyElsesBooking_whenAMemberPublishesOrWithdrawsIt_thenTheBookingIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenACardTheAccountMayNotBook_whenItsPlaceIsPublished_thenItNeitherSeesNorTakesIt`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberBarredFromBooking_whenAPlaceIsPublished_thenTheyNeitherSeeNorTakeIt`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenADisabledAccount_whenItTriesToTakeAPlace_thenThePlaceIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberAlreadyPlaying_whenAPlaceInTheSameBookingIsPublished_thenTheyAreNotOfferedIt`, `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenNoSession_whenOpenPlacesAreListed_thenTheRequestIsRefused`.
+Negative tests: `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenSomebodyElsesBooking_whenAMemberOffersOrWithdrawsItsPlace_thenTheBookingIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenSomebodyElsesBooking_whenAMemberPublishesOrWithdrawsIt_thenTheBookingIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenACardTheAccountMayNotBook_whenItsPlaceIsPublished_thenItNeitherSeesNorTakesIt`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberBarredFromBooking_whenAPlaceIsPublished_thenTheyNeitherSeeNorTakeIt`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenADisabledAccount_whenItTriesToTakeAPlace_thenThePlaceIsNotFound`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberAlreadyPlaying_whenAPlaceInTheSameBookingIsPublished_thenTheyAreNotOfferedIt`, `src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenNoSession_whenOpenPlacesAreListed_thenTheRequestIsRefused`, `src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAPublishedPlace_whenItsHolderStaysExternalAfterTheMembershipEnds_thenNobodySeesOrTakesIt`.
 
 ### Participant card availability
 
@@ -562,7 +562,7 @@ Negative tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.jav
 
 ### Outsider account closure
 
-Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.
+Only an account that is an outsider and whose person has no membership period, past, running or planned, closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, a person with any other membership period, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.
 
 Attributes: `current-account`, `role`, `current-membership`.
 
@@ -570,7 +570,7 @@ Production: `src/main/java/org/courtside/identity/internal/AccountClosure.java#c
 
 Positive tests: `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutABooking_whenTheyCloseTheirAccount_thenNothingOfThemRemainsAndTheyCannotSignIn`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWhoseBookingHasEnded_whenTheyCloseTheirAccount_thenItCloses`.
 
-Negative tests: `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAMember_whenTheyCloseTheirAccount_thenOnlyTheBoardMayEndIt`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst`.
+Negative tests: `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAMember_whenTheyCloseTheirAccount_thenOnlyTheBoardMayEndIt`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst`, `src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWhoWasOnceAMember_whenTheyCloseTheirAccount_thenTheMembershipRefusesIt`.
 
 ### Outsider membership link
 

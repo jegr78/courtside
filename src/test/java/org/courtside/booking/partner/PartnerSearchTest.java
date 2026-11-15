@@ -156,6 +156,24 @@ class PartnerSearchTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPublishedPlace_whenItsHolderStaysExternalAfterTheMembershipEnds_thenNobodySeesOrTakesIt() {
+        // given
+        UUID booking = bookLookingForAPartner(holder);
+        UUID invitation = partnerSearch.publish(booking, holder.accountId());
+        memberships.changeAccountRoles(holder.personId(), Set.of(Role.EXTERNAL, Role.MEMBER));
+
+        // when
+        memberships.endMembership(holder.personId());
+
+        // then
+        assertThat(openPlacesFor(seeker)).as("a member's name must not reach an outsider's booking").isEmpty();
+        assertThatThrownBy(() -> partnerSearch.accept(invitation, seeker.accountId(), seeker.personId(),
+                seeker.roles()))
+                .isInstanceOf(PartnerInvitationNotFoundException.class);
+        assertThat(participantsOf(booking)).noneMatch(row -> seeker.personId().equals(row.get("person_id")));
+    }
+
+    @Test
     void givenABookingWithoutTheMarker_whenItsHolderPublishes_thenThereIsNoPlaceToOffer() {
         // given
         UUID booking = book(holder, MEMBER_CARD, List.of(ParticipantSpec.card(BALL_MACHINE)));

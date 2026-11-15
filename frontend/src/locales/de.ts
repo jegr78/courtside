@@ -110,6 +110,8 @@ const de = {
   "identity.account.closureNotOpen": "Das Konto eines Mitglieds beendet nur der Vorstand.",
   "identity.account.closureBlockedByBooking": "Du hast noch eine anstehende Buchung. Storniere sie, bevor du dein Konto schließt.",
   "error.type.account-closure-blocked-by-booking": "Du hast noch eine anstehende Buchung. Storniere sie, bevor du dein Konto schließt.",
+  "identity.account.closureBlockedByMembership": "Für dich ist eine Mitgliedschaft eingetragen. Dein Konto beendet deshalb der Vorstand, wende dich bitte an ihn.",
+  "error.type.account-closure-blocked-by-membership": "Für dich ist eine Mitgliedschaft eingetragen. Dein Konto beendet deshalb der Vorstand, wende dich bitte an ihn.",
   "identity.account.closureBlockedByCredit": "Du hast noch Guthaben. Bitte den Kassenwart, es dir auszuzahlen, bevor du dein Konto schließt.",
   "error.type.account-closure-blocked-by-credit": "Du hast noch Guthaben. Bitte den Kassenwart, es dir auszuzahlen, bevor du dein Konto schließt.",
   "identity.account.closureBlockedByPayment": "Eine PayPal-Zahlung oder -Erstattung von dir ist noch nicht abgeschlossen. Schließe dein Konto, sobald PayPal sie abgeschlossen hat, oder frag den Kassenwart.",

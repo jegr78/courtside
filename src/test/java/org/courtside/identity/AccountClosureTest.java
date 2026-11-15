@@ -28,6 +28,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
 import java.util.Optional;
@@ -183,6 +184,48 @@ class AccountClosureTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-booking"));
         assertThat(identity.isAccountEnabled(johnAccount)).as("a refused closure changes nothing").isTrue();
         assertThat(identity.personName(john)).isEqualTo("John Roe");
+    }
+
+    @Test
+    void givenAnExternalPlayerWhoWasOnceAMember_whenTheyCloseTheirAccount_thenTheMembershipRefusesIt()
+            throws Exception {
+        // given
+        members.addMembershipPeriod(john, members.createMembershipType("Former members"), LocalDate.of(2024, 1, 1),
+                LocalDate.of(2025, 12, 31));
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-membership"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByMembership"));
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a former member leaves through the board").isTrue();
+        assertThat(identity.personName(john)).isEqualTo("John Roe");
+    }
+
+    @Test
+    void givenAnExternalPlayerWithAPlannedMembership_whenTheyCloseTheirAccount_thenTheMembershipRefusesIt()
+            throws Exception {
+        // given
+        members.addMembershipPeriod(john, members.createMembershipType("Next season"), LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 12, 31));
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByMembership"));
+        assertThat(identity.isAccountEnabled(johnAccount)).isTrue();
+    }
+
+    @Test
+    void givenAnExternalPlayerWithAMembershipEndedOnItsFirstDay_whenTheyCloseTheirAccount_thenItCloses()
+            throws Exception {
+        // given
+        members.assignMembership(john, members.createMembershipType("Entered by mistake"), LocalDate.of(2026, 5, 12));
+        members.endMembership(john);
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a period that never ran held no membership").isFalse();
     }
 
     @Test

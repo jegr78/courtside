@@ -3,6 +3,7 @@ package org.courtside.identity.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.MembershipHistory;
 import org.courtside.identity.Outsiders;
 import org.courtside.identity.RecentAuthentication;
 import org.courtside.identity.UserAccount;
@@ -21,6 +22,7 @@ class AccountClosure {
     private final CurrentUser currentUser;
     private final RecentAuthentication recentAuthentication;
     private final Outsiders outsiders;
+    private final MembershipHistory membershipHistory;
     private final UpcomingBookings upcomingBookings;
     private final HeldCredit heldCredit;
     private final PaymentsInFlight paymentsInFlight;
@@ -33,6 +35,9 @@ class AccountClosure {
         UserAccount account = currentUser.requireAccountForUpdate();
         if (!outsiders.isOutsider(account.getId(), account.getRoles())) {
             throw new AccountClosureNotOpenException();
+        }
+        if (membershipHistory.everHeldMembership(account.getId())) {
+            throw new AccountClosureBlockedByMembershipException();
         }
         // A refund or capture changes the ledger under this lock, so the checks below read its settled result.
         heldCredit.lock(account.getId());
