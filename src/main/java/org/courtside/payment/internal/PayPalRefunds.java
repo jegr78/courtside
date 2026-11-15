@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /** Returns a PayPal payment through PayPal and takes its credit back; PayPal is called outside any transaction. */
 @Slf4j
@@ -189,7 +190,7 @@ public class PayPalRefunds {
         PayPalCheckout.requireNoTransaction();
         Optional<PayPalClient.ListedRefund> listed;
         try {
-            listed = listedRefundOf(refund, readable);
+            listed = ownListedRefundOf(refund, readable);
         } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of refund {} could not be read before a retry: {}", refund.orderId(),
                     refund.id(), down.getMessage());
@@ -226,7 +227,7 @@ public class PayPalRefunds {
         PayPalCheckout.requireNoTransaction();
         Optional<PayPalClient.ListedRefund> listed;
         try {
-            listed = listedRefundOf(refund, readable);
+            listed = ownListedRefundOf(refund, readable);
         } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of refused refund {} could not be read: {}", refund.orderId(), refund.id(),
                     down.getMessage());
@@ -239,10 +240,22 @@ public class PayPalRefunds {
         return answered(listed.map(found -> follow(refund, found)).orElseGet(() -> failed(refund, null, reason)));
     }
 
+    /** The refund PayPal lists as the one Courtside requested under this refund's id, unless it failed. */
+    private Optional<PayPalClient.ListedRefund> ownListedRefundOf(StoredRefund refund,
+                                                                  PayPalClient.Credentials readable) {
+        return listedRefundOf(refund, readable, listed -> refund.id().toString().equals(listed.customId()));
+    }
+
     /** The full-amount refund PayPal lists on the order that has not failed, a completed one first. */
     private Optional<PayPalClient.ListedRefund> listedRefundOf(StoredRefund refund,
                                                                PayPalClient.Credentials readable) {
+        return listedRefundOf(refund, readable, listed -> true);
+    }
+
+    private Optional<PayPalClient.ListedRefund> listedRefundOf(StoredRefund refund, PayPalClient.Credentials readable,
+                                                               Predicate<PayPalClient.ListedRefund> eligible) {
         return client.getOrder(readable, refund.orderId()).refunds().stream()
+                .filter(eligible)
                 .filter(listed -> listed.amountMinor() == refund.amountMinor()
                         && listed.currency().equals(refund.currency().getCurrencyCode()))
                 .filter(listed -> !listed.status().equals("FAILED") && !listed.status().equals("CANCELLED"))

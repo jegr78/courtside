@@ -642,6 +642,23 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnOrderOfTheNewCredentials_whenTheFormerOnesAreRetired_thenItStaysOpenWithItsCourt() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        jdbc.sql("UPDATE paypal_order SET client_fingerprint = encode(sha256(convert_to('client-other', 'UTF8')), 'hex')")
+                .update();
+
+        // when
+        saveSettings("client-other", "SANDBOX", true, "paypal-secret-other").andExpect(status().isOk());
+
+        // then
+        assertThat(orderStatus()).as("retiring one PayPal account ends only that account's orders")
+                .isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
+    }
+
+    @Test
     void givenAnUnattemptedOrderAndPayPalDown_whenTheEnvironmentChanges_thenItIsVoidedAndTheCourtIsFree()
             throws Exception {
         // given

@@ -19,6 +19,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +39,9 @@ final class FakePayPal {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final List<Seen> seen = new CopyOnWriteArrayList<>();
+    static final String OWN_REFUND = "${ownRefund}";
+    private static final Pattern CUSTOM_ID = Pattern.compile("\"custom_id\":\"([^\"]+)\"");
+
     private final Map<String, Deque<Reply>> replies = new ConcurrentHashMap<>();
     private final Map<String, CountDownLatch> held = new ConcurrentHashMap<>();
     private final Map<String, CountDownLatch> firstHeld = new ConcurrentHashMap<>();
@@ -71,7 +76,7 @@ final class FakePayPal {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
-            byte[] answer = reply.body().getBytes(StandardCharsets.UTF_8);
+            byte[] answer = reply.body().replace(OWN_REFUND, lastRefundCustomId()).getBytes(StandardCharsets.UTF_8);
             try {
                 exchange.sendResponseHeaders(reply.status(), answer.length);
                 exchange.getResponseBody().write(answer);
@@ -150,6 +155,13 @@ final class FakePayPal {
         return seen(route).getFirst();
     }
 
+    // PayPal lists a refund with the custom id Courtside sent, so the fake echoes the last one it received.
+    private String lastRefundCustomId() {
+        return seen.stream().filter(request -> request.route().startsWith("POST ") && request.route().endsWith("/refund"))
+                .map(request -> CUSTOM_ID.matcher(request.body())).filter(Matcher::find)
+                .map(found -> found.group(1)).reduce((first, last) -> last).orElse("none");
+    }
+
     private synchronized Reply next(String route) {
         Deque<Reply> queue = replies.get(route);
         if (queue == null || queue.isEmpty()) return new Reply(404, "{}", Duration.ZERO);
@@ -164,9 +176,19 @@ final class FakePayPal {
     }
 
     static String refundedOrder(UUID booking, String refundId, String status, String value) {
+        return listingRefund(booking, refundId, status, value, ",\"custom_id\":\"" + OWN_REFUND + "\"");
+    }
+
+    /** An order listing a refund made in the PayPal account itself, which carries no custom id. */
+    static String refundedInPayPalOrder(UUID booking, String refundId, String status, String value) {
+        return listingRefund(booking, refundId, status, value, "");
+    }
+
+    private static String listingRefund(UUID booking, String refundId, String status, String value, String customId) {
         String refunded = order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00"))
                 .replace("}]}}],\"links\"", "}],\"refunds\":[{\"id\":\"" + refundId + "\",\"status\":\"" + status
-                        + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}}]}}],\"links\"");
+                        + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}" + customId
+                        + "}]}}],\"links\"");
         assertThat(refunded).as("the refund is listed in the order").contains("\"refunds\":[{\"id\":\"" + refundId);
         return refunded;
     }

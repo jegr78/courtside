@@ -8,6 +8,9 @@ public interface PaymentsInFlight {
     /** Both answers come from one statement, so a payment settling in between cannot fall through the gap. */
     MoneyHeld moneyHeldBy(UUID accountId);
 
+    /** Whether any PayPal refund is unanswered, whose reversal would book credit in the currency it was taken in. */
+    boolean refundUnsettledForAnyone();
+
     record MoneyHeld(boolean credit, boolean payment) {
     }
 }

@@ -417,7 +417,8 @@ goes below zero. `credit.entry.recorded` names the account, the entry, its kind,
 and booking, never the reason. The account holder reads its balance and entries, most recent first with
 the balance after each, under `/api/my/credit`; the treasury searches external accounts and lists
 every account with a balance under `/api/treasury/credit`. The club currency cannot change while any
-account holds a balance or any booking with an amount above zero has not ended yet, which
+account holds a balance, any booking with an amount above zero has not ended yet or any PayPal
+refund is still `PENDING`, whose refusal would restore credit in the currency it was taken in, which
 `config.currency.creditHeld` reports.
 
 A booking with an amount above zero is paid from the booker's credit in the transaction that writes
@@ -545,7 +546,7 @@ answers clearly, and in every case at the earlier of 24 hours past its deadline 
 booking's start.
 
 Changing the client id or environment, switching PayPal off or removing the credentials ends the
-open orders of the former credentials after the change commits. An order without a capture attempt
+open orders the former credentials created after the change commits. An order without a capture attempt
 cannot have moved money, so it is voided and its booking released without asking PayPal. One with
 an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
@@ -578,7 +579,8 @@ The return runs in three steps, and no database lock is held across the PayPal c
    conditions, appends a `PAYPAL_REFUND` entry of minus the amount, stores a `PENDING`
    `paypal_refund` and audits `payment.paypal.refund.requested`.
 2. Courtside asks PayPal to refund the capture in full, with the `paypal_refund` id as
-   `PayPal-Request-Id`, so a repeated request cannot refund twice.
+   `PayPal-Request-Id`, so a repeated request cannot refund twice, and as the refund's `custom_id`,
+   which PayPal lists with the refund on the order.
 3. The answer is recorded under the order's row lock. A completed refund becomes `COMPLETED` with
    PayPal's refund id, is audited as `payment.paypal.refunded` and tells the payer that the amount
    went back to PayPal; this message kind cannot be declined. A refund PayPal holds as pending keeps
@@ -587,7 +589,8 @@ The return runs in three steps, and no database lock is held across the PayPal c
 Credit comes back only on a clear refusal: a 4xx answer to the refund request other than 401, 403,
 409, 429, a duplicate or in-progress request and an already fully refunded capture, or a refund
 PayPal reports as `FAILED` or `CANCELLED`. Before restoring it Courtside reads the order, and follows
-a refund of the full amount PayPal lists there instead. A refusal marks the refund `FAILED` with
+a refund of the full amount PayPal lists there under this refund's `custom_id` instead; a refund made
+in the PayPal account carries none and is never taken for Courtside's own. A refusal marks the refund `FAILED` with
 PayPal's reason, appends a `PAYPAL_REFUND_REVERSED` of the amount and is audited as
 `payment.paypal.refundFailed`. `FAILED` is final for the order; the treasurer then pays out by hand.
 Neither a closure nor the retention run anonymises an account while a refund of it is `PENDING`, so
@@ -600,7 +603,7 @@ refund `PENDING` with its credit taken.
 
 `PayPalReconciliation` also resolves `PENDING` refunds older than five minutes, up to 50 per run and
 longest unchecked first: one without a PayPal refund id is requested again with the same request id
-after reading the order, one with an id is read at PayPal, and the answer is recorded as in step 3.
+after reading the order for a refund under its `custom_id`, one with an id is read at PayPal, and the answer is recorded as in step 3.
 These calls count towards the run's stop after three unanswered reads. A pending refund whose order
 another PayPal account created than the one now stored is not asked again and stays pending. A
 refund that stays unclear

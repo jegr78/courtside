@@ -121,7 +121,8 @@ public class PayPalCheckout {
     /** Settles or voids every open order of credentials that are no longer active; an unreadable one stays open. */
     void retire(PayPalClient.Credentials retired) {
         requireNoTransaction();
-        for (StoredOrder stored : orders.open(retired.environment())) {
+        for (StoredOrder stored : orders.open(retired.environment()).stream()
+                .filter(open -> PayPalCredentials.created(open, retired)).toList()) {
             try {
                 Settlement settlement = stored.captureAttemptedAt() == null
                         ? voided(stored, VoidReason.CREDENTIALS_CHANGED)

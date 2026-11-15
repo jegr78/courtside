@@ -25,6 +25,7 @@ import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubCurrency;
 import org.courtside.shared.HeldCredit;
+import org.courtside.shared.PaymentsInFlight;
 import org.courtside.shared.UpcomingBookings;
 import org.courtside.config.ExternalBookings;
 import org.courtside.config.ClubTimeZone;
@@ -63,6 +64,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     private final ApplicationEventPublisher events;
     private final HeldCredit heldCredit;
     private final UpcomingBookings upcomingBookings;
+    private final PaymentsInFlight paymentsInFlight;
 
     public ClubConfigurationSnapshot current() {
         return ClubConfigurationSnapshot.from(currentEntity());
@@ -392,6 +394,6 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     private boolean moneyIsHeld() {
-        return heldCredit.heldByAnyone() || upcomingBookings.chargedToAnyone();
+        return heldCredit.heldByAnyone() || upcomingBookings.chargedToAnyone() || paymentsInFlight.refundUnsettledForAnyone();
     }
 }

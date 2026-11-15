@@ -2,6 +2,7 @@ package org.courtside.config.web;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.credit.testfixture.CreditTestFixture;
+import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,9 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private CreditTestFixture credit;
+
+    @Autowired
+    private PaymentTestFixture payments;
 
     private MockMvc mockMvc;
 
@@ -365,6 +369,25 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         // given
         UUID person = identity.createPerson("John", "Roe", "john.roe@example.org");
         credit.credit(identity.createEnabledAccount(person, "roe.john", Set.of(Role.EXTERNAL)), 1500);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"currency\": \"CHF\","))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:currency-change-blocked-by-credit"));
+        mockMvc.perform(get("/api/public/config")).andExpect(jsonPath("$.currency").value("EUR"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPayPalRefundNotYetAnswered_whenTheClubChangesItsCurrency_thenTheChangeWaitsForIt() throws Exception {
+        // given
+        UUID person = identity.createPerson("John", "Roe", "john.roe@example.org");
+        payments.pendingRefund(identity.createEnabledAccount(person, "roe.john", Set.of(Role.EXTERNAL)),
+                UUID.randomUUID());
 
         // when / then
         mockMvc.perform(put("/api/admin/config")

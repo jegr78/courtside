@@ -224,7 +224,8 @@ class PayPalClientTest {
 
         // then
         Seen sent = seenFor("POST /v2/payments/captures/CAP1/refund");
-        assertThat(sent.body()).isEqualTo("{}");
+        assertThat(sent.body()).as("the refund names itself, so the order lists it as Courtside's")
+                .isEqualTo("{\"custom_id\":\"" + requestId + "\"}");
         assertThat(sent.header("PayPal-Request-Id")).isEqualTo(requestId.toString());
         assertThat(refund.id()).isEqualTo("REF1");
         assertThat(refund.status()).isEqualTo("COMPLETED");
@@ -337,15 +338,17 @@ class PayPalClientTest {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
         reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds("[{\"id\":\"REF1\",\"status\":\"COMPLETED\","
-                + "\"amount\":{\"currency_code\":\"EUR\",\"value\":\"12.34\"}}]"));
+                + "\"amount\":{\"currency_code\":\"EUR\",\"value\":\"12.34\"},\"custom_id\":\"own-refund\"},"
+                + "{\"id\":\"REF2\",\"status\":\"COMPLETED\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"1.00\"}}]"));
         PayPalClient client = client(Duration.ofSeconds(2));
 
         // when
         PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
 
         // then
-        assertThat(order.refunds())
-                .containsExactly(new PayPalClient.ListedRefund("REF1", "COMPLETED", 1234, "EUR"));
+        assertThat(order.refunds()).as("a refund made in the PayPal account carries no custom id")
+                .containsExactly(new PayPalClient.ListedRefund("REF1", "COMPLETED", 1234, "EUR", "own-refund"),
+                        new PayPalClient.ListedRefund("REF2", "COMPLETED", 100, "EUR", ""));
     }
 
     @Test
