@@ -124,7 +124,7 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
 async function capturePage(page: Page, label: string, opts: { expectedStatuses?: number[]; subject?: Locator }) {
   const info = test.info();
   trace(label, "start");
-  const profile = info.project.metadata as { locale: "de" | "en"; phone: boolean };
+  const profile = info.project.metadata as { locale: "de" | "en"; phone: boolean; engine: string };
   const idle = await inCapturePhase(page, "settle", () => page.waitForLoadState("networkidle", { timeout: 3_000 }).then(() => true, () => false));
   let settled = await inCapturePhase(page, "settle", () => settle(page));
   await inCapturePhase(page, "settle", () => page.evaluate(() => document.fonts?.ready)).catch(() => undefined);
@@ -153,7 +153,7 @@ async function capturePage(page: Page, label: string, opts: { expectedStatuses?:
   const record = watched.get(page) ?? { console: [], consoleEvents: [], httpErrors: [] };
   const httpErrors = record.httpErrors.filter((error) => !(opts.expectedStatuses ?? []).includes(error.status));
   appendFileSync(runPath("metrics.jsonl"), JSON.stringify({
-    project: info.project.name, persona, test: info.title, label, url: page.url(), at: new Date().toISOString(),
+    project: info.project.name, engine: profile.engine, persona, test: info.title, label, url: page.url(), at: new Date().toISOString(),
     shot: `${base}.png`, networkIdle: idle, settled, ...measured, smallTargets: profile.phone ? measured.smallTargets : [],
     axe, console: record.console.splice(0), consoleEvents: record.consoleEvents.splice(0), httpErrors
   }) + "\n");
