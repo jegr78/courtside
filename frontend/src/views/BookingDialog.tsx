@@ -245,7 +245,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const guestCount = guestNames.filter((name) => name.trim()).length;
   const chosenPlayers = 1 + selectedMembers.length + guestCount + participantCardIds.filter(Boolean).length;
   const requiredPlayers = requiredFor(chosenCard, chosenPlayers);
-  const guestFee = !waitlist && currency && chosenCard && chosenCard.guestFeeMinor > 0 && guestCount > 0 ? {
+  const guestFee = !waitlist && memberFeatures && currency && chosenCard && chosenCard.guestFeeMinor > 0 && guestCount > 0 ? {
     count: guestCount,
     fee: formatMinor(chosenCard.guestFeeMinor, i18n.language, currency),
     total: formatMinor(chosenCard.guestFeeMinor * guestCount, i18n.language, currency)

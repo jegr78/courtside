@@ -366,6 +366,20 @@ it("given a card priced at 12.99 per hour for external players, when an external
   expect(screen.getByTestId("booking-amount")).toHaveTextContent("Betrag: 19,49 €");
 });
 
+it("given a card that charges guests, when an external player enters a guest, then no guest fee is stated", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(500)]);
+  render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false} currency="EUR"
+    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+
+  // when
+  await enterGuests("Jane Doe");
+
+  // then
+  expect(screen.queryByTestId("booking-guest-fee"), "an external booker owes no guest fee").not.toBeInTheDocument();
+});
+
 it("given a card priced for external players, when a member opens the dialog, then no amount is shown", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor: 1299 }]);
