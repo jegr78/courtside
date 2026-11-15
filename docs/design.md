@@ -723,7 +723,9 @@ so switching the card back on reopens nothing without a new check-in; at a cance
 displacement of its booking; and at the booking's end at the latest. A court closed that day or out of
 service neither starts a hold nor keeps a running one open, even when the closure begins while the
 booking already runs and so displaces nothing; a start there answers `409` with
-`urn:courtside:error:door-hold-court-closed`. A move ends it even when the new
+`urn:courtside:error:door-hold-court-closed`. Once such a court is open again, a hold that still runs
+opens its doors again. Only holds on bookings that are not over end; a row a past booking left
+unended stays as it was. A move ends it even when the new
 slot still covers the old window, because the doors may no longer be the booking's. A hold also
 runs only while its booking is confirmed and it began inside the booking's current window, so
 nothing has to run when a booking ends. Starting and ending are audited as `booking.doorHold.started` and

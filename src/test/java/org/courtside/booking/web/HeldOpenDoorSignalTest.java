@@ -338,6 +338,22 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAHoldNobodyEndedOnABookingThatIsOver_whenTheCardOrTheHoldersAccountIsSwitchedOff_thenItsRowStays() {
+        // given
+        UUID over = bookings.insertBookingThatHasStarted(courtOne, campCard,
+                new TimeSlot(NOW.minus(90, ChronoUnit.MINUTES), NOW.minus(30, ChronoUnit.MINUTES)), trainer);
+        bookings.holdDoorsOpenAt(over, trainer, NOW.minus(80, ChronoUnit.MINUTES));
+
+        // when
+        cards.letBookingsHoldDoorsOpen(campCard, false);
+        members.setAccountEnabled(trainerPerson, false);
+
+        // then
+        assertThat(endedHoldsOf(over)).as("a hold that ended with its booking is history, not rewritten").isZero();
+        assertThat(auditedEndsOf(over)).as("nothing that already ended is audited as ending now").isZero();
+    }
+
+    @Test
     void givenAnInactiveGate_whenPolled_thenItIsNotAnswered() throws Exception {
         // given
         facility.deactivateAccessPoint(gateTwo);
@@ -349,6 +365,11 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     private UUID runningTraining(UUID court) {
         return bookings.insertBookingThatHasStarted(court, campCard,
                 new TimeSlot(NOW.minus(30, ChronoUnit.MINUTES), NOW.plus(30, ChronoUnit.MINUTES)), trainer);
+    }
+
+    private long auditedEndsOf(UUID booking) {
+        return jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'booking.doorHold.ended' AND subject_id = :id")
+                .param("id", booking).query(Long.class).single();
     }
 
     private long endedHoldsOf(UUID booking) {

@@ -8488,7 +8488,8 @@ paths:
         A card that offers no hold answers `409` with `urn:courtside:error:door-hold-not-offered`;
         outside the window or on a booking that is not confirmed the answer is `409` with
         `urn:courtside:error:door-hold-closed`; a court closed today or out of service answers `409`
-        with `urn:courtside:error:door-hold-court-closed`; a hold somebody else runs answers `409` with `urn:courtside:error:door-hold-already-running`. Starting again while one's own hold runs
+        with `urn:courtside:error:door-hold-court-closed`; a hold somebody else runs answers `409` with
+        `urn:courtside:error:door-hold-already-running`. Starting again while one's own hold runs
         changes nothing. A booking the caller may not act on answers `404` like one that does not
         exist.
       security:

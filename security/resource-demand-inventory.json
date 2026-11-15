@@ -872,12 +872,15 @@
     {
       "id": "door-hold-ends",
       "kind": "ordinary",
-      "rationale": "Each runs inside the cancelling, moving, displacing, withdrawing or closing transaction. Cancelling, moving and displacing end the unended door holds of the bookings they name with one indexed update; closing an account ends the unended holds it runs with one update over the partial index of unended holds; a withdrawal locks and loads its one booking, reads its running hold and the holder's account, and ends that hold when it is the withdrawing player's own. Each publishes one audit event per hold it ended and calls nothing outside the process.",
+      "rationale": "Each runs inside the cancelling, moving, displacing, withdrawing, closing, disabling or card-changing transaction. Cancelling, moving and displacing end the unended door holds of the bookings they name with one indexed update; closing or disabling an account ends the unended holds it runs, and deactivating a card or switching its holds off ends the unended holds on its bookings, each with one update over the partial index of unended holds of the last two days, limited to bookings not yet over; a card change that keeps its holds changes nothing; a withdrawal locks and loads its one booking, reads its running hold and the holder's account, and ends that hold when it is the withdrawing player's own. Each publishes one audit event per hold it ended and calls nothing outside the process.",
       "entryPoints": [
         "DoorHoldService#on(AccountClosed)",
         "DoorHoldService#on(BookingCancelled)",
         "DoorHoldService#on(BookingDisplaced)",
+        "DoorHoldService#on(CardEvent.BookingCardAvailabilityChanged)",
+        "DoorHoldService#on(CardEvent.BookingCardChanged)",
         "DoorHoldService#on(ParticipantWithdrew)",
+        "DoorHoldService#on(RosterEvent.AccountAvailabilityChanged)",
         "DoorHoldService#on(SeriesCancelled)",
         "DoorHoldService#on(SeriesMoved)"
       ]
