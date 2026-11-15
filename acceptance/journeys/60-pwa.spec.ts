@@ -1,5 +1,5 @@
 import { test, expect } from "../lib/fixtures";
-import { capture, setPersona } from "../lib/checks";
+import { capture, setPersona, whileOffline } from "../lib/checks";
 import { openAs } from "../lib/session";
 import { addPartner, bookAt, cancelQuietly, projectName } from "../lib/journey";
 
@@ -54,17 +54,17 @@ test("given a booking of my own, when offline and reloaded, then My bookings sti
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId(`booking-${ids[0]}`), "product: the new booking is listed online").toBeVisible();
     await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => undefined);
-    // when
-    await page.context().setOffline(true);
-    await page.goto("/my-bookings");
-    // then
-    await expect(page.getByTestId(`booking-${ids[0]}`), "product: the booking is shown offline").toBeVisible();
-    await capture(page, "offline-my-bookings");
-    await page.getByTestId("court-plan-link").click();
-    await expect(page.getByTestId("court-plan-view")).toBeVisible();
-    await capture(page, "offline-plan");
+    await whileOffline(page, async () => {
+      // when
+      await page.goto("/my-bookings");
+      // then
+      await expect(page.getByTestId(`booking-${ids[0]}`), "product: the booking is shown offline").toBeVisible();
+      await capture(page, "offline-my-bookings");
+      await page.getByTestId("court-plan-link").click();
+      await expect(page.getByTestId("court-plan-view")).toBeVisible();
+      await capture(page, "offline-plan");
+    });
   } finally {
-    await page.context().setOffline(false);
     await cancelQuietly(page, ids);
     await page.context().close();
   }

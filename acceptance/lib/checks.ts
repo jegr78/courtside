@@ -10,11 +10,12 @@ export async function measure(page: Page, locale: "de" | "en") {
 }
 
 type ConsoleEvent = {
-  kind: "console" | "pageerror"; message: string; observedAt: string; phase: string;
+  kind: "console" | "pageerror"; message: string; observedAt: string; phase: string; offline: boolean;
   stack: string | null; location: { url: string; lineNumber: number; columnNumber: number } | null;
 };
-type Watched = { console: string[]; consoleEvents: ConsoleEvent[]; phase: string; capture: string | null;
-  httpErrors: { url: string; status: number }[] };
+type ProblemResponse = { url: string; status: number; type: string };
+type Watched = { console: string[]; consoleEvents: ConsoleEvent[]; phase: string; capture: string | null; offline: boolean;
+  httpErrors: { url: string; status: number }[]; problemResponses: ProblemResponse[]; reading: Set<Promise<void>> };
 const watched = new WeakMap<Page, Watched>();
 const personaOf = new WeakMap<Page, string>();
 const counters = new Map<string, number>();
@@ -26,12 +27,13 @@ const slug = (title: string) => title.replace(/^given |^when /, "").replace(/[^a
 export function watch(page: Page) {
   const existing = watched.get(page);
   if (existing) return existing;
-  const record: Watched = { console: [], consoleEvents: [], phase: "journey", capture: null, httpErrors: [] };
+  const record: Watched = { console: [], consoleEvents: [], phase: "journey", capture: null, offline: false, httpErrors: [],
+    problemResponses: [], reading: new Set() };
   const owner = { project: test.info().project.name, test: test.info().title };
   watched.set(page, record);
   const add = (kind: ConsoleEvent["kind"], text: string, stack?: string, location?: ConsoleEvent["location"]) => {
     const message = text.replaceAll(PASSWORD, "<redacted>");
-    const event: ConsoleEvent = { kind, message, observedAt: new Date().toISOString(), phase: record.phase,
+    const event: ConsoleEvent = { kind, message, observedAt: new Date().toISOString(), phase: record.phase, offline: record.offline,
       stack: stack ? safeStack(stack) : null,
       location: location?.url ? { ...location, url: sourcePath(location.url) } : null };
     record.console.push(message);
@@ -45,7 +47,13 @@ export function watch(page: Page) {
   });
   page.on("pageerror", (error) => add("pageerror", `pageerror: ${error.message}`, error.stack));
   page.on("response", (response) => {
-    if (response.status() >= 400) record.httpErrors.push({ url: response.url(), status: response.status() });
+    if (response.status() < 400) return;
+    record.httpErrors.push({ url: response.url(), status: response.status() });
+    if (!response.headers()["content-type"]?.startsWith("application/problem+json")) return;
+    const reading = response.json().then((body) => {
+      if (typeof body?.type === "string") record.problemResponses.push({ url: sourcePath(response.url()), status: response.status(), type: body.type });
+    }, () => undefined).finally(() => record.reading.delete(reading));
+    record.reading.add(reading);
   });
   return record;
 }
@@ -74,16 +82,32 @@ export async function inCapturePhase<T>(page: Page, phase: string, operation: ()
   try { return await operation(); } finally { if (record) record.phase = previous; }
 }
 
+const answersRead = async (record: Watched | undefined) => { if (record) await Promise.allSettled([...record.reading]); };
+
 // Another site's console and failed requests belong to that site: they stay in browser-events.jsonl but no capture counts them.
 export async function offSite<T>(page: Page, operation: () => Promise<T>): Promise<T> {
   const record = watched.get(page);
-  const before = record ? { console: record.console.length, events: record.consoleEvents.length, http: record.httpErrors.length } : undefined;
+  await answersRead(record);
+  const before = record ? { console: record.console.length, events: record.consoleEvents.length, http: record.httpErrors.length,
+    problems: record.problemResponses.length } : undefined;
   try { return await inCapturePhase(page, "off-site", operation); } finally {
+    await answersRead(record);
     if (record && before) {
       record.console.splice(before.console);
       record.consoleEvents.splice(before.events);
       record.httpErrors.splice(before.http);
+      record.problemResponses.splice(before.problems);
     }
+  }
+}
+
+export async function whileOffline<T>(page: Page, operation: () => Promise<T>): Promise<T> {
+  const record = watch(page);
+  await page.context().setOffline(true);
+  record.offline = true;
+  try { return await operation(); } finally {
+    await page.context().setOffline(false);
+    record.offline = false;
   }
 }
 
@@ -150,12 +174,14 @@ async function capturePage(page: Page, label: string, opts: { expectedStatuses?:
   const axe = (await inCapturePhase(page, "axe", () => new AxeBuilder({ page }).analyze())).violations
     .map((violation) => ({ id: violation.id, impact: violation.impact, nodes: violation.nodes.length,
       targets: violation.nodes.slice(0, 5).map((node) => node.target.join(" ")) }));
-  const record = watched.get(page) ?? { console: [], consoleEvents: [], httpErrors: [] };
+  await answersRead(watched.get(page));
+  const record = watched.get(page) ?? { console: [], consoleEvents: [], httpErrors: [], problemResponses: [] };
   const httpErrors = record.httpErrors.filter((error) => !(opts.expectedStatuses ?? []).includes(error.status));
   appendFileSync(runPath("metrics.jsonl"), JSON.stringify({
     project: info.project.name, engine: profile.engine, persona, test: info.title, label, url: page.url(), at: new Date().toISOString(),
     shot: `${base}.png`, networkIdle: idle, settled, ...measured, smallTargets: profile.phone ? measured.smallTargets : [],
-    axe, console: record.console.splice(0), consoleEvents: record.consoleEvents.splice(0), httpErrors
+    axe, console: record.console.splice(0), consoleEvents: record.consoleEvents.splice(0), httpErrors,
+    problemResponses: record.problemResponses.splice(0)
   }) + "\n");
   record.httpErrors.length = 0;
 }
