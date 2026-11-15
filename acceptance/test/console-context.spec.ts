@@ -2,8 +2,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { capture, inCapturePhase, watch } from "../lib/checks";
+import { capture, inCapturePhase, watch, whileOffline } from "../lib/checks";
 import { runPath } from "../lib/context";
+import { collectFindings } from "../report/findings.mjs";
 
 const rows = (name: string) => readFileSync(runPath(name), "utf8").trim().split("\n").map((line) => JSON.parse(line));
 
@@ -134,4 +135,35 @@ test("given a page already watched, when diagnostics attach again, then one brow
   // then
   const events = rows("browser-events.jsonl").filter((event) => event.test === info.title && event.project === info.project.name && event.message === message);
   expect(events, "reusing the watcher cannot duplicate browser observations").toHaveLength(1);
+});
+
+test("given refused and failed requests, when a capture collects them, then only the password prompt and the offline journey are expected", async ({ page, browserName }, info) => {
+  // given
+  const problem = (type: string) => ({ status: 403, contentType: "application/problem+json", body: JSON.stringify({ type, status: 403 }) });
+  await page.route("https://club.example.org/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/refunds") return route.fulfill(problem("urn:courtside:error:recent-authentication-required"));
+    if (path === "/api/roster") return route.fulfill(problem("urn:courtside:error:forbidden"));
+    if (path.startsWith("/api/")) return route.abort("failed");
+    return route.fulfill({ contentType: "text/html", body: '<html lang="en"><title>Plan</title><main><h1>Plan</h1></main></html>' });
+  });
+  watch(page);
+  await page.goto("https://club.example.org/plan");
+  const call = (path: string) => page.evaluate((target) => fetch(target).then(() => undefined, () => undefined), path);
+
+  // when
+  await call("/api/refunds");
+  await call("/api/roster");
+  await call("/api/session");
+  await whileOffline(page, () => call("/api/source"));
+  await capture(page, "refused-requests");
+
+  // then
+  const metric = rows("metrics.jsonl").filter((row) => row.test === info.title && row.project === info.project.name).at(-1);
+  const where = (finding: { where: unknown[]; detail: string }) => finding.where.map(() => finding.detail);
+  const findings = collectFindings({ metrics: [metric], failures: [] }).flatMap(where);
+  const remaining = [expect.stringMatching(/status of 403/), ...(browserName === "webkit" ? [] : [expect.stringMatching(/net::ERR_FAILED/)])];
+  expect(findings, `only the other 403 and, where the engine logs one, the online failure remain, from ${JSON.stringify(metric.consoleEvents)}`).toEqual(remaining);
+  const journal = rows("browser-events.jsonl").filter((event) => event.test === info.title && event.project === info.project.name);
+  for (const event of metric.consoleEvents) expect(journal, "the offline flag is journalled when received").toContainEqual(expect.objectContaining(event));
 });
