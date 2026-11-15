@@ -1157,6 +1157,38 @@ test("given a stylesheet refusal, when collected, then only WebKit's own screens
   assert.deepEqual([unauthenticated("chromium"), unauthenticated(undefined)], [[], []], "a 401 stays expected in every engine");
 });
 
+const REAUTH = "urn:courtside:error:recent-authentication-required";
+const refusedMessage = "Failed to load resource: the server responded with a status of 403 ()";
+const unreachable = "Failed to load resource: net::ERR_FAILED";
+const observed = (message, path, extra = {}) => ({ kind: "console", message, observedAt: "2030-03-11T09:00:00.000Z", phase: "journey", stack: null,
+  location: path ? { url: path, lineNumber: 0, columnNumber: 0 } : null, offline: false, ...extra });
+
+test("given 403 responses, when collected, then only the one that asks for the password again is expected", () => {
+  // given
+  const problems = [{ url: "https://club.example.org/api/treasury/refunds", status: 403, type: REAUTH },
+    { url: "https://club.example.org/api/admin/roster", status: 403, type: "urn:courtside:error:forbidden" }];
+  const keys = (paths, rows = problems) => collectFindings({ metrics: [row({ console: paths.map(() => refusedMessage),
+    consoleEvents: paths.map((path) => observed(refusedMessage, path)), problemResponses: rows })], failures: [] }).flatMap((finding) => finding.where.map(() => finding.key));
+
+  // then
+  assert.deepEqual(keys(["/api/treasury/refunds"]), [], "a request for recent authentication is the password prompt");
+  assert.equal(keys(["/api/admin/roster"]).length, 1, "a 403 with another problem type stays a finding");
+  assert.equal(keys(["/api/treasury/refunds", "/api/treasury/refunds"]).length, 1, "one re-authentication answer explains one console message");
+  assert.equal(keys(["/api/treasury/refunds"], []).length, 1, "a 403 whose answer was not read stays a finding");
+  assert.equal(keys([null]).length, 1, "a 403 without a source cannot be matched");
+  assert.equal(collectFindings({ metrics: [row({ console: [refusedMessage], problemResponses: problems })], failures: [] }).length, 1, "a row without observations fails closed");
+});
+
+test("given failed requests, when collected, then only those while the journey took the network away are expected", () => {
+  // when
+  const keys = (extra) => collectFindings({ metrics: [row({ console: [unreachable], consoleEvents: [observed(unreachable, "/api/session", extra)] })], failures: [] }).map((finding) => finding.key);
+
+  // then
+  assert.deepEqual(keys({ offline: true }), [], "the offline journey cut the network on purpose");
+  assert.equal(keys({}).length, 1, "a failed request to the instance while online stays a finding");
+  assert.equal(keys({ offline: undefined }).length, 1, "an observation that does not say it was offline fails closed");
+});
+
 test("given browser context with unsafe markup, when the report is rendered, then reviewers see escaped phase and source evidence", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-console-report-"));
