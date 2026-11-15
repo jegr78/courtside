@@ -2,6 +2,7 @@ package org.courtside.dataexchange;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.dataexchange.internal.ExternalReference;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportPreview;
@@ -54,6 +55,7 @@ public class ExecutionService {
     private final SourceLock sourceLock;
     private final ObjectMapper json;
     private final Clock clock;
+    private final ClubTimeZone clubTimeZone;
 
     @Transactional(timeoutString = DatabaseDeadlines.REPORT)
     public RunOutcome execute(UUID previewId, boolean confirmRemovals, UUID accountId) {
@@ -66,6 +68,7 @@ public class ExecutionService {
         requireSameActor(preview, executingAccountId);
         requireExecutable(preview, now);
         PreviewContent content = contentOf(preview);
+        requireTheYearItsBandsWereTakenIn(preview, content, now);
         requireNobodyChangedSince(preview, content);
         requireConfirmedRemovals(preview, confirmRemovals);
 
@@ -102,6 +105,18 @@ public class ExecutionService {
             throw new ImportPreviewExpiredException("import.preview.expired",
                     Map.of("previewId", preview.getId().toString()));
         }
+    }
+
+    private void requireTheYearItsBandsWereTakenIn(ImportPreview preview, PreviewContent content, Instant now) {
+        boolean banded = content.changeSet().changes().stream().anyMatch(ResolvedChangeSet.PersonChange::typeFromAgeBand);
+        if (banded && yearOf(preview.getCreatedAt()) != yearOf(now)) {
+            throw new ImportPreviewSupersededException("import.preview.yearChanged",
+                    Map.of("previewId", preview.getId().toString()));
+        }
+    }
+
+    private int yearOf(Instant instant) {
+        return instant.atZone(clubTimeZone.zoneId()).getYear();
     }
 
     private static void requireSameActor(ImportPreview preview, UUID accountId) {

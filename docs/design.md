@@ -1314,7 +1314,8 @@ leaves the row out, and otherwise it fails as a row.
 A mapped category value can also be split by age. A source then maps a `BIRTH_DATE` column, which it
 can never own, and lists for that value lower age bounds starting at 0, each naming a membership
 type. The age is the one a person reaches in the current calendar year of the club time zone, so a
-type changes with the first import of a year. `SnapshotParser` turns the cell into the band's type
+type changes with the first import of a year, and a preview that set a type from a band in an earlier year is refused
+at execution with `import.preview.yearChanged` under `import-preview-superseded`. `SnapshotParser` turns the cell into the band's type
 while it reads the row: the import reads a birth date only to select a type and stores nothing of
 it, neither in the change set, the stored preview, the fingerprint, the audit nor a log. A row
 without a readable date in `DD.MM.YYYY`, `YYYY-MM-DD` or `YYYY` form takes the value's own mapping

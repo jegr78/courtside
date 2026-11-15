@@ -1663,6 +1663,7 @@ const de = {
   "import.preview.actorMismatch": "Nur das Konto, das diese Vorschau geprüft hat, kann sie ausführen. Falls die Verantwortung gewechselt hat, lade die Datei mit diesem Konto erneut hoch.",
   "import.preview.stale": "Seit dieser Vorschau hat sich jemand geändert, den sie ändern würde. Bitte die Datei erneut hochladen und die neue Vorschau prüfen.",
   "import.preview.superseded": "Für diese Quelle gibt es eine neuere Vorschau oder diese Vorschau wurde bereits ausgeführt.",
+  "import.preview.yearChanged": "Diese Vorschau stammt aus dem Vorjahr. Ein Altersband richtet sich nach dem Alter im laufenden Jahr, deshalb muss die Vorschau neu erstellt werden.",
   "import.preview.expired": "Diese Vorschau ist abgelaufen und kann nicht mehr ausgeführt werden. Bitte lade die Datei erneut hoch.",
   "import.removals.needConfirmation": "Dieser Import würde mehr Mitgliedschaften beenden, als die Quelle ohne Bestätigung erlaubt.",
   "request.uploadTooLarge": "Die hochgeladene Datei überschreitet die erlaubte Größe.",
