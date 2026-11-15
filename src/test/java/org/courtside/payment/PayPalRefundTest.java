@@ -198,7 +198,8 @@ class PayPalRefundTest extends PayPalIntegrationTest {
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.failureReason").doesNotExist());
         FakePayPal.Seen request = PAYPAL.only(REFUND);
-        assertThat(request.body()).as("an empty body refunds the whole capture").isEqualTo("{}");
+        assertThat(request.body()).as("a body without an amount refunds the whole capture and names the refund")
+                .isEqualTo("{\"custom_id\":\"" + refundRow().get("id") + "\"}");
         assertThat(request.header("PayPal-Request-Id")).as("a retried refund cannot refund twice")
                 .isEqualTo(refundRow().get("id").toString());
         assertThat(credit.balance(johnAccount)).isZero();
@@ -519,6 +520,64 @@ class PayPalRefundTest extends PayPalIntegrationTest {
         assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
         assertThat(audit("payment.paypal.refunded", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("refundId").asString()).isEqualTo("REFUND7"));
+    }
+
+    @Test
+    void givenARefusedRefundWhileTheOrderListsAWholeRefundMadeInPayPal_whenReturning_thenThatRefundIsFollowed()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedInPayPalOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertThat(refundRow()).as("the payer already has the whole payment back").containsEntry("status", "COMPLETED");
+        assertThat(credit.balance(johnAccount)).as("so no credit comes back on top").isZero();
+    }
+
+    @Test
+    void givenAPartRefundedInPayPalOfTheCreditedRest_whenTheRestIsRefused_thenTheCreditComesBack() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, FakePayPal.partlyRefundedOrder(booking, "COMPLETED", "7.50"));
+        capture().andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+        assertThat(credit.balance(johnAccount)).isEqualTo(750);
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+        assertThat(refundRow()).as("an earlier refund of the same amount made in PayPal is not Courtside's")
+                .containsEntry("status", "FAILED");
+        assertThat(credit.balance(johnAccount)).as("only half the payment went back, so the rest returns as credit")
+                .isEqualTo(750);
+    }
+
+    @Test
+    void givenACaptureFullyRefundedByARefundMadeInPayPal_whenReturning_thenThatRefundIsRecordedCompleted()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, FULLY_REFUNDED);
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedInPayPalOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertThat(refundRow()).as("the money already reached the payer, whoever sent it")
+                .containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND7");
+        assertThat(credit.balance(johnAccount)).isZero();
     }
 
     @ParameterizedTest(name = "{0} with an order read answering {1}")

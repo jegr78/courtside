@@ -419,6 +419,38 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
     }
 
     @Test
+    void givenAnUnansweredRefundTheOrderListsAsCourtsides_whenTheJobRuns_thenItIsFollowedWithoutAskingAgain()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND7");
+        assertThat(PAYPAL.seen(REFUND)).as("a refund PayPal lists as Courtside's is not requested again").hasSize(1);
+    }
+
+    @Test
+    void givenAnUnansweredRefundAndAnEqualRefundMadeInPayPal_whenTheJobRuns_thenCourtsideAsksForItsOwnAgain()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedInPayPalOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+        PAYPAL.replaceReply(REFUND, 201, FakePayPal.refund("PENDING", "15.00"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(REFUND)).as("a refund made in the PayPal account is not taken for Courtside's")
+                .hasSize(2);
+        assertThat(refundRow()).doesNotContainEntry("refund_id", "REFUND7");
+    }
+
+    @Test
     void givenAPendingRefundAnsweredFullyRefunded_whenTheJobRuns_thenItIsCompletedWithoutRestoringCredit()
             throws Exception {
         // given
@@ -639,6 +671,23 @@ class PayPalReconciliationTest extends PayPalIntegrationTest {
         assertThat(entries(booking)).isEmpty();
         assertThat(audit("payment.paypal.voided", booking)).singleElement().satisfies(payload ->
                 assertThat(payload.get("reason").asString()).isEqualTo("CREDENTIALS_CHANGED"));
+    }
+
+    @Test
+    void givenAnOrderOfTheNewCredentials_whenTheFormerOnesAreRetired_thenItStaysOpenWithItsCourt() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        jdbc.sql("UPDATE paypal_order SET client_fingerprint = encode(sha256(convert_to('client-other', 'UTF8')), 'hex')")
+                .update();
+
+        // when
+        saveSettings("client-other", "SANDBOX", true, "paypal-secret-other").andExpect(status().isOk());
+
+        // then
+        assertThat(orderStatus()).as("retiring one PayPal account ends only that account's orders")
+                .isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
     }
 
     @Test

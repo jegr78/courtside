@@ -453,6 +453,7 @@ const en: Record<keyof typeof de, string> = {
   "config.slotMinutes.futureBookingConflict": "At least one future booking does not fit the selected {{slotMinutes}}-minute grid.",
   "config.timeZone.futureBookingConflict": "The time zone cannot be changed while future bookings exist.",
   "config.currency.creditHeld": "The currency cannot be changed while an account holds credit. Pay out every balance first.",
+  "config.currency.refundPending": "The currency cannot be changed while a PayPal refund is still open. Check the open refunds under Credit accounts.",
   "error.type.currency-change-blocked-by-credit": "The currency cannot be changed while an account holds credit. Pay out every balance first.",
   "config.slotMinutes.openingHoursConflict": "At least one opening-hours window does not fit the selected {{slotMinutes}}-minute grid.",
   "facility.openingHours.effectiveInPast": "New opening hours take effect on {{today}} or later.",

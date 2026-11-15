@@ -451,6 +451,7 @@ const de = {
   "config.slotMinutes.futureBookingConflict": "Mindestens eine zukünftige Buchung passt nicht in das gewählte {{slotMinutes}}-Minuten-Raster.",
   "config.timeZone.futureBookingConflict": "Die Zeitzone kann nicht geändert werden, solange zukünftige Buchungen vorhanden sind.",
   "config.currency.creditHeld": "Die Währung kann nicht geändert werden, solange ein Konto Guthaben hat. Zahle zuerst jedes Guthaben aus.",
+  "config.currency.refundPending": "Die Währung kann nicht geändert werden, solange eine PayPal-Rückzahlung offen ist. Prüfe die offenen Rückzahlungen unter Guthabenkonten.",
   "error.type.currency-change-blocked-by-credit": "Die Währung kann nicht geändert werden, solange ein Konto Guthaben hat. Zahle zuerst jedes Guthaben aus.",
   "config.slotMinutes.openingHoursConflict": "Mindestens eine Öffnungszeit passt nicht in das gewählte {{slotMinutes}}-Minuten-Raster.",
   "facility.openingHours.effectiveInPast": "Neue Öffnungszeiten gelten frühestens ab {{today}}.",

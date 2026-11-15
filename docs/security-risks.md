@@ -105,6 +105,18 @@ can cause this from outside: it needs the application killed during a handover, 
 avoids by letting the outbox finish within its stop grace. The bound is one repeat per crash and
 message. Reconsider if the relay offers an idempotent submission keyed by `Message-ID`.
 
+## Money PayPal returns after a capture can come back a second time as credit
+
+Courtside reads a PayPal order until it is captured and never again. When the money goes back to
+the payer afterwards, through a refund in the club's PayPal account, a dispute or a chargeback, and
+the external player then cancels before play, the cancellation still credits the booking amount,
+because it reads the credit ledger and not PayPal. The player can spend that credit or ask for a
+payout, so the club pays the amount twice. It needs an action outside Courtside: the treasurer
+refunding in the PayPal account, or the payer opening a dispute and winning it before the booking
+starts. The bound is one booking amount per such payment, and the treasurer sees every dispute and
+refund in the PayPal account and can correct the balance with a payout entry. Reconsider when
+Courtside receives PayPal webhooks, or when a cancellation already reads the capture at PayPal.
+
 ## A cached booking page keeps an access code until the next refresh
 
 The installed app keeps the member's last bookings page and the first page of bookings they play in

@@ -114,8 +114,8 @@ public class PayPalClient {
     }
 
     Refund refundCapture(Credentials credentials, String captureId, UUID requestId) {
-        Answer answer = api(credentials, "POST", capturePath(captureId) + "/refund", "{}", requestId.toString(),
-                PayPalDeadline.NONE);
+        Answer answer = api(credentials, "POST", capturePath(captureId) + "/refund",
+                "{\"custom_id\":\"" + requestId + "\"}", requestId.toString(), PayPalDeadline.NONE);
         if (answer.status() == 422 && hasIssue(answer.body(), FULLY_REFUNDED)) {
             throw new PayPalCaptureFullyRefundedException();
         }
@@ -321,7 +321,8 @@ public class PayPalClient {
                 throw new PayPalUnavailableException("PayPal listed refund " + read.id()
                         + " without a readable amount");
             }
-            listed.add(new ListedRefund(read.id(), read.status(), amount.minor(), amount.currency()));
+            listed.add(new ListedRefund(read.id(), read.status(), amount.minor(), amount.currency(),
+                    text(refund, "custom_id")));
         }
         return List.copyOf(listed);
     }
@@ -503,7 +504,8 @@ public class PayPalClient {
         }
     }
 
-    public record ListedRefund(String id, String status, int amountMinor, String currency) {
+    /** {@code customId} is the refund id Courtside sent, empty on a refund made in the PayPal account itself. */
+    public record ListedRefund(String id, String status, int amountMinor, String currency, String customId) {
     }
 
 }

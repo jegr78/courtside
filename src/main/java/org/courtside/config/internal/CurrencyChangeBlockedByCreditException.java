@@ -13,8 +13,16 @@ class CurrencyChangeBlockedByCreditException extends CodedDomainFailure {
             "Credit held in the current currency",
             "Pay out every credit balance before changing the club currency");
 
-    CurrencyChangeBlockedByCreditException() {
-        super("config.currency.creditHeld", Map.of());
+    private CurrencyChangeBlockedByCreditException(String code) {
+        super(code, Map.of());
+    }
+
+    static CurrencyChangeBlockedByCreditException creditHeld() {
+        return new CurrencyChangeBlockedByCreditException("config.currency.creditHeld");
+    }
+
+    static CurrencyChangeBlockedByCreditException refundPending() {
+        return new CurrencyChangeBlockedByCreditException("config.currency.refundPending");
     }
 
     @Override

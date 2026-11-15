@@ -30,4 +30,13 @@ class PayPalPaymentsInFlight implements PaymentsInFlight {
                 .param("account", accountId)
                 .query((rs, row) -> new MoneyHeld(rs.getBoolean("credit"), rs.getBoolean("payment"))).single();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean refundUnsettledForAnyone() {
+        return jdbc.sql("""
+                        SELECT EXISTS (SELECT 1 FROM paypal_refund WHERE status = 'PENDING')
+                        """)
+                .query(Boolean.class).single();
+    }
 }
