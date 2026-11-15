@@ -1142,6 +1142,21 @@ test("given repeated observer warnings in different phases, when collected, then
   assert.equal(findings[0].severity, "minor", "capture-phase warnings still require an assessment");
 });
 
+test("given a stylesheet refusal, when collected, then only WebKit's own screenshot style is expected", () => {
+  // given
+  const refusal = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
+
+  // when
+  const keys = (engine) => collectFindings({ metrics: [row({ engine, console: [refusal] })], failures: [] }).map((finding) => finding.key);
+
+  // then
+  assert.deepEqual(keys("webkit"), [], "Playwright's WebKit screenshotter inserts a style the policy refuses");
+  assert.equal(keys("chromium").length, 1, "the same refusal in another engine is a stylesheet of the page");
+  assert.equal(keys(undefined).length, 1, "a row that does not name its engine cannot be waved through");
+  const unauthenticated = (engine) => collectFindings({ metrics: [row({ engine, console: ["Failed to load resource: the server responded with a status of 401 ()"] })], failures: [] });
+  assert.deepEqual([unauthenticated("chromium"), unauthenticated(undefined)], [[], []], "a 401 stays expected in every engine");
+});
+
 test("given browser context with unsafe markup, when the report is rendered, then reviewers see escaped phase and source evidence", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-console-report-"));

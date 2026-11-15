@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 
 const AXE_GRADE = { critical: "major", serious: "minor", moderate: "hint", minor: "hint" };
-const EXPECTED_CONSOLE = [/Refused to apply a stylesheet/, /status of 401/, /status of 409/];
+// Playwright's WebKit screenshotter appends `<style>body {}</style>`, which `style-src 'self'` refuses.
+const EXPECTED_CONSOLE = [{ pattern: /Refused to apply a stylesheet/, engine: "webkit" }, { pattern: /status of 401/ }, { pattern: /status of 409/ }];
+const expected = (message, engine) => EXPECTED_CONSOLE.some((entry) => entry.pattern.test(message) && (entry.engine ?? engine) === engine);
 const pathOf = (url) => { try { return new URL(url).pathname; } catch { return url; } };
 const normalise = (text) => text
   .replace(/https?:\/\/[^/\s]+/g, "")
@@ -31,7 +33,7 @@ export function collectFindings({ metrics, failures }) {
         title: `axe ${violation.id} (${violation.impact})`, detail: violation.targets.slice(0, 3).join(" | ") }, where);
     }
     const observations = [...(row.consoleEvents ?? [])];
-    for (const message of row.console.filter((candidate) => !EXPECTED_CONSOLE.some((pattern) => pattern.test(candidate)))) {
+    for (const message of row.console.filter((candidate) => !expected(candidate, row.engine))) {
       const index = observations.findIndex((event) => event.message === message);
       const observation = index >= 0 ? observations.splice(index, 1)[0] : null;
       add(findingKey.console(message), { severity: "minor", kind: "console", title: `Console error: ${normalise(message).slice(0, 140)}`, detail: message.slice(0, 300) },
