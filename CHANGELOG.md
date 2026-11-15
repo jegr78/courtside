@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0-rc.7](https://github.com/jegr78/courtside/compare/v0.5.0-rc.6...v0.5.0-rc.7) (2026-11-15)
+
+
+### Bug fixes
+
+* offer sign-in once on the public plan ([#2025](https://github.com/jegr78/courtside/issues/2025)) ([40a5076](https://github.com/jegr78/courtside/commit/40a5076865fdeb7dc531b12c057ab9f995aa1407)), closes [#2022](https://github.com/jegr78/courtside/issues/2022)
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
