@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api, type Dependant, type GuardianGrant, type Notification, type PersonalBooking } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationContext } from "../club/registry";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { DependantsView } from "./DependantsView";
 
@@ -111,6 +112,23 @@ describe("DependantsView", () => {
     expect(within(entry).queryByRole("link"), "the dependant's own pages are not the guardian's").toBeNull();
     expect(mark).not.toHaveBeenCalled();
     expect(api.dependantBookings).not.toHaveBeenCalled();
+  });
+
+  it("given reading messages is granted and the club configuration failed, when the page opens, then the messages show the failure with a retry", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["READ_MESSAGES"])]);
+    const load = vi.fn();
+    render(<MemoryRouter><ClubConfigurationContext value={{ error: "The club settings are unavailable.", changed: () => undefined, load, refresh: () => undefined }}>
+      <DependantsView />
+    </ClubConfigurationContext></MemoryRouter>);
+    const messages = await screen.findByTestId("dependant-messages");
+
+    // when
+    await userEvent.click(await within(messages).findByTestId("retry-load"));
+
+    // then
+    expect(load, "the failure offers to load the configuration again").toHaveBeenCalled();
+    expect(within(messages).queryByRole("status"), "nothing is left loading").toBeNull();
   });
 
   it("given reading messages is granted, when the guardian opens the read list, then it is fetched by state and stays read only", async () => {

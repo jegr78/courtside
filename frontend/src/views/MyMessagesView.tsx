@@ -118,10 +118,13 @@ export function NotificationLists({ testId, revision = 0, timeZone, fetchPage, m
     const requested = generation.current;
     setLoading(state);
     try {
-      const page = await fetchPage(state === "read", cursor);
+      const following = await fetchPage(state === "read", cursor);
+      // An empty page after a cursor means its entry was deleted meanwhile, so the list starts over.
+      const restart = cursor !== undefined && following.items.length === 0;
+      const page = restart ? await fetchPage(state === "read") : following;
       if (requested !== generation.current) return;
       const store = state === "read" ? setRead : setUnread;
-      store((current) => ({ items: cursor ? [...(current?.items ?? []), ...page.items] : page.items, next: page.nextCursor ?? undefined }));
+      store((current) => ({ items: cursor && !restart ? [...(current?.items ?? []), ...page.items] : page.items, next: page.nextCursor ?? undefined }));
       setUnreadCount(page.unread);
     } catch (cause) {
       if (requested === generation.current) failed(cause);

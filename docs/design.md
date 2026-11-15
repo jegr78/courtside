@@ -1711,7 +1711,10 @@ My messages lists unread and read entries separately behind a small bar, and bot
 until the member opens one; a guardian granted to read a dependant's messages sees the same split
 without marking anything. A read entry is deleted by an hourly job once the club's period,
 `readNotificationDays`, 90 by default and at most ten years, has passed since it was read. An unread
-entry is never deleted, so nothing disappears that the member has not seen.
+entry is never deleted, so nothing disappears that the member has not seen. A board that shortens
+the period confirms first that read entries older than the new one go within the hour. When the
+entry a list continues after has been deleted meanwhile, the next page comes back empty and the list
+loads again from its start, so no older entry is skipped.
 
 Members choose optional message kinds and, separately, channels. No opt-out means enabled. A
 declined kind reaches the account on no channel, the centre included. A declined email channel

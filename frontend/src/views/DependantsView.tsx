@@ -174,7 +174,7 @@ function DependantBookings({ dependant, cancels, refused, acted }: {
 
 function DependantMessages({ dependant, refused, revision }: { dependant: Dependant; refused: (cause: unknown) => Promise<void>; revision: number }) {
   const { t } = useTranslation();
-  const { club } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const name = nameOf(dependant);
   const { message: error, report, clear } = useReportedFailure();
   const [retry, setRetry] = useState(0);
@@ -191,7 +191,8 @@ function DependantMessages({ dependant, refused, revision }: { dependant: Depend
     <h3 id="dependant-messages-title" className="text-xl font-semibold">{t("dependants.messages")}</h3>
     <p className="text-muted text-sm">{t("dependants.messagesReadOnly", { name })}</p>
     {error && <LoadFailure message={error} retry={() => setRetry((count) => count + 1)} />}
-    {!club && !error && <LoadingStatus />}
+    {clubError && !error && <LoadFailure message={clubError} retry={loadClub} />}
+    {!club && !error && !clubError && <LoadingStatus />}
     {club && <NotificationLists testId="dependant-notifications" revision={revision + retry} timeZone={club.timeZone}
       fetchPage={fetchPage} failed={failed} emptyUnread={t("dependants.noUnreadMessages", { name })}
       emptyRead={t("dependants.noReadMessages", { name })} />}

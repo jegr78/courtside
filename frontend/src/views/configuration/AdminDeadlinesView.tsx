@@ -3,7 +3,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ClubConfig } from "../../api/client";
 import { Alert } from "../../components/Alert";
+import { Button } from "../../components/Button";
 import { LoadFailure } from "../../components/LoadFailure";
+import { Modal } from "../../components/Modal";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
 import { TextField } from "../../components/TextField";
 import { useReportedFailure } from "../../failures/useReportedFailure";
@@ -15,8 +17,9 @@ import { ownedFields, useClubConfigForm } from "./clubConfigForm";
 export function AdminDeadlinesView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const { message: error, report, clear } = useReportedFailure();
-  const { config, unsaved, loaded, applied, change, discard, save: send } = useClubConfigForm(configurationChanged, ownedFields.deadlines);
+  const { config, saved, unsaved, loaded, applied, change, discard, save: send } = useClubConfigForm(configurationChanged, ownedFields.deadlines);
   const [pending, setPending] = useState(false);
+  const [confirmingDeletion, setConfirmingDeletion] = useState(false);
   const [success, setSuccess] = useState<string>();
   const [loadAttempt, retryLoad] = useRetry();
 
@@ -34,9 +37,18 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
     };
   }, [loadAttempt, loaded, report]);
 
-  async function save(event: FormEvent) {
+  function save(event: FormEvent) {
     event.preventDefault();
     if (!config || pending) return;
+    const shortened = saved?.readNotificationDays !== undefined && config.readNotificationDays !== undefined
+      && config.readNotificationDays < saved.readNotificationDays;
+    if (shortened) setConfirmingDeletion(true);
+    else void persist();
+  }
+
+  async function persist() {
+    if (!config) return;
+    setConfirmingDeletion(false);
     setPending(true);
     clear();
     setSuccess(undefined);
@@ -57,7 +69,7 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <form id="deadlines-form" noValidate onSubmit={(event) => void save(event)} className="grid gap-5">
+        <form id="deadlines-form" noValidate onSubmit={save} className="grid gap-5">
           <div data-testid="deadline-fields" className="grid gap-5 [&>*]:min-w-0 md:grid-cols-2 md:items-start">
             <TextField data-testid="new-account-credential-hours" type="number" min={1} max={168} className="max-w-32" label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => change({ newAccountCredentialHours: Number(event.target.value) })} />
             <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={168} className="max-w-32" label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => change({ passwordResetCredentialHours: Number(event.target.value) })} />
@@ -81,6 +93,18 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
           <SaveBar id="deadlines" subject={t("admin.deadlines.title")} saveTestId="save-deadlines" form="deadlines-form"
                    unsaved={unsaved} pending={pending} discard={discard} />
         </form>
+        {confirmingDeletion && <Modal labelledBy="read-notification-days-confirm-title" closed={() => setConfirmingDeletion(false)}>
+          <div className="grid gap-4">
+            <h2 id="read-notification-days-confirm-title" className="text-2xl font-bold">{t("admin.deadlines.shortenTitle")}</h2>
+            <p data-testid="read-notification-days-confirm-text">{t("admin.deadlines.shortenConfirm", { days: config.readNotificationDays })}</p>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="primary" data-testid="read-notification-days-confirm" type="button"
+                onClick={() => void persist()}>{t("admin.deadlines.shortenAction")}</Button>
+              <Button variant="secondary" data-testid="read-notification-days-cancel" type="button"
+                onClick={() => setConfirmingDeletion(false)}>{t("admin.deadlines.shortenCancel")}</Button>
+            </div>
+          </div>
+        </Modal>}
         <AttendancePolicySection />
       </>}
   </section>;
