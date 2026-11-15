@@ -154,9 +154,10 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
                 command.cardId(), command.bookedBy(), command.note(), clock.instant());
         command.courtIds().forEach(courtId -> booking.allocate(courtId, command.slot()));
         BookingCard card = cards.findCard(command.cardId()).orElseThrow();
-        GuestFee guestFee = new GuestFee(card.getGuestFeeMinor(), currency.currency());
+        boolean outsider = outsiders.isOutsider(command.bookedBy(), command.callerRoles());
+        GuestFee guestFee = new GuestFee(outsider ? 0 : card.getGuestFeeMinor(), currency.currency());
         slots.forEach(slot -> booking.addParticipant(slot, guestFee));
-        if (outsiders.isOutsider(command.bookedBy(), command.callerRoles())) {
+        if (outsider) {
             booking.charge(BookingAmount.forDuration(card.getExternalPriceMinor() * command.courtIds().size(),
                     command.slot().duration(), currency.currency()));
         }

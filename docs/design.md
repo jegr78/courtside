@@ -378,7 +378,9 @@ slots leaves out the searching person, because the booker already holds a slot. 
 count do not track participants.
 
 A booking card carries a guest fee per guest place, zero by default, in the currency of the club
-configuration. Amounts are stored and exchanged in the currency's minor unit, cents for the euro.
+configuration. It applies to bookings by members; a guest place on an external booker's booking is
+stamped with a fee of zero, because the card's price for external bookers already covers the court,
+and the booking dialog states no guest fee to them. Amounts are stored and exchanged in the currency's minor unit, cents for the euro.
 The minor unit is the one ISO 4217 states, as Java's `Currency` reports it; the club configuration
 carries its digits as `currencyFractionDigits`, and the client reads and writes amounts in the club
 currency with them instead of the browser's own count, which differs for currencies such as the

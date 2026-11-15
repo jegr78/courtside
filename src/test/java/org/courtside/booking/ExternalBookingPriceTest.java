@@ -147,6 +147,26 @@ class ExternalBookingPriceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACardChargingGuests_whenAnExternalAccountBooksWithAGuest_thenTheGuestCarriesNoFee() {
+        // given
+        UUID doubles = cards.createDoublesCardForGuestsAllowing("Guest doubles", Set.of(Role.EXTERNAL, Role.MEMBER));
+        cards.priceForExternals(doubles, 1500);
+        cards.chargeGuests(doubles, 500);
+        credit.credit(externalAccount, 2000);
+
+        // when
+        UUID booking = bookingService.create(new CreateBookingCommand(List.of(courtId), doubles,
+                new TimeSlot(TOMORROW_AFTERNOON, TOMORROW_AFTERNOON.plus(Duration.ofHours(1))), externalAccount,
+                externalPerson, Set.of(Role.EXTERNAL), null, List.of(ParticipantSpec.guest("Mary Major")), null));
+
+        // then
+        assertThat(amount(booking)).as("the hourly price covers the court").containsEntry("amount_minor", 1500);
+        assertThat(jdbc.sql("SELECT guest_fee_minor FROM booking_participant WHERE booking_id = :id AND kind = 'GUEST'")
+                .param("id", booking).query(Integer.class).single())
+                .as("the guest fee is owed by members who bring guests, not by an external booker").isZero();
+    }
+
+    @Test
     void givenTheClubChargingInFrancs_whenAnExternalAccountBooks_thenTheAmountCarriesTheClubCurrency() {
         // given
         config.chargeIn("CHF");
