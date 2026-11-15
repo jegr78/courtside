@@ -303,7 +303,9 @@ must read 0 within three minutes. Ask your electrician as well whether the door 
 an hour and longer, because some door openers are built for short pulses only. If it may not, the
 hold unlocks the bell instead of holding the door open: a second **AND** takes the door's AND on I1
 and the Code Touch's **Bell** output on I2 and goes to I2 of the OR in place of the first. During the
-booking a press on the bell then opens the door as long as a code does. Other controllers
+booking a press on the bell then opens the door as long as a code does. Because a press is shorter
+than the pulse an active lock needs to unlock, an **Off-Delay** with the Code Touch's `Don`, about
+3 seconds, sits between the second AND and the OR. Other controllers
 without such a status compare `expires` with their clock. Poll at least once a minute. Before you
 wire a lock to these lines, issue a new key and poll over
 HTTPS with certificate verification only: whoever can change the answer on its way can otherwise

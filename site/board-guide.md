@@ -317,7 +317,9 @@ Türausgang eine Stunde und länger eingeschaltet bleiben darf, denn manche Tür
 kurze Impulse gebaut. Darf er das nicht, hält das Offenhalten die Tür nicht offen, sondern schaltet
 die Klingel frei: Ein zweites **UND** bekommt das UND der Tür an I1 und den Ausgang **Bell** des Code
 Touch an I2 und geht statt des ersten an I2 des ODER. Während der Buchung öffnet dann ein Druck auf
-die Klingel die Tür so lange wie ein Code. Andere Steuerungen ohne einen solchen Status vergleichen `expires` mit ihrer
+die Klingel die Tür so lange wie ein Code. Weil ein Tastendruck kürzer ist als der Impuls, den ein
+aktives Schloss zum Entriegeln braucht, kommt zwischen das zweite UND und das ODER eine
+**Ausschaltverzögerung** mit derselben Dauer wie `Don` des Code Touch, etwa 3 Sekunden. Andere Steuerungen ohne einen solchen Status vergleichen `expires` mit ihrer
 Uhr. Fragt mindestens einmal pro Minute ab. Bevor ihr ein Schloss an diese Zeilen hängt,
 stellt einen neuen Schlüssel aus und fragt nur noch über HTTPS mit Zertifikatsprüfung ab: Wer die
 Antwort unterwegs verändern kann, hält die Tür sonst offen. Die Codes funktionieren auch ohne dieses
