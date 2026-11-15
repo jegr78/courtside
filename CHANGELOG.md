@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0-rc.6](https://github.com/jegr78/courtside/compare/v0.5.0-rc.5...v0.5.0-rc.6) (2026-11-15)
+
+
+### Bug fixes
+
+* charge no guest fee on an external booking ([#2016](https://github.com/jegr78/courtside/issues/2016)) ([5933c44](https://github.com/jegr78/courtside/commit/5933c443fd2053097f07a7029d2b91d4bb47219f))
+* end a door hold when a closure, a disabled account or a switched-off card takes away its right ([#2015](https://github.com/jegr78/courtside/issues/2015)) ([0a2a386](https://github.com/jegr78/courtside/commit/0a2a386f71a0477caef332227cdc07c91238a00d))
+* keep a former member who stays external out of member features ([#2019](https://github.com/jegr78/courtside/issues/2019)) ([07e2a33](https://github.com/jegr78/courtside/commit/07e2a33eaf6f1810b55c57a5ac6fefc460afcc07))
+* keep dependant messages, read-message paging and a shortened period from failing silently ([#2020](https://github.com/jegr78/courtside/issues/2020)) ([a460adb](https://github.com/jegr78/courtside/commit/a460adb696b023986091823b50d59e15a173bc7f)), closes [#2010](https://github.com/jegr78/courtside/issues/2010)
+* keep PayPal money consistent across a currency switch, a returned capture and a refund made in PayPal ([#2017](https://github.com/jegr78/courtside/issues/2017)) ([83f3c4e](https://github.com/jegr78/courtside/commit/83f3c4e4665ae98bb0bc75a9075f72911834c39f))
+* refuse an age-banded import preview executed in a later calendar year ([#2018](https://github.com/jegr78/courtside/issues/2018)) ([6d706ec](https://github.com/jegr78/courtside/commit/6d706eca34ded6aaa99c4387ec890b1d3c8b733c)), closes [#2011](https://github.com/jegr78/courtside/issues/2011)
+
+
+### Documentation
+
+* let a hold unlock the doorbell for door openers built for short pulses ([#2007](https://github.com/jegr78/courtside/issues/2007)) ([ffc562c](https://github.com/jegr78/courtside/commit/ffc562c95eeda69e7e65e15dfaf55aa828bb6116))
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
