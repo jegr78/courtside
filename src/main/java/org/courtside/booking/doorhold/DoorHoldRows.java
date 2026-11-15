@@ -106,7 +106,24 @@ class DoorHoldRows {
                 .list();
     }
 
+    /** Ends every unended hold on a booking of this card and answers which holds it ended. */
+    List<Hold> endOnCard(UUID cardId, Instant at) {
+        return jdbc.sql("""
+                        UPDATE door_hold SET ended_at = :at, ended_by = NULL
+                        WHERE ended_at IS NULL AND booking_id IN (SELECT id FROM booking WHERE card_id = :card)
+                        RETURNING id, booking_id, held_at, held_by
+                        """)
+                .param("at", Timestamp.from(at)).param("card", cardId)
+                .query((rs, row) -> new Hold(rs.getObject("id", UUID.class), rs.getObject("booking_id", UUID.class),
+                        rs.getTimestamp("held_at").toInstant(), rs.getObject("held_by", UUID.class)))
+                .list();
+    }
+
     record Window(UUID bookingId, Instant opensAt, Instant closesAt) {
+
+        boolean isOpenAt(Instant at) {
+            return !at.isBefore(opensAt) && at.isBefore(closesAt);
+        }
     }
 
     record Hold(UUID id, UUID bookingId, Instant heldAt, UUID heldBy) {

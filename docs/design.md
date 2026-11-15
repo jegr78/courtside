@@ -718,8 +718,12 @@ the switch, a closed window and a hold somebody else runs are refused by their o
 
 A hold ends at check-out by the person who started it, even one who has since lost access to the
 booking, or by an administrator; when a player who started it withdraws from the booking; when the
-account that started it is closed; at a cancellation, move or displacement of its booking; and at the
-booking's end at the latest. A deactivated card neither starts a hold nor keeps a running one open. A move ends it even when the new
+account that started it is closed or disabled; when its card is deactivated or stops offering holds,
+so switching the card back on reopens nothing without a new check-in; at a cancellation, move or
+displacement of its booking; and at the booking's end at the latest. A court closed that day or out of
+service neither starts a hold nor keeps a running one open, even when the closure begins while the
+booking already runs and so displaces nothing; a start there answers `409` with
+`urn:courtside:error:door-hold-court-closed`. A move ends it even when the new
 slot still covers the old window, because the doors may no longer be the booking's. A hold also
 runs only while its booking is confirmed and it began inside the booking's current window, so
 nothing has to run when a booking ends. Starting and ending are audited as `booking.doorHold.started` and

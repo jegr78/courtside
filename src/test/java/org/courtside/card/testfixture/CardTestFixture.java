@@ -86,6 +86,10 @@ public final class CardTestFixture {
         cards.setCardActive(cardId, false);
     }
 
+    public void activateBookingCard(UUID cardId) {
+        cards.setCardActive(cardId, true);
+    }
+
     public UUID createUnlimitedParticipantCard(String label) {
         return cards.createParticipantCard(label, null).getId();
     }

@@ -257,8 +257,10 @@ no-show sets `lifted_at` and keeps the row, so the no-show stays visible but sto
 
 A `door_hold` row is running while `ended_at` is null, its booking is confirmed, `held_at` lies in
 the booking's current window from `access_lead_minutes` before the start to the end, the end has
-not passed and the booking's card still offers holds. The partial index `door_hold_unended` keeps the
-occupancy poll to unended rows of the last two days. Cancelling or moving a booking ends its unended rows, and a booking that is over holds
+not passed, the booking's card is active and still offers holds, none of its courts is closed that day
+or out of service and the account in `held_by` is enabled. The partial index `door_hold_unended` keeps the
+occupancy poll to unended rows of the last two days. Cancelling, moving or displacing a booking, a named player's withdrawal, closing or disabling the
+holder's account and switching its card or the card's holds off end its unended rows, and a booking that is over holds
 nothing open without any row being changed. `door_hold.booking_id` carries no foreign key either, and pseudonymisation clears
 `held_by` and `ended_by` with the booking's other actors.
 `attendance_policy_release_needs_attendance` refuses a release time while attendance is off.

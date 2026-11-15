@@ -13,17 +13,21 @@ import org.courtside.booking.internal.BookingExtension;
 import org.courtside.booking.internal.BookingExtensionRefusedException;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.card.BookingCard;
+import org.courtside.card.CardEvent;
 import org.courtside.card.CardService;
 import org.courtside.config.AccessPolicy;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.BookingGridSettings;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.AccessPoint;
+import org.courtside.facility.CourtClosure;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Outsiders;
 import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.member.RosterEvent;
 import org.courtside.shared.AccountClosed;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.BookingDisplaced;
@@ -70,6 +74,7 @@ public class DoorHoldService {
     private final FacilityService facility;
     private final Outsiders outsiders;
     private final UserAccountRepository accounts;
+    private final ClubTimeZone timeZone;
 
     public DoorHold start(UUID bookingId, UUID actor, Set<Role> actorRoles) {
         Booking booking = lockedBooking(bookingId);
@@ -83,6 +88,9 @@ public class DoorHoldService {
         if (booking.getStatus() != BookingStatus.CONFIRMED || now.isBefore(window.opensAt())
                 || !now.isBefore(window.closesAt())) {
             throw new DoorHoldClosedException(lead().toMinutes());
+        }
+        if (courtClosed(booking)) {
+            throw new DoorHoldCourtClosedException();
         }
         Optional<Hold> running = rows.unendedSince(window);
         if (running.isPresent()) {
@@ -148,8 +156,29 @@ public class DoorHoldService {
 
     @EventListener
     public void on(AccountClosed closed) {
-        rows.endHeldBy(closed.accountId(), clock.instant())
-                .forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
+        endHeldBy(closed.accountId());
+    }
+
+    @EventListener
+    public void on(RosterEvent.AccountAvailabilityChanged changed) {
+        if (!changed.enabled()) {
+            endHeldBy(changed.accountId());
+        }
+    }
+
+    // Ending the rows keeps a card switched back on from reopening doors nobody checked in to.
+    @EventListener
+    public void on(CardEvent.BookingCardAvailabilityChanged changed) {
+        if (!changed.active()) {
+            endOnCard(changed.cardId());
+        }
+    }
+
+    @EventListener
+    public void on(CardEvent.BookingCardChanged changed) {
+        if (!changed.holdsDoorsOpen()) {
+            endOnCard(changed.cardId());
+        }
     }
 
     @EventListener
@@ -175,8 +204,19 @@ public class DoorHoldService {
     }
 
     private void endAll(List<UUID> bookingIds, UUID endedBy) {
-        rows.endAll(bookingIds, endedBy, clock.instant())
-                .forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
+        announceEnded(rows.endAll(bookingIds, endedBy, clock.instant()));
+    }
+
+    private void endHeldBy(UUID accountId) {
+        announceEnded(rows.endHeldBy(accountId, clock.instant()));
+    }
+
+    private void endOnCard(UUID cardId) {
+        announceEnded(rows.endOnCard(cardId, clock.instant()));
+    }
+
+    private void announceEnded(List<Hold> ended) {
+        ended.forEach(hold -> events.publishEvent(new DoorHoldEvent.Ended(hold.bookingId(), hold.id())));
     }
 
     /** The door hold state of each booking whose card offers one and {@code viewer} may hold, as they see it. */
@@ -185,17 +225,19 @@ public class DoorHoldService {
         Set<UUID> holdingCards = cards.activeCards().stream().filter(BookingCard::isHoldsDoorsOpen)
                 .map(BookingCard::getId).collect(Collectors.toSet());
         boolean outsider = outsiders.isOutsiderAccount(viewer);
+        Instant now = clock.instant();
         Map<UUID, Window> windows = candidates.stream()
                 .filter(booking -> !outsider || viewer.equals(booking.getBookedBy()))
                 .filter(booking -> !booking.getAllocations().isEmpty())
                 .filter(booking -> holdingCards.contains(booking.getCardId()))
+                .filter(booking -> !(windowOf(booking).isOpenAt(now) && courtClosed(booking)))
                 .collect(Collectors.toMap(Booking::getId, this::windowOf));
         Set<UUID> confirmed = candidates.stream().filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
                 .map(Booking::getId).collect(Collectors.toSet());
-        Instant now = clock.instant();
         Map<UUID, Hold> held = rows.unendedSince(windows.values()).stream()
                 .filter(hold -> confirmed.contains(hold.bookingId()))
                 .filter(hold -> now.isBefore(windows.get(hold.bookingId()).closesAt()))
+                .filter(this::heldByAnEnabledAccount)
                 .collect(Collectors.toMap(Hold::bookingId, Function.identity()));
         return windows.values().stream().collect(Collectors.toMap(Window::bookingId,
                 window -> toDoorHold(window, Optional.ofNullable(held.get(window.bookingId())), viewer, !outsider)));
@@ -225,6 +267,18 @@ public class DoorHoldService {
     }
 
     public record DoorSignals(List<DoorSignal> doors, Instant expiresAt) {
+    }
+
+    private boolean courtClosed(Booking booking) {
+        List<CourtClosure> closures = facility.courtClosures();
+        return booking.getAllocations().stream().anyMatch(allocation ->
+                facility.findCourt(allocation.getCourtId()).map(court -> !court.isActive()).orElse(true)
+                        || closures.stream().anyMatch(closure -> closure.courtId().equals(allocation.getCourtId())
+                                && closure.covers(allocation.getStartsAt().atZone(timeZone.zoneId()).toLocalDate())));
+    }
+
+    private boolean heldByAnEnabledAccount(Hold hold) {
+        return hold.heldBy() != null && accounts.findById(hold.heldBy()).map(UserAccount::isEnabled).orElse(false);
     }
 
     private Optional<Hold> running(Booking booking) {
