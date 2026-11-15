@@ -41,7 +41,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     @Query(nativeQuery = true, value = """
             SELECT EXISTS (SELECT 1 FROM user_account a JOIN member m ON m.person_id = a.person_id
-                           WHERE a.id = :accountId)
+                           WHERE a.id = :accountId AND (m.ended_on IS NULL OR m.ended_on > m.started_on))
             """)
     boolean hasMembershipOfAccount(@Param("accountId") UUID accountId);
 

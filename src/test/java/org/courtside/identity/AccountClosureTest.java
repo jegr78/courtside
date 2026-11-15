@@ -203,6 +203,32 @@ class AccountClosureTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnExternalPlayerWithAPlannedMembership_whenTheyCloseTheirAccount_thenTheMembershipRefusesIt()
+            throws Exception {
+        // given
+        members.addMembershipPeriod(john, members.createMembershipType("Next season"), LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 12, 31));
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByMembership"));
+        assertThat(identity.isAccountEnabled(johnAccount)).isTrue();
+    }
+
+    @Test
+    void givenAnExternalPlayerWithAMembershipEndedOnItsFirstDay_whenTheyCloseTheirAccount_thenItCloses()
+            throws Exception {
+        // given
+        members.assignMembership(john, members.createMembershipType("Entered by mistake"), LocalDate.of(2026, 5, 12));
+        members.endMembership(john);
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a period that never ran held no membership").isFalse();
+    }
+
+    @Test
     void givenAnExternalPlayerWhoseBookingHasEnded_whenTheyCloseTheirAccount_thenItCloses() throws Exception {
         // given
         bookings.insertBookingThatHasStarted(court, winterDoubles,

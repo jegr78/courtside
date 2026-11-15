@@ -562,7 +562,7 @@ Negative tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.jav
 
 ### Outsider account closure
 
-Only an account that is an outsider and whose person never held a membership closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, a former member, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.
+Only an account that is an outsider and whose person has no membership period, past, running or planned, closes itself, and only while it holds no confirmed booking of its own that has not ended, no credit balance and no PayPal payment or refund still in flight; closing anonymises the current account in place and ends its sessions. A member, a person with any other membership period, an administrator or an outsider with an upcoming booking, a credit balance or a payment in flight is refused without any change.
 
 Attributes: `current-account`, `role`, `current-membership`.
 

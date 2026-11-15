@@ -345,8 +345,9 @@ audited as `roster.account.rolesChanged`; `EXTERNAL` stays until the board remov
 writes accepts an anonymised person. The import's membership writes add no role.
 An outsider closes its own account with `DELETE /api/account` after a re-authentication no older
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
-with `identity.account.closureNotOpen`, an outsider whose person has any membership period, a former
-member who leaves through the board like every other, with `identity.account.closureBlockedByMembership`
+with `identity.account.closureNotOpen`, an outsider whose person has a membership period that is not
+empty, past, running or planned, who leaves through the board like every member, with
+`identity.account.closureBlockedByMembership`
 read through `identity.MembershipHistory`, and an outsider holding a confirmed or pending booking of its
 own that has not ended, read through `shared.UpcomingBookings`, with
 `identity.account.closureBlockedByBooking`. An outsider whose credit ledger still holds a balance

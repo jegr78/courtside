@@ -522,7 +522,8 @@ oder Erstattung von dir noch nicht abgeschlossen, warte, bis das geschehen ist. 
 Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und dein Passwort und meldet dich
 ab. Vergangene Buchungen bleiben ohne deinen Namen, ohne deine Notizen und ohne die Namen deiner
 Gäste beim Verein. Deinen
-Benutzernamen kann danach jemand neu registrieren. Als Mitglied beendet der Vorstand dein Konto.
+Benutzernamen kann danach jemand neu registrieren. Bist du Mitglied, warst
+es oder ist eine Mitgliedschaft für dich geplant, beendet der Vorstand dein Konto.
 
 ![Die Kontosicherheit mit Zwei-Faktor-Authentifizierung, Sicherheitsschlüsseln, aktiven Sitzungen und Passwortänderung.](screenshots/de/account-security.png)
 
