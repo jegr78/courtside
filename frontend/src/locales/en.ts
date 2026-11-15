@@ -1665,6 +1665,7 @@ const en: Record<keyof typeof de, string> = {
   "import.preview.actorMismatch": "Only the account that reviewed this preview can execute it. Upload the file again with this account if responsibility changed.",
   "import.preview.stale": "Somebody this preview would change has changed since it was taken. Upload the file again and review the new preview.",
   "import.preview.superseded": "A newer preview exists for this source, or this one has already been executed.",
+  "import.preview.yearChanged": "This preview was made last year. Age bands follow the age reached in the current year, so preview the file again.",
   "import.preview.expired": "This preview is no longer kept and cannot be executed. Upload the file again.",
   "import.removals.needConfirmation": "This import would end more memberships than the source permits without confirmation.",
   "request.uploadTooLarge": "The uploaded file exceeds the size limit.",

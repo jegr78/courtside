@@ -2,6 +2,7 @@ package org.courtside.dataexchange;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.TestClock;
 import org.courtside.dataexchange.internal.SnapshotHeaderInvalidException;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +60,8 @@ class AgeBandImportTest extends AbstractIntegrationTest {
     private MemberTestFixture memberFixture;
     @Autowired
     private JdbcClient jdbc;
+    @Autowired
+    private TestClock testClock;
 
     private UUID youth;
     private UUID adult;
@@ -105,6 +109,22 @@ class AgeBandImportTest extends AbstractIntegrationTest {
         assertThat(typeOf(people.get("4714"))).isEqualTo(unsorted);
         assertThat(tablesHolding(FROM_THE_FILE)).as("no table holds a birth date or year from the file").isEmpty();
         assertThat(output.getAll()).as("no log line carries one").doesNotContain("16.03.2010", "2008-07-21", "23.09.2011");
+    }
+
+    @Test
+    void givenAnAgeBandedPreviewFromLastYear_whenItIsExecutedInTheNewYear_thenItMustBePreviewedAgain() {
+        // given
+        testClock.set(Instant.parse("2026-12-30T12:00:00Z"));
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+        PreviewSummary lastYear = preview(source, EXPORT);
+        testClock.set(Instant.parse("2027-01-02T12:00:00Z"));
+
+        // when / then
+        assertThatThrownBy(() -> executions.execute(lastYear.previewId(), false, actor))
+                .as("a band follows the age reached this year, which the preview no longer knows")
+                .isInstanceOf(ImportPreviewSupersededException.class)
+                .hasFieldOrPropertyWithValue("code", "import.preview.yearChanged");
+        assertThat(references.list(source, null, 50).items()).as("nothing was imported").isEmpty();
     }
 
     @Test
