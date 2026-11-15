@@ -13,8 +13,9 @@ test("when a visitor reads the plan, the sign-in and the recovery page, then eve
   await step("visitor", "sign-in notice", async () => {
     await expect(page.getByTestId("guest-guidance"), "product: the plan tells a visitor how to book").toBeVisible();
     expect(await page.getByRole("heading", { level: 1 }).count(), "product: the plan carries exactly one page heading").toBe(1);
-    await page.getByTestId("guest-sign-in").click();
-    await expect(page.getByTestId("login-view"), "product: the notice's action opens the sign-in").toBeVisible();
+    await expect(page.getByRole("link").and(page.locator('[href="/login"]')), "product: sign-in is offered once, in the navigation bar").toHaveCount(1);
+    await page.getByTestId("sign-in-link").click();
+    await expect(page.getByTestId("login-view"), "product: the navigation bar's action opens the sign-in").toBeVisible();
     await page.goBack();
     await expect(page.getByTestId("guest-guidance")).toBeVisible();
   });
