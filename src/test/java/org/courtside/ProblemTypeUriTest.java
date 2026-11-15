@@ -78,6 +78,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:attendance-not-recordable",
             "urn:courtside:error:attendance-policy-invalid",
             "urn:courtside:error:check-in-closed",
+            "urn:courtside:error:door-hold-court-closed",
             "urn:courtside:error:door-hold-not-offered",
             "urn:courtside:error:door-hold-closed",
             "urn:courtside:error:booking-extension-refused",

@@ -182,9 +182,12 @@ writes no access log and the UAT proxy strips the query from what it logs. Whoev
 learns, per active court, whether it is occupied and how many minutes remain until its next
 booking, and, per active access point named by its id, whether a running door hold keeps it open
 right now. It learns nothing about who booked or which card, and cannot change anything in Courtside.
-A court door reads open only while somebody who may manage one of its bookings has checked in on it
-in the app, which proves no presence at the court; a door open to members reads open while any such
-hold runs. External players cannot start a hold.
+A court door reads open only while somebody on one of its bookings has checked in on it in the app:
+its booker, a named player, an administrator or a managing role, an external booker on their own
+booking included. A check-in proves no presence at the court, and a door open to members reads open
+while any such hold runs, so a verified email address and a confirmed booking are enough to hold the
+clubhouse door open from the lead before the start. That is accepted for the same reason an external
+booker reads the members' door code during their booking; it gains nothing the code does not.
 
 Once a club's controller keeps a lock open from `door.*`, the answer stops being information and
 starts opening a door. Whoever can alter the answer on its way, on a club network or a router

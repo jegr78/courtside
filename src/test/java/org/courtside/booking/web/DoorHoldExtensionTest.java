@@ -347,16 +347,16 @@ class DoorHoldExtensionTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "roe.john", roles = "TRAINER")
-    void givenADeactivatedCard_whenTheTrainerExtends_thenTheCardIsNoLongerBookable() throws Exception {
+    void givenADeactivatedCard_whenTheTrainerExtends_thenNoHoldRunsAnyMore() throws Exception {
         // given
         UUID booking = heldTraining(List.of(court));
         cards.deactivateBookingCard(campCard);
 
         // when / then
         mockMvc.perform(extend(booking, EXTENDED))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-not-bookable"))
-                .andExpect(jsonPath("$.violations[0].code").value("card.inactive"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:door-hold-not-running"))
+                .andExpect(jsonPath("$.violations[0].code").value("doorHold.notRunning"));
         assertThat(endsOf(booking)).containsExactly(ENDS);
     }
 

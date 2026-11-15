@@ -7,6 +7,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.AccountClosed;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.TimeSlot;
@@ -21,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
@@ -52,6 +54,9 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     private CardTestFixture cards;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private OccupancyKeys keys;
 
     @Autowired
@@ -69,6 +74,7 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     private UUID courtTwo;
     private UUID gateOne;
     private UUID gateTwo;
+    private UUID trainerPerson;
     private UUID trainer;
     private UUID campCard;
 
@@ -79,8 +85,8 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
         courtTwo = facility.createCourt(2, "Court 2");
         gateOne = facility.createAccessPoint("North gate", List.of(courtOne), null);
         gateTwo = facility.createAccessPoint("South gate", List.of(courtTwo), null);
-        trainer = identity.createEnabledAccount(identity.createPerson("John", "Roe", "john@example.org"), "roe.john",
-                Set.of(Role.TRAINER));
+        trainerPerson = identity.createPerson("John", "Roe", "john@example.org");
+        trainer = identity.createEnabledAccount(trainerPerson, "roe.john", Set.of(Role.TRAINER));
         campCard = cards.createBookingCard("Holiday camp", Set.of(Role.TRAINER), Set.of(Role.TRAINER));
         cards.letBookingsHoldDoorsOpen(campCard, true);
         key = keys.issue().key();
@@ -246,6 +252,108 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenARunningHold_whenTheCourtIsClosedFromToday_thenTheGateCloses() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        facility.closeCourt(courtOne, LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 12));
+
+        // then
+        assertThat(lines()).as("a closure over a booking that already runs closes its gate")
+                .contains("door." + gateOne + ".open=0");
+    }
+
+    @Test
+    void givenARunningHold_whenTheCourtIsTakenOutOfService_thenTheGateCloses() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        facility.deactivateCourt(courtOne);
+
+        // then
+        assertThat(lines()).as("a court out of service opens no gate").contains("door." + gateOne + ".open=0");
+    }
+
+    @Test
+    void givenARunningHold_whenTheBoardDisablesTheHoldersAccount_thenTheHoldEndsAndTheGateCloses() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        members.setAccountEnabled(trainerPerson, false);
+
+        // then
+        assertThat(lines()).as("a disabled account holds no door open").contains("door." + gateOne + ".open=0");
+        assertThat(endedHoldsOf(booking)).as("the end is recorded like any other").isEqualTo(1L);
+    }
+
+    @Test
+    void givenARunningHold_whenTheHoldersAccountIsDisabledOutsideTheRoster_thenTheGateCloses() throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        identity.disableAccount(trainer);
+
+        // then
+        assertThat(lines()).contains("door." + gateOne + ".open=0");
+    }
+
+    @Test
+    void givenACardSwitchedOffAndOnAgain_whenPolled_thenTheGateStaysClosedUntilSomebodyChecksInAgain()
+            throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        cards.letBookingsHoldDoorsOpen(campCard, false);
+        cards.letBookingsHoldDoorsOpen(campCard, true);
+
+        // then
+        assertThat(lines()).as("switching the card back on reopens nothing").contains("door." + gateOne + ".open=0");
+        assertThat(endedHoldsOf(booking)).isEqualTo(1L);
+    }
+
+    @Test
+    void givenACardDeactivatedAndReactivated_whenPolled_thenTheGateStaysClosedUntilSomebodyChecksInAgain()
+            throws Exception {
+        // given
+        UUID booking = runningTraining(courtOne);
+        bookings.holdDoorsOpenAt(booking, trainer, NOW.minus(10, ChronoUnit.MINUTES));
+
+        // when
+        cards.deactivateBookingCard(campCard);
+        cards.activateBookingCard(campCard);
+
+        // then
+        assertThat(lines()).as("reactivating the card reopens nothing").contains("door." + gateOne + ".open=0");
+        assertThat(endedHoldsOf(booking)).isEqualTo(1L);
+    }
+
+    @Test
+    void givenAHoldNobodyEndedOnABookingThatIsOver_whenTheCardOrTheHoldersAccountIsSwitchedOff_thenItsRowStays() {
+        // given
+        UUID over = bookings.insertBookingThatHasStarted(courtOne, campCard,
+                new TimeSlot(NOW.minus(90, ChronoUnit.MINUTES), NOW.minus(30, ChronoUnit.MINUTES)), trainer);
+        bookings.holdDoorsOpenAt(over, trainer, NOW.minus(80, ChronoUnit.MINUTES));
+
+        // when
+        cards.letBookingsHoldDoorsOpen(campCard, false);
+        members.setAccountEnabled(trainerPerson, false);
+
+        // then
+        assertThat(endedHoldsOf(over)).as("a hold that ended with its booking is history, not rewritten").isZero();
+        assertThat(auditedEndsOf(over)).as("nothing that already ended is audited as ending now").isZero();
+    }
+
+    @Test
     void givenAnInactiveGate_whenPolled_thenItIsNotAnswered() throws Exception {
         // given
         facility.deactivateAccessPoint(gateTwo);
@@ -257,6 +365,11 @@ class HeldOpenDoorSignalTest extends AbstractIntegrationTest {
     private UUID runningTraining(UUID court) {
         return bookings.insertBookingThatHasStarted(court, campCard,
                 new TimeSlot(NOW.minus(30, ChronoUnit.MINUTES), NOW.plus(30, ChronoUnit.MINUTES)), trainer);
+    }
+
+    private long auditedEndsOf(UUID booking) {
+        return jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'booking.doorHold.ended' AND subject_id = :id")
+                .param("id", booking).query(Long.class).single();
     }
 
     private long endedHoldsOf(UUID booking) {

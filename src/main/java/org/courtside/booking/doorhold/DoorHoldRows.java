@@ -93,20 +93,43 @@ class DoorHoldRows {
                 .list();
     }
 
-    /** Ends every unended hold this account runs, recording it as the one who ended them. */
+    /** Ends every hold this account runs on a booking not yet over, recording it as the one who ended them. */
     List<Hold> endHeldBy(UUID accountId, Instant at) {
         return jdbc.sql("""
                         UPDATE door_hold SET ended_at = :at, ended_by = :by
-                        WHERE held_by = :by AND ended_at IS NULL
+                        WHERE held_by = :by AND ended_at IS NULL AND held_at > :since
+                          AND booking_id IN (SELECT booking_id FROM court_allocation WHERE ends_at > :at)
                         RETURNING id, booking_id, held_at, held_by
                         """)
                 .param("at", Timestamp.from(at)).param("by", accountId)
+                .param("since", Timestamp.from(at.minus(RUNNING_HOLD_REACH)))
+                .query((rs, row) -> new Hold(rs.getObject("id", UUID.class), rs.getObject("booking_id", UUID.class),
+                        rs.getTimestamp("held_at").toInstant(), rs.getObject("held_by", UUID.class)))
+                .list();
+    }
+
+    /** Ends every hold on a booking of this card not yet over and answers which holds it ended. */
+    List<Hold> endOnCard(UUID cardId, Instant at) {
+        return jdbc.sql("""
+                        UPDATE door_hold SET ended_at = :at, ended_by = NULL
+                        WHERE ended_at IS NULL AND held_at > :since
+                          AND booking_id IN (SELECT allocation.booking_id FROM court_allocation allocation
+                                             JOIN booking ON booking.id = allocation.booking_id
+                                             WHERE booking.card_id = :card AND allocation.ends_at > :at)
+                        RETURNING id, booking_id, held_at, held_by
+                        """)
+                .param("at", Timestamp.from(at)).param("card", cardId)
+                .param("since", Timestamp.from(at.minus(RUNNING_HOLD_REACH)))
                 .query((rs, row) -> new Hold(rs.getObject("id", UUID.class), rs.getObject("booking_id", UUID.class),
                         rs.getTimestamp("held_at").toInstant(), rs.getObject("held_by", UUID.class)))
                 .list();
     }
 
     record Window(UUID bookingId, Instant opensAt, Instant closesAt) {
+
+        boolean isOpenAt(Instant at) {
+            return !at.isBefore(opensAt) && at.isBefore(closesAt);
+        }
     }
 
     record Hold(UUID id, UUID bookingId, Instant heldAt, UUID heldBy) {

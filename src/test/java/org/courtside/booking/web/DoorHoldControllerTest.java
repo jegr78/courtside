@@ -21,6 +21,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
@@ -648,6 +649,40 @@ class DoorHoldControllerTest extends AbstractIntegrationTest {
                 new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)), member);
         bookings.nameMemberAsPlayer(booking, player);
         return booking;
+    }
+
+    @Test
+    @WithMockUser(username = "roe.john", roles = "TRAINER")
+    void givenATrainingOnACourtClosedFromToday_whenItsTrainerHoldsTheDoorsOpen_thenTheConflictSaysTheCourtIsClosed()
+            throws Exception {
+        // given
+        UUID booking = startingInMinutes(campCard, 5);
+        facility.closeCourt(court, LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 12));
+
+        // when / then
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:door-hold-court-closed"))
+                .andExpect(jsonPath("$.violations[0].code").value("doorHold.courtClosed"));
+        assertThat(unendedHoldsOf(booking)).as("a closed court is held open by nobody").isZero();
+        mockMvc.perform(get("/api/my/bookings"))
+                .andExpect(jsonPath("$.items[0].id").value(booking.toString()))
+                .andExpect(jsonPath("$.items[0].doorHold").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "roe.john", roles = "TRAINER")
+    void givenATrainingOnACourtOutOfService_whenItsTrainerHoldsTheDoorsOpen_thenTheConflictSaysTheCourtIsClosed()
+            throws Exception {
+        // given
+        UUID booking = startingInMinutes(campCard, 5);
+        facility.deactivateCourt(court);
+
+        // when / then
+        mockMvc.perform(post("/api/my/bookings/{id}/door-hold", booking).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:door-hold-court-closed"));
+        assertThat(unendedHoldsOf(booking)).isZero();
     }
 
     private long unendedHoldsOf(UUID booking) {
