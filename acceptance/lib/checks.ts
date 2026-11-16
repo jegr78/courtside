@@ -179,6 +179,7 @@ async function capturePage(page: Page, label: string, opts: { expectedStatuses?:
   const httpErrors = record.httpErrors.filter((error) => !(opts.expectedStatuses ?? []).includes(error.status));
   appendFileSync(runPath("metrics.jsonl"), JSON.stringify({
     project: info.project.name, engine: profile.engine, persona, test: info.title, label, url: page.url(), at: new Date().toISOString(),
+    expectedStatuses: opts.expectedStatuses ?? [],
     shot: `${base}.png`, networkIdle: idle, settled, ...measured, smallTargets: profile.phone ? measured.smallTargets : [],
     axe, console: record.console.splice(0), consoleEvents: record.consoleEvents.splice(0), httpErrors,
     problemResponses: record.problemResponses.splice(0)

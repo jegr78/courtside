@@ -5,15 +5,17 @@ const AXE_GRADE = { critical: "major", serious: "minor", moderate: "hint", minor
 const EXPECTED_CONSOLE = [{ pattern: /Refused to apply a stylesheet/, engine: "webkit" }, { pattern: /status of 401/ }, { pattern: /status of 409/ }];
 const REAUTHENTICATION = "urn:courtside:error:recent-authentication-required";
 const pathOf = (url) => { try { return new URL(url).pathname; } catch { return url; } };
-const expectedInContext = (message, observation, unexplained) => {
-  if (/status of 403/.test(message)) {
-    const index = unexplained.findIndex((problem) => problem.status === 403 && problem.type === REAUTHENTICATION && pathOf(problem.url) === observation?.location?.url);
+const expectedInContext = (message, observation, unexplained, declared) => {
+  const status = Number(message.match(/status of (\d{3})/)?.[1]);
+  if (status) {
+    const index = unexplained.findIndex((problem) => problem.status === status && pathOf(problem.url) === observation?.location?.url
+      && ((status === 403 && problem.type === REAUTHENTICATION) || declared.includes(status)));
     return index >= 0 && unexplained.splice(index, 1).length === 1;
   }
   return /^Failed to load resource: net::ERR_/.test(message) && observation?.offline === true;
 };
-const expected = (message, engine, observation, unexplained) => EXPECTED_CONSOLE.some((entry) => entry.pattern.test(message) && (entry.engine ?? engine) === engine)
-  || expectedInContext(message, observation, unexplained);
+const expected = (message, row, observation, unexplained) => EXPECTED_CONSOLE.some((entry) => entry.pattern.test(message) && (entry.engine ?? row.engine) === row.engine)
+  || expectedInContext(message, observation, unexplained, row.expectedStatuses ?? []);
 const normalise = (text) => text
   .replace(/https?:\/\/[^/\s]+/g, "")
   .replace(/\/?[a-z0-9-]+(\.[a-z0-9-]+)+(?=\/)/gi, "")
@@ -46,7 +48,7 @@ export function collectFindings({ metrics, failures }) {
     for (const message of row.console) {
       const index = observations.findIndex((event) => event.message === message);
       const observation = index >= 0 ? observations.splice(index, 1)[0] : null;
-      if (expected(message, row.engine, observation, unexplained)) continue;
+      if (expected(message, row, observation, unexplained)) continue;
       add(findingKey.console(message), { severity: "minor", kind: "console", title: `Console error: ${normalise(message).slice(0, 140)}`, detail: message.slice(0, 300) },
         { ...where, ...(observation ? { consoleEvent: observation } : {}) });
     }

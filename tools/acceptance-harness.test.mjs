@@ -1179,6 +1179,27 @@ test("given 403 responses, when collected, then only the one that asks for the p
   assert.equal(collectFindings({ metrics: [row({ console: [refusedMessage], problemResponses: problems })], failures: [] }).length, 1, "a row without observations fails closed");
 });
 
+test("given a refusal the capture declared, when collected, then its console message is expected only with a read answer of that status", () => {
+  // given
+  const refused = "Failed to load resource: the server responded with a status of 400 ()";
+  const answer = { url: "/api/admin/import/sources/a/previews", status: 400, type: "urn:courtside:error:import-snapshot-unreadable" };
+
+  // when
+  const keys = (declared, answers = [answer], sources = [answer.url], events = true) => collectFindings({ metrics: [row({ expectedStatuses: declared,
+    console: sources.map(() => refused), consoleEvents: events ? sources.map((path) => observed(refused, path)) : undefined, problemResponses: answers })], failures: [] })
+    .flatMap((finding) => finding.where.map(() => finding.key));
+
+  // then
+  assert.deepEqual(keys([400]), [], "the journey provoked and declared this refusal");
+  assert.equal(keys([]).length, 1, "an undeclared 400 stays a finding");
+  assert.equal(keys(undefined).length, 1, "a row that declares nothing fails closed");
+  assert.equal(keys([400], []).length, 1, "a declared status without a read answer stays a finding");
+  assert.equal(keys([400], [{ ...answer, status: 422 }]).length, 1, "an answer of another status does not explain it");
+  assert.equal(keys([400], [answer], ["/api/admin/roster"]).length, 1, "an answer for another path does not explain it");
+  assert.equal(keys([400], [answer], [answer.url], false).length, 1, "a message without an observation fails closed");
+  assert.equal(keys([400], [answer], [answer.url, answer.url]).length, 1, "one answer explains one message");
+});
+
 test("given failed requests, when collected, then only those while the journey took the network away are expected", () => {
   // when
   const keys = (extra) => collectFindings({ metrics: [row({ console: [unreachable], consoleEvents: [observed(unreachable, "/api/session", extra)] })], failures: [] }).map((finding) => finding.key);
