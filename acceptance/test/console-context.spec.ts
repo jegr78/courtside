@@ -137,13 +137,15 @@ test("given a page already watched, when diagnostics attach again, then one brow
   expect(events, "reusing the watcher cannot duplicate browser observations").toHaveLength(1);
 });
 
-test("given refused and failed requests, when a capture collects them, then only the password prompt and the offline journey are expected", async ({ page, browserName }, info) => {
+test("given refused and failed requests, when a capture collects them, then only the password prompt, the declared refusal and the offline journey are expected", async ({ page, browserName }, info) => {
   // given
-  const problem = (type: string) => ({ status: 403, contentType: "application/problem+json", body: JSON.stringify({ type, status: 403 }) });
+  const problem = (type: string, status = 403) => ({ status, contentType: "application/problem+json", body: JSON.stringify({ type, status }) });
   await page.route("https://club.example.org/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/refunds") return route.fulfill(problem("urn:courtside:error:recent-authentication-required"));
     if (path === "/api/roster") return route.fulfill(problem("urn:courtside:error:forbidden"));
+    if (path === "/api/previews") return route.fulfill(problem("urn:courtside:error:import-snapshot-unreadable", 400));
+    if (path === "/api/members") return route.fulfill(problem("urn:courtside:error:validation", 422));
     if (path.startsWith("/api/")) return route.abort("failed");
     return route.fulfill({ contentType: "text/html", body: '<html lang="en"><title>Plan</title><main><h1>Plan</h1></main></html>' });
   });
@@ -154,16 +156,18 @@ test("given refused and failed requests, when a capture collects them, then only
   // when
   await call("/api/refunds");
   await call("/api/roster");
+  await call("/api/previews");
+  await call("/api/members");
   await call("/api/session");
   await whileOffline(page, () => call("/api/source"));
-  await capture(page, "refused-requests");
+  await capture(page, "refused-requests", { expectedStatuses: [400] });
 
   // then
   const metric = rows("metrics.jsonl").filter((row) => row.test === info.title && row.project === info.project.name).at(-1);
-  const where = (finding: { where: unknown[]; detail: string }) => finding.where.map(() => finding.detail);
-  const findings = collectFindings({ metrics: [metric], failures: [] }).flatMap(where);
-  const remaining = [expect.stringMatching(/status of 403/), ...(browserName === "webkit" ? [] : [expect.stringMatching(/net::ERR_FAILED/)])];
-  expect(findings, `only the other 403 and, where the engine logs one, the online failure remain, from ${JSON.stringify(metric.consoleEvents)}`).toEqual(remaining);
+  const sources = collectFindings({ metrics: [metric], failures: [] })
+    .flatMap((finding: { where: { consoleEvent?: { location: { url: string } | null } }[] }) => finding.where.map((where) => where.consoleEvent?.location?.url)).sort();
+  const remaining = ["/api/members", "/api/roster", ...(browserName === "webkit" ? [] : ["/api/session"])].sort();
+  expect(sources, `only the other 403, the undeclared 422 and, where the engine logs one, the online failure remain, from ${JSON.stringify(metric.consoleEvents)}`).toEqual(remaining);
   const journal = rows("browser-events.jsonl").filter((event) => event.test === info.title && event.project === info.project.name);
   for (const event of metric.consoleEvents) expect(journal, "the offline flag is journalled when received").toContainEqual(expect.objectContaining(event));
 });
