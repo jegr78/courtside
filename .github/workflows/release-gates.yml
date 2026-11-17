@@ -694,18 +694,31 @@ jobs:
         with:
           ref: ${{ inputs.source-commit }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/tool-dependencies
       - name: Capture npm audit evidence
         working-directory: frontend
         run: |
           mkdir -p ../build/security
           npm run audit:security -- --output ../build/security/npm.json
+      - name: Choose the published npm baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: node tools/published-npm-baseline.mjs --subject "$SOURCE_COMMIT" --directory build/security/baseline-npm
+      - name: Capture the baseline's npm audit evidence
+        working-directory: frontend
+        run: |
+          test -f ../build/security/baseline-npm/package-lock.json || exit 0
+          npm run audit:security -- --output ../build/security/baseline-npm/npm-audit.json --directory ../build/security/baseline-npm
       - name: Enforce the release npm policy
         env:
           SOURCE_COMMIT: ${{ inputs.source-commit }}
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm.json
+          --npm-lockfile frontend/package-lock.json
+          --baseline-from build/security/baseline-npm
           --npm-version "$(npm --version)"
           --exceptions security/exceptions.json
           --assessment-policy not-applicable

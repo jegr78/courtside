@@ -175,6 +175,18 @@ jobs:
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
             --output ../build/security/npm.json
 
+      - name: Choose the published npm baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/published-npm-baseline.mjs --subject "$COMMIT" --directory build/security/baseline-npm
+
+      - name: Capture the baseline's npm audit evidence
+        working-directory: frontend
+        run: |
+          test -f ../build/security/baseline-npm/package-lock.json || exit 0
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
+            --output ../build/security/baseline-npm/npm-audit.json --directory ../build/security/baseline-npm
+
       - uses: ./.github/actions/trivy-databases
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -214,6 +226,8 @@ jobs:
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm.json
+          --npm-lockfile frontend/package-lock.json
+          --baseline-from build/security/baseline-npm
           --trivy build/security/trivy-runtime.json
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
@@ -289,7 +303,7 @@ jobs:
 
       - name: Remove raw release-build security reports
         if: always()
-        run: rm -rf build/security/npm.json build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql
+        run: rm -rf build/security/npm.json build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/baseline-npm
 
       - name: Require completed release security gates
         if: always()

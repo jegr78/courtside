@@ -7,6 +7,7 @@ const networkCodes = new Set(["EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ENETUN
   "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"]);
 const severities = new Set(["critical", "high", "medium", "low"]);
 const summaryFindingFields = ["blockingFindings", "acceptedFindings", "informationalFindings"];
+const optionalSummaryFindingFields = ["preExistingFindings"];
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export function dependencyConfigPath(value, fallback) {
@@ -89,6 +90,7 @@ function addCurrentFinding(findings, finding) {
     findings.push(finding);
     return;
   }
+  existing.inBaseline = existing.inBaseline && finding.inBaseline;
   existing.aliases = [...new Set([...existing.aliases, ...finding.aliases])].toSorted();
   const rank = { low: 0, medium: 1, high: 2, critical: 3 };
   if (rank[finding.severity] > rank[existing.severity]) existing.severity = finding.severity;
@@ -117,8 +119,12 @@ export function currentDependencyEvidence(summaries, subject) {
     for (const field of summaryFindingFields) {
       if (!Array.isArray(summary[field])) throw new Error(`current security summary requires ${field}`);
     }
+    for (const field of optionalSummaryFindingFields) {
+      if (summary[field] !== undefined && !Array.isArray(summary[field])) throw new Error(`current security summary has invalid ${field}`);
+    }
     relevantSources.push(...summary.evidenceSources.filter((source) => ["npm", "trivy"].includes(source.scanner)));
-    for (const record of summaryFindingFields.flatMap((field) => summary[field])) {
+    for (const [field, record] of [...summaryFindingFields, ...optionalSummaryFindingFields]
+      .flatMap((field) => (summary[field] ?? []).map((record) => [field, record]))) {
       for (const observation of record.observations ?? [record]) {
         const scanner = observation.scanner ?? record.scanner;
         const component = observation.component ?? record.component;
@@ -132,7 +138,8 @@ export function currentDependencyEvidence(summaries, subject) {
           component,
           ecosystem: scanner === "npm" ? "npm" : "maven",
           manifestPath,
-          severity: normalizedSeverity(record.severity ?? observation.severity)
+          severity: normalizedSeverity(record.severity ?? observation.severity),
+          inBaseline: field === "preExistingFindings"
         });
       }
     }
@@ -284,7 +291,8 @@ export function evaluateDependencyRemediation({ alerts, currentFindings, previou
       component: requiredString(finding.component, "current dependency component"),
       ecosystem: requiredString(finding.ecosystem, "current dependency ecosystem").toLowerCase(),
       manifestPath: normalizedPath(finding.manifestPath),
-      severity: normalizedSeverity(finding.severity)
+      severity: normalizedSeverity(finding.severity),
+      inBaseline: finding.inBaseline === true
     });
   }
   for (const previous of previousFindings) {
@@ -369,11 +377,12 @@ export function evaluateDependencyRemediation({ alerts, currentFindings, previou
       containmentState,
       disposition,
       remediationPlan: assessment?.remediationPlan ?? null,
-      exception: exceptionCurrent ? { id: exception.id, validUntil: validUntil.toISOString() } : null
+      exception: exceptionCurrent ? { id: exception.id, validUntil: validUntil.toISOString() } : null,
+      inBaseline: currentFinding.inBaseline
     });
   }
   findings.sort((left, right) => left.identity.localeCompare(right.identity));
-  const blocked = findings.some((finding) => !finding.exception
+  const blocked = findings.some((finding) => !finding.exception && !finding.inBaseline
     && (finding.disposition === "pending-alert-correlation"
       || ["due", "overdue"].includes(finding.remediationState)
       || ["due", "overdue"].includes(finding.containmentState)));

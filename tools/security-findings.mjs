@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateAssessmentGateRecord } from "./security-assessment-gate.mjs";
@@ -9,7 +9,7 @@ const requiredExceptionFields = [
 ];
 
 export function evaluateSecurityReports({
-  reports, exceptions, scope, subject, assessment, assessmentPolicy,
+  reports, exceptions, scope, subject, assessment, assessmentPolicy, baseline,
   today = new Date().toISOString().slice(0, 10)
 }) {
   if (!scope || !subject) throw new Error("Security evidence requires a scope and subject");
@@ -31,6 +31,8 @@ export function evaluateSecurityReports({
   const matchedExceptions = new Set();
   const blockingFindings = [];
   const acceptedFindings = [];
+  const preExistingFindings = [];
+  const published = publishedIdentities(baseline);
   for (const finding of findings) {
     const exception = scopedExceptions.find((candidate) => matches(candidate, finding));
     if (exception) {
@@ -46,6 +48,8 @@ export function evaluateSecurityReports({
           independentReview: exception.independentReview
         }
       });
+    } else if (published.has(baselineIdentity(finding))) {
+      preExistingFindings.push(finding);
     } else {
       blockingFindings.push(finding);
     }
@@ -69,7 +73,33 @@ export function evaluateSecurityReports({
     })).toSorted((left, right) => left.scanner.localeCompare(right.scanner)),
     blockingFindings: deduplicateFindings(blockingFindings),
     acceptedFindings: deduplicateFindings(acceptedFindings), informationalFindings,
+    preExistingFindings: deduplicateFindings(preExistingFindings),
+    ...(baseline ? { baseline: baselineRecord(baseline) } : {}),
     ...(assessment ? { assessment: structuredClone(assessment) } : {})
+  };
+}
+
+function baselineIdentity(finding) {
+  if (finding.scanner !== "npm" || !["dev", "prod"].includes(finding.dependencyScope)) return null;
+  return `${finding.component}\0${finding.id}\0${finding.dependencyScope}`;
+}
+
+function publishedIdentities(baseline) {
+  const reports = baseline?.release ? baseline.reports ?? [] : [];
+  return new Set(reports.filter((report) => report.scanner === "npm" && report.status === "completed")
+    .flatMap((report) => report.findings.map((finding) => baselineIdentity({ scanner: "npm", ...finding })))
+    .filter(Boolean));
+}
+
+function baselineRecord(baseline) {
+  if (!baseline.release) return { release: null, reason: baseline.reason ?? "no-baseline", ...(baseline.detail ? { detail: baseline.detail } : {}) };
+  return {
+    release: baseline.release,
+    sources: baseline.reports.map((report) => ({
+      scanner: report.scanner, version: report.version ?? "unknown", status: report.status ?? "completed",
+      subject: report.subject ?? baseline.release, ...(report.reason ? { reason: report.reason } : {}),
+      findingCount: report.findings.length
+    }))
   };
 }
 
@@ -132,6 +162,8 @@ export function combineSecuritySummaries({
   const acceptedFindings = deduplicateFindings(summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding));
   const informationalFindings = deduplicateFindings(
     summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding));
+  const preExistingFindings = deduplicateFindings(
+    summaries.flatMap((summary) => summary.preExistingFindings ?? []).toSorted(compareFinding));
   const assessments = summaries.filter((summary) => summary.assessment).map((summary) => structuredClone(summary.assessment));
   if (blockingFindings.length > 0) throw new Error("Cannot combine blocked security evidence");
   return {
@@ -140,9 +172,10 @@ export function combineSecuritySummaries({
     sources: summaries.map((summary) => ({
       scope: summary.scope, subject: summary.subject, status: summary.status,
       assessmentPolicy: summary.assessmentPolicy,
-      evidenceSources: (summary.evidenceSources ?? []).map(releaseEvidenceSource)
+      evidenceSources: (summary.evidenceSources ?? []).map(releaseEvidenceSource),
+      ...(summary.baseline ? { baseline: structuredClone(summary.baseline) } : {})
     })),
-    blockingFindings, acceptedFindings, informationalFindings,
+    blockingFindings, acceptedFindings, informationalFindings, preExistingFindings,
     ...(assessments.length > 0 ? { assessments } : {}),
     ...(assessmentGates.length > 0 ? { assessmentGates: structuredClone(assessmentGates) } : {})
   };
@@ -213,6 +246,9 @@ function validateSummary(summary, today) {
   }
   for (const field of ["blockingFindings", "acceptedFindings", "informationalFindings"]) {
     if (!Array.isArray(summary[field])) throw new Error(`Security summary requires ${field}`);
+  }
+  if (summary.preExistingFindings !== undefined && !Array.isArray(summary.preExistingFindings)) {
+    throw new Error("Security summary has invalid preExistingFindings");
   }
   if (!["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
     throw new Error("Security summary has an invalid status");
@@ -305,26 +341,34 @@ export function parseNpmReport(input, metadata = {}) {
     };
   }
   validateNpmReport(input);
-  const findings = Object.entries(input.vulnerabilities).map(([name, finding]) => {
-    const advisory = finding.via.find((entry) => typeof entry === "object");
-    return {
-      id: String(advisory?.source ?? advisory?.url ?? `npm:${name}`),
-      severity: finding.severity.toUpperCase(),
-      target: `${name}@${finding.range}`,
+  const findings = Object.entries(input.vulnerabilities).flatMap(([name, finding]) => {
+    const dependencyScope = lockfileScope(finding.nodes, metadata.lockfile);
+    return finding.via.filter((entry) => typeof entry === "object").map((advisory) => ({
+      id: String(advisory.source ?? advisory.url ?? `npm:${name}`),
+      severity: String(advisory.severity ?? finding.severity).toUpperCase(),
+      target: `${name}@${advisory.range ?? finding.range}`,
       component: name,
-      advisorySource: advisory?.url ?? null,
+      advisorySource: advisory.url ?? null,
       aliases: [...new Set([
-        String(advisory?.source ?? `npm:${name}`),
-        ...(String(advisory?.url ?? "").match(/(?:GHSA-[a-z0-9-]+|CVE-[0-9]{4}-[0-9]+)/ig) ?? [])
+        String(advisory.source ?? `npm:${name}`),
+        ...(String(advisory.url ?? "").match(/(?:GHSA-[a-z0-9-]+|CVE-[0-9]{4}-[0-9]+)/ig) ?? [])
       ].map((alias) => alias.toUpperCase()))].toSorted(),
-      cwes: [...new Set(advisory?.cwe ?? [])].toSorted(),
-      reachability: "not-assessed"
-    };
+      cwes: [...new Set(advisory.cwe ?? [])].toSorted(),
+      reachability: "not-assessed",
+      dependencyScope
+    }));
   });
   return {
     scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
     subject: metadata.subject ?? "unknown", findings
   };
+}
+
+function lockfileScope(nodes, lockfile) {
+  if (!lockfile?.packages || !Array.isArray(nodes) || nodes.length === 0) return "unknown";
+  const entries = nodes.map((node) => lockfile.packages[node]);
+  if (entries.some((entry) => !entry || typeof entry !== "object")) return "unknown";
+  return entries.every((entry) => entry.dev === true) ? "dev" : "prod";
 }
 
 export function validateNpmReport(input) {
@@ -347,6 +391,12 @@ export function validateNpmReport(input) {
         || (advisory.cwe !== undefined && (!Array.isArray(advisory.cwe)
           || advisory.cwe.some((cwe) => typeof cwe !== "string")))))) {
       throw new Error(`npm audit vulnerability ${name} has invalid via evidence`);
+    }
+    for (const advisory of finding.via.filter((entry) => typeof entry === "object")) {
+      if (!severities.has(advisory.severity)) throw new Error(`npm audit advisory of ${name} has an invalid severity`);
+      if (!["number", "string"].includes(typeof advisory.source) || String(advisory.source).trim() === "") {
+        throw new Error(`npm audit advisory of ${name} has no source`);
+      }
     }
   }
 }
@@ -418,9 +468,20 @@ export function finalizeSupplyChainEvidence(summary, evidence) {
   };
 }
 
+function baselineDirectory(directory) {
+  const choice = JSON.parse(readFileSync(join(directory, "baseline.json"), "utf8"));
+  if (!choice.release) return { baselineReason: choice.reason ?? "no-baseline", baselineDetail: choice.detail };
+  for (const name of ["npm-audit.json", "package-lock.json"]) {
+    if (!existsSync(join(directory, name))) throw new Error(`Baseline ${choice.release} has no ${name}`);
+  }
+  return { baselineRelease: choice.release, baselineNpm: join(directory, "npm-audit.json"),
+    baselineNpmLockfile: join(directory, "package-lock.json") };
+}
+
 function parseArguments(args) {
   const values = {
-    trivy: [], npm: [], codeql: [], summary: [], assessmentGate: [], lifecycle: undefined,
+    trivy: [], npm: [], npmLockfile: [], codeql: [], summary: [], assessmentGate: [], lifecycle: undefined,
+    baselineNpm: undefined, baselineNpmLockfile: undefined, baselineRelease: undefined, baselineReason: undefined, baselineDetail: undefined,
     trivyVersion: undefined, npmVersion: undefined, assessmentPolicy: undefined,
     sourceSubject: undefined, exceptions: undefined, output: undefined, scope: undefined, subject: undefined
   };
@@ -432,6 +493,8 @@ function parseArguments(args) {
     else if (option === "--trivy-version") values.trivyVersion = value;
     else if (option === "--npm") values.npm.push(value);
     else if (option === "--npm-version") values.npmVersion = value;
+    else if (option === "--npm-lockfile") values.npmLockfile.push(value);
+    else if (option === "--baseline-from") Object.assign(values, baselineDirectory(value));
     else if (option === "--codeql") values.codeql.push(value);
     else if (option === "--summary") values.summary.push(value);
     else if (option === "--assessment-gate") values.assessmentGate.push(value);
@@ -454,6 +517,12 @@ function parseArguments(args) {
   if (reportCount > 0 && !values.exceptions) throw new Error("Missing --exceptions");
   if (values.trivy.length > 0 && !values.trivyVersion) throw new Error("Missing --trivy-version");
   if (values.npm.length > 0 && !values.npmVersion) throw new Error("Missing --npm-version");
+  if (values.npmLockfile.length > 0 && values.npmLockfile.length !== values.npm.length) {
+    throw new Error("Each --npm report needs its --npm-lockfile");
+  }
+  if (values.baselineRelease && (values.npm.length === 0 || values.npmLockfile.length !== values.npm.length)) {
+    throw new Error("A baseline is compared against npm reports with their lockfiles");
+  }
   if (reportCount > 0 && !values.assessmentPolicy) throw new Error("Missing --assessment-policy");
   if (values.assessmentPolicy === "required" && !values.lifecycle) throw new Error("Required lifecycle record is missing");
   if (values.assessmentPolicy === "not-applicable" && values.lifecycle) {
@@ -477,14 +546,19 @@ function main(args) {
     validateRiskAcceptances(policy.riskAcceptances ?? []);
     const reports = [
       ...values.trivy.map((path) => trivyReport(path, { version: values.trivyVersion, subject: values.subject })),
-      ...values.npm.map((path) => npmReport(path, { version: values.npmVersion, subject: values.subject })),
+      ...values.npm.map((path, index) => npmReport(path, { version: values.npmVersion, subject: values.subject,
+        ...(values.npmLockfile[index] ? { lockfile: JSON.parse(readFileSync(values.npmLockfile[index], "utf8")) } : {}) })),
       ...values.codeql.flatMap((path) => codeqlReports(path, { subject: values.subject }))
     ];
     if (reports.some((report) => report.version === "unknown"
       || !["completed", "skipped"].includes(report.status))) {
       throw new Error("Security scanner identity or completion status is missing");
     }
-    const skippedReports = reports.filter((report) => report.status === "skipped");
+    const baseline = values.baselineRelease
+      ? { release: values.baselineRelease, reports: [npmReport(values.baselineNpm, { version: values.npmVersion,
+        subject: values.baselineRelease, lockfile: JSON.parse(readFileSync(values.baselineNpmLockfile, "utf8")) })] }
+      : values.baselineReason ? { release: null, reason: values.baselineReason, detail: values.baselineDetail } : undefined;
+    const skippedReports = [...reports, ...(baseline?.reports ?? [])].filter((report) => report.status === "skipped");
     if (skippedReports.some((report) => report.scanner !== "npm")
       || (skippedReports.length > 0 && !["release-build", "scheduled-npm-audit"].includes(values.scope))) {
       throw new Error("Skipped scanner evidence is not allowed for this scope");
@@ -497,7 +571,7 @@ function main(args) {
     }
     result = evaluateSecurityReports({
       reports, exceptions: policy.exceptions, scope: values.scope, subject: values.subject,
-      assessment, assessmentPolicy: values.assessmentPolicy
+      assessment, assessmentPolicy: values.assessmentPolicy, baseline
     });
   }
   writeFileSync(values.output, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });

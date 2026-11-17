@@ -1007,11 +1007,25 @@ jobs:
         run: >
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security --
           --output ../build/security/npm.json
+      - name: Choose the published npm baseline
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: frontend/node/node tools/published-npm-baseline.mjs --subject ${{ github.sha }} --directory build/security/baseline-npm
+      - name: Capture the baseline's npm audit evidence
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        working-directory: frontend
+        run: |
+          test -f ../build/security/baseline-npm/package-lock.json || exit 0
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
+            --output ../build/security/baseline-npm/npm-audit.json --directory ../build/security/baseline-npm
       - name: Enforce release-build security policy
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: >
           frontend/node/node tools/security-findings.mjs
           --npm build/security/npm.json
+          --npm-lockfile frontend/package-lock.json
+          --baseline-from build/security/baseline-npm
           --trivy build/security/trivy-runtime.json
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
@@ -1024,7 +1038,7 @@ jobs:
           --output build/security/release-build.json
       - name: Remove raw security reports
         if: always()
-        run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime build/security/npm.json
+        run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime build/security/npm.json build/security/baseline-npm
       - name: Upload security evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

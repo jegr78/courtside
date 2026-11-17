@@ -224,7 +224,7 @@ test("given npm vulnerabilities, when parsing the audit report, then they become
   // given
   const input = { auditReportVersion: 2, vulnerabilities: {
     example: { severity: "high", range: "<2.0.0", via: [{
-      source: 1234, url: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz", cwe: ["CWE-79"]
+      source: 1234, url: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz", severity: "high", cwe: ["CWE-79"]
     }] }
   } };
 
@@ -238,7 +238,7 @@ test("given npm vulnerabilities, when parsing the audit report, then they become
   assert.deepEqual(report.findings[0], {
     id: "1234", severity: "HIGH", target: "example@<2.0.0", component: "example",
     advisorySource: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
-    aliases: ["1234", "GHSA-XXXX-YYYY-ZZZZ"], cwes: ["CWE-79"], reachability: "not-assessed"
+    aliases: ["1234", "GHSA-XXXX-YYYY-ZZZZ"], cwes: ["CWE-79"], reachability: "not-assessed", dependencyScope: "unknown"
   });
 });
 

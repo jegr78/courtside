@@ -17,7 +17,7 @@ const IDENTIFIER = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
 const VERSION = new RegExp(
   `^v(${NUMBER})\\.(${NUMBER})\\.(${NUMBER})(?:-(${IDENTIFIER}(?:\\.${IDENTIFIER})*))?$`);
 
-function parseVersion(tag) {
+export function parseVersion(tag) {
   const match = VERSION.exec(tag);
   return match && {
     tag, major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]),
@@ -27,7 +27,7 @@ function parseVersion(tag) {
 
 // Semantic versioning §11: a candidate precedes the release it is a candidate for, a numeric
 // identifier is compared as a number, and a shorter set of identifiers precedes a longer one.
-function precedence(left, right) {
+export function precedence(left, right) {
   if (left.major !== right.major) return left.major - right.major;
   if (left.minor !== right.minor) return left.minor - right.minor;
   if (left.patch !== right.patch) return left.patch - right.patch;

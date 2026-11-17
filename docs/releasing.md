@@ -344,9 +344,10 @@ weeks. It was removed.
 
 ## What the release refuses after scanning
 
-**No confirmed dependency finding may be past its remediation deadline.** The candidate's
-`release-build` matches the complete Dependabot alert history against npm and Trivy summaries bound
-to the release commit. The
+**No confirmed dependency finding the release introduces may be past its remediation deadline.**
+The candidate's `release-build` matches the complete Dependabot alert history against npm and Trivy
+summaries bound to the release commit. An npm finding the published baseline already has does not block,
+as `docs/security-scanning.md` describes. The
 summaries establish current dependency state; alert history supplies the earliest reliable clock.
 An exact, current maintainer exception can keep the release ready. An unavailable alert service
 produces explicit skipped evidence and does not block publication by itself. The latest completed

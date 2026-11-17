@@ -4,7 +4,7 @@ Courtside treats scanners as evidence, not as proof that the product is secure. 
 
 CodeQL runs the `security-extended` query suite. Trivy scans the unpacked runtime JAR as a root filesystem so that transitive Java libraries are included, then scans repository secrets and deployment configuration separately. Dependency Review rejects newly introduced High and Critical vulnerable dependencies.
 
-The `npm audit` workflow checks the complete locked frontend dependency tree every Tuesday and on manual request. Pull requests do not call the remote audit service because Dependency Review evaluates their dependency changes. Releases run the complete audit again. A valid report with High or Critical findings blocks both paths. A network error reported by npm or an HTTP 502, 503 or 504 response records npm as `skipped` and does not block a release. The scheduled workflow still fails when its audit is skipped, so the nightly failure tracker makes a prolonged outage visible without stopping publication. A six-minute process budget stops a hung client but remains a failure because it does not prove that the remote service caused the hang. Empty, malformed and unknown responses fail both paths. The retained source status therefore distinguishes a completed clean scan from an unavailable service.
+The `npm audit` workflow checks the complete locked frontend dependency tree every Tuesday and on manual request. Pull requests do not call the remote audit service because Dependency Review evaluates their dependency changes. Releases run the complete audit again. A valid report with High or Critical findings fails the Tuesday workflow. On the release path, which is every scheduled or dispatched full build, the release gates and the candidate, such a finding blocks unless the published baseline has it too (see below). A network error reported by npm or an HTTP 502, 503 or 504 response records npm as `skipped` and does not block a release. The scheduled workflow still fails when its audit is skipped, so the nightly failure tracker makes a prolonged outage visible without stopping publication. A six-minute process budget stops a hung client but remains a failure because it does not prove that the remote service caused the hang. Empty, malformed and unknown responses fail both paths. The retained source status therefore distinguishes a completed clean scan from an unavailable service.
 
 Every other scanner outage or missing report fails its named workflow step and is never reported as a clean scan. Maintainers can run the same classified npm audit locally with `cd frontend && npm run audit:security -- --output ../build/security/npm.json`.
 
@@ -16,7 +16,7 @@ when a scan runs again, a branch is rebased or an alert is reopened. The alert h
 the clock, not the current dependency state. SHA-bound npm and Trivy summaries confirm which
 findings exist in the tested lockfile or runtime. This avoids treating a delayed Dependabot update
 as evidence about a newer commit. A current scanner finding that Dependabot has not ingested is
-recorded as `pending-alert-correlation` and blocks release until its version and original discovery
+recorded as `pending-alert-correlation` and blocks a release that introduces it until its version and original discovery
 can be correlated. It cannot use an exception while that version is unknown. Critical findings must be
 remediated within 72 hours. A Critical finding that is actively exploited or directly reachable
 must also be contained within 24 hours. Until its reachability is documented in
@@ -27,7 +27,14 @@ The maintainer owns triage, containment and remediation. A finding with an upstr
 unplanned update until its assessment names the repository issue that plans it; a finding without
 a patched version is recorded separately as an unavailable upstream fix. An alert dismissed as
 inaccurate does not start the clock. A confirmed finding that reaches its deadline blocks a
-release. Dependabot proposals, including major updates, are evaluated by Dependency Review and CI
+release that introduces it. An npm finding the published baseline already has never blocks a
+release, whatever its deadline: withholding the next release would not remove it from the instances
+that run the current one, and would delay every other fix the next release carries. A release
+candidate counts as published because UAT and the club test instance run it. An exception that lets
+a release ship with a finding therefore ends that finding's release block for good; the Tuesday audit
+is what keeps it in sight. It stays in the
+evidence with `inBaseline: true` and keeps failing the Tuesday audit until it is fixed.
+Dependabot proposals, including major updates, are evaluated by Dependency Review and CI
 rather than rejected by a hard pre-approval ignore rule.
 
 The project's single maintainer may approve a dependency exception in `security/exceptions.json`.
@@ -56,7 +63,7 @@ observations. The importer does not execute scanners.
 
 ## Triage and exceptions
 
-High and Critical npm and Trivy findings and CodeQL findings with a security severity of at least 7 block the gate. A maintainer validates reachability and exploitability before deciding whether to fix the dependency, remove the affected feature or record an exception.
+High and Critical npm and Trivy findings and CodeQL findings with a security severity of at least 7 block the gate. An npm finding is the exception when the published baseline has it as well. The baseline is the newest published release that is a strict ancestor of the scanned commit and whose own release record shows a completed npm audit. Its `frontend/package-lock.json` is audited in the same job, so both sides use the same advisory data. Both sides are compared by package, advisory and dependency scope, where `dev` or `prod` comes from the lockfile. A package that moves from a development to a production dependency is therefore new. Such a finding is listed under `preExistingFindings` in the summary and in the release record, and the record names the baseline release. Without a usable baseline every High or Critical npm finding blocks, and the summary records why, including a failed release lookup. Trivy findings are not yet compared against a baseline. A maintainer validates reachability and exploitability before deciding whether to fix the dependency, remove the affected feature or record an exception.
 
 Static-scanner exceptions live in `security/exceptions.json` and match one scan scope, scanner, finding id and target exactly. The maintained scopes are `required-build`, `release-build`, `release-image-amd64` and `release-image-arm64`. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate and incomplete exceptions fail every gate; an unused exception fails its own scope without blocking unrelated scopes.
 

@@ -1,0 +1,404 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@rollup/plugin-babel": {
+      "name": "@rollup/plugin-babel",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/pluginutils"
+      ],
+      "effects": [],
+      "range": ">=5.2.0",
+      "nodes": [
+        "node_modules/@rollup/plugin-babel"
+      ],
+      "fixAvailable": true
+    },
+    "@rollup/plugin-node-resolve": {
+      "name": "@rollup/plugin-node-resolve",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/pluginutils"
+      ],
+      "effects": [
+        "workbox-build"
+      ],
+      "range": ">=8.4.0",
+      "nodes": [
+        "node_modules/@rollup/plugin-node-resolve"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.20.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@rollup/plugin-replace": {
+      "name": "@rollup/plugin-replace",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/pluginutils"
+      ],
+      "effects": [
+        "workbox-build"
+      ],
+      "range": ">=2.3.4",
+      "nodes": [
+        "node_modules/@rollup/plugin-replace"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.20.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@rollup/pluginutils": {
+      "name": "@rollup/pluginutils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "picomatch"
+      ],
+      "effects": [
+        "@rollup/plugin-babel",
+        "@rollup/plugin-node-resolve",
+        "@rollup/plugin-replace"
+      ],
+      "range": ">=3.0.10",
+      "nodes": [
+        "node_modules/@rollup/pluginutils"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.20.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@typescript-eslint/eslint-plugin": {
+      "name": "@typescript-eslint/eslint-plugin",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/parser",
+        "@typescript-eslint/type-utils",
+        "@typescript-eslint/utils"
+      ],
+      "effects": [],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/@typescript-eslint/eslint-plugin"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/parser": {
+      "name": "@typescript-eslint/parser",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree"
+      ],
+      "effects": [],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/@typescript-eslint/parser"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/type-utils": {
+      "name": "@typescript-eslint/type-utils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree",
+        "@typescript-eslint/utils"
+      ],
+      "effects": [],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/@typescript-eslint/type-utils"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/typescript-estree": {
+      "name": "@typescript-eslint/typescript-estree",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "tinyglobby"
+      ],
+      "effects": [
+        "@typescript-eslint/parser",
+        "@typescript-eslint/type-utils",
+        "@typescript-eslint/utils",
+        "typescript-eslint"
+      ],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/@typescript-eslint/typescript-estree"
+      ],
+      "fixAvailable": {
+        "name": "typescript-eslint",
+        "version": "8.47.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@typescript-eslint/utils": {
+      "name": "@typescript-eslint/utils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree"
+      ],
+      "effects": [
+        "@typescript-eslint/eslint-plugin"
+      ],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/@typescript-eslint/utils"
+      ],
+      "fixAvailable": true
+    },
+    "@vitejs/plugin-react": {
+      "name": "@vitejs/plugin-react",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "vite"
+      ],
+      "effects": [],
+      "range": ">=6.0.0-beta.0",
+      "nodes": [
+        "node_modules/@vitejs/plugin-react"
+      ],
+      "fixAvailable": {
+        "name": "@vitejs/plugin-react",
+        "version": "5.2.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@vitest/coverage-v8": {
+      "name": "@vitest/coverage-v8",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "vitest"
+      ],
+      "effects": [
+        "vitest"
+      ],
+      "range": ">=3.2.0-beta.1",
+      "nodes": [
+        "node_modules/@vitest/coverage-v8"
+      ],
+      "fixAvailable": {
+        "name": "@vitest/coverage-v8",
+        "version": "3.1.4",
+        "isSemVerMajor": true
+      }
+    },
+    "fdir": {
+      "name": "fdir",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "picomatch"
+      ],
+      "effects": [],
+      "range": ">=5.2.1",
+      "nodes": [
+        "node_modules/fdir"
+      ],
+      "fixAvailable": true
+    },
+    "picomatch": {
+      "name": "picomatch",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1247710,
+          "name": "picomatch",
+          "dependency": "picomatch",
+          "title": "picomatch vulnerable to ReDoS through single-branch repeated extglobs",
+          "url": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+          "severity": "high",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=4.0.7"
+        }
+      ],
+      "effects": [
+        "@rollup/pluginutils",
+        "fdir",
+        "tinyglobby",
+        "vite",
+        "vitest"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/picomatch"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "3.1.4",
+        "isSemVerMajor": true
+      }
+    },
+    "tinyglobby": {
+      "name": "tinyglobby",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "fdir",
+        "picomatch"
+      ],
+      "effects": [
+        "@typescript-eslint/typescript-estree",
+        "vite-plugin-pwa",
+        "vitest"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/tinyglobby"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "3.1.4",
+        "isSemVerMajor": true
+      }
+    },
+    "typescript-eslint": {
+      "name": "typescript-eslint",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser",
+        "@typescript-eslint/typescript-estree",
+        "@typescript-eslint/utils"
+      ],
+      "effects": [],
+      "range": ">=8.47.1-alpha.0",
+      "nodes": [
+        "node_modules/typescript-eslint"
+      ],
+      "fixAvailable": {
+        "name": "typescript-eslint",
+        "version": "8.47.0",
+        "isSemVerMajor": true
+      }
+    },
+    "vite": {
+      "name": "vite",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "picomatch",
+        "tinyglobby"
+      ],
+      "effects": [
+        "@vitejs/plugin-react",
+        "vitest"
+      ],
+      "range": ">=6.3.0-beta.0",
+      "nodes": [
+        "node_modules/vite"
+      ],
+      "fixAvailable": {
+        "name": "vite",
+        "version": "6.2.7",
+        "isSemVerMajor": true
+      }
+    },
+    "vite-plugin-pwa": {
+      "name": "vite-plugin-pwa",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "tinyglobby",
+        "workbox-build"
+      ],
+      "effects": [],
+      "range": ">=0.6.3",
+      "nodes": [
+        "node_modules/vite-plugin-pwa"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.20.0",
+        "isSemVerMajor": true
+      }
+    },
+    "vitest": {
+      "name": "vitest",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@vitest/coverage-v8",
+        "picomatch",
+        "tinyglobby",
+        "vite"
+      ],
+      "effects": [
+        "@vitest/coverage-v8"
+      ],
+      "range": ">=3.1.2",
+      "nodes": [
+        "node_modules/vitest"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "3.1.4",
+        "isSemVerMajor": true
+      }
+    },
+    "workbox-build": {
+      "name": "workbox-build",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/plugin-babel",
+        "@rollup/plugin-node-resolve",
+        "@rollup/plugin-replace"
+      ],
+      "effects": [
+        "vite-plugin-pwa"
+      ],
+      "range": ">=6.0.0-alpha.0",
+      "nodes": [
+        "node_modules/workbox-build"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.20.0",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 19,
+      "critical": 0,
+      "total": 19
+    },
+    "dependencies": {
+      "prod": 17,
+      "dev": 749,
+      "optional": 69,
+      "peer": 7,
+      "peerOptional": 0,
+      "total": 765
+    }
+  }
+}

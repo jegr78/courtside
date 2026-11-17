@@ -83,6 +83,8 @@ test("given npm is executed inside a bounded job, when planning the child proces
   // then
   assert.equal(invocation[2].timeout, undefined);
   assert.equal(invocation[2].maxBuffer, 10 * 1024 * 1024);
+  assert.ok(invocation[1].includes("--package-lock-only"),
+    "the candidate and a published release are audited from their lockfiles alone, the same way");
 });
 
 test("given malformed or unknown output, when classification runs, then it fails closed", () => {
