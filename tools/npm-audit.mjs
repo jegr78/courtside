@@ -60,7 +60,7 @@ export function runAudit({ output, directory }, execute) {
 export function executeNpmAudit(execute = spawnSync, env = process.env, workingDirectory = process.cwd()) {
   const npmCli = env.npm_execpath;
   if (!npmCli || !isAbsolute(npmCli)) throw new Error("Run npm audit through the audit:security package script");
-  return execute(process.execPath, [npmCli, "audit", "--json", "--audit-level=high"], {
+  return execute(process.execPath, [npmCli, "audit", "--json", "--package-lock-only", "--audit-level=high"], {
     cwd: workingDirectory, encoding: "utf8", env, maxBuffer: 10 * 1024 * 1024
   });
 }

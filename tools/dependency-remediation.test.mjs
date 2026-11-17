@@ -94,7 +94,8 @@ test("given immutable scanner evidence, when reading current dependencies, then 
       component: "example-package",
       ecosystem: "npm",
       manifestPath: "frontend/package-lock.json",
-      severity: "medium"
+      severity: "medium",
+      inBaseline: false
     }]
   });
 });
@@ -135,6 +136,44 @@ test("given a current finding before Dependabot ingests it, when evaluating rele
   assert.equal(result.releaseReadiness, "blocked");
 });
 
+test("given a finding the published release already has, when its alert is missing or overdue, then release readiness ignores it", () => {
+  // given
+  const preExisting = { ...securitySummary().informationalFindings[0], severity: "HIGH", aliases: ["1247710", "GHSA-FC5Q-39XC-VJPF"],
+    component: "picomatch", target: "picomatch@<=4.0.7", dependencyScope: "dev" };
+  const evidence = currentDependencyEvidence([securitySummary({ informationalFindings: [], preExistingFindings: [preExisting] })], "a".repeat(40));
+  const overdueAlert = { ...baseAlert, created_at: "2026-07-01T00:00:00Z" };
+
+  // when
+  const correlation = evaluate([], { currentFindings: evidence.findings });
+  const overdue = evaluate([overdueAlert], { currentFindings: [{ aliases: ["GHSA-1111-2222-3333"], component: "example-package",
+    ecosystem: "npm", manifestPath: "frontend/package-lock.json", severity: "high", inBaseline: true }] });
+
+  // then
+  assert.equal(evidence.findings[0].inBaseline, true);
+  assert.equal(correlation.findings[0].disposition, "pending-alert-correlation");
+  assert.equal(correlation.findings[0].inBaseline, true, "the gap stays in the evidence");
+  assert.equal(correlation.releaseReadiness, "ready", "a gap the published release has cannot hold the next release");
+  assert.equal(overdue.findings[0].remediationState, "overdue");
+  assert.equal(overdue.releaseReadiness, "ready");
+  assert.equal(evaluate([overdueAlert]).releaseReadiness, "blocked", "the same overdue finding outside the baseline still blocks");
+});
+
+test("given one finding seen both as pre-existing and as new, when reading evidence, then it counts as new", () => {
+  // given
+  const finding = { ...securitySummary().informationalFindings[0], severity: "HIGH" };
+  const summaries = [
+    securitySummary({ informationalFindings: [], preExistingFindings: [finding] }),
+    securitySummary({ scope: "release-build", informationalFindings: [], blockingFindings: [finding] })
+  ];
+
+  // when
+  const evidence = currentDependencyEvidence(summaries, "a".repeat(40));
+
+  // then
+  assert.equal(evidence.findings.length, 1);
+  assert.equal(evidence.findings[0].inBaseline, false, "one observation outside the baseline is enough to treat it as new");
+});
+
 test("given scanner evidence for another subject or an unavailable scanner, when reading it, then it cannot become successful evidence", () => {
   assert.throws(() => currentDependencyEvidence([
     securitySummary({ subject: "b".repeat(40) })
@@ -163,7 +202,8 @@ test("given scanner evidence for another subject or an unavailable scanner, when
       component: "org.example:example-package",
       ecosystem: "maven",
       manifestPath: "pom.xml",
-      severity: "medium"
+      severity: "medium",
+      inBaseline: false
     }]
   });
 });

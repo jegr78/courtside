@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "scope": "release",
+  "subject": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+  "generatedAt": "2026-11-15T00:00:00.000Z",
+  "status": "passed",
+  "sources": [
+    {
+      "scope": "release-build",
+      "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+      "status": "passed",
+      "assessmentPolicy": "not-applicable",
+      "evidenceSources": [
+        {
+          "scanner": "codeql",
+          "version": "2.27.4",
+          "status": "completed",
+          "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+          "findingCount": 3
+        },
+        {
+          "scanner": "codeql",
+          "version": "2.27.4",
+          "status": "completed",
+          "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+          "findingCount": 13
+        },
+        {
+          "scanner": "npm",
+          "version": "11.17.0",
+          "status": "completed",
+          "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+          "findingCount": 4
+        },
+        {
+          "scanner": "trivy",
+          "version": "0.70.0",
+          "status": "completed",
+          "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+          "findingCount": 0
+        },
+        {
+          "scanner": "trivy",
+          "version": "0.70.0",
+          "status": "completed",
+          "subject": "4f10fde13589bf75239b9c818f2f1b9891aa0e1e",
+          "findingCount": 1
+        }
+      ]
+    },
+    {
+      "scope": "release-image-amd64",
+      "subject": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+      "status": "passed",
+      "assessmentPolicy": "not-applicable",
+      "evidenceSources": [
+        {
+          "scanner": "trivy",
+          "version": "0.70.0",
+          "status": "completed",
+          "subject": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+          "artifactDigest": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+          "findingCount": 34
+        }
+      ]
+    },
+    {
+      "scope": "release-image-arm64",
+      "subject": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+      "status": "passed",
+      "assessmentPolicy": "not-applicable",
+      "evidenceSources": [
+        {
+          "scanner": "trivy",
+          "version": "0.70.0",
+          "status": "completed",
+          "subject": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+          "artifactDigest": "sha256:06ffbab46a41242c340f01b25cbbc9a6c878706b27f4760c13d1da04afffe285",
+          "findingCount": 34
+        }
+      ]
+    }
+  ]
+}
