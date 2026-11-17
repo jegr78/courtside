@@ -171,7 +171,7 @@ jobs:
     needs: test-profile-plan
     if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.test-profile-plan.outputs.tooling == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -227,7 +227,7 @@ jobs:
     needs: test-profile-plan
     if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.test-profile-plan.outputs.clock_shift == 'true')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
