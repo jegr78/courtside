@@ -427,22 +427,24 @@ test("given the host's and the application's IPv6 routes, when doctor probes the
   });
 });
 
+const HOST_TOOLS_WITHOUT_CURL = ["mkdir", "chmod", "rm", "rmdir", "sed", "head", "tail", "mktemp", "cp", "mv", "ln", "grep", "stat", "find",
+  "awk", "tr", "date", "df", "id", "readlink", "env", "sort", "wc", "sleep", "dirname", "bash"];
+const DIGEST_TOOLS = ["sha256sum", "shasum"];
+
 test("given a host without curl or an application still starting, when doctor probes IPv6, then it reports only what it measured", () => {
   fixture((context) => {
     // given
     assert.equal(initialize(context).status, 0);
     const withoutCurl = join(context.root, "path-without-curl");
     mkdirSync(withoutCurl);
-    for (const directory of context.environment.PATH.split(":")) {
-      if (!existsSync(directory)) continue;
-      for (const name of readdirSync(directory)) {
-        if (name === "curl" || existsSync(join(withoutCurl, name))) continue;
-        symlinkSync(join(directory, name), join(withoutCurl, name));
-      }
-    }
+    symlinkSync(join(context.root, "bin", "docker"), join(withoutCurl, "docker"));
+    for (const name of HOST_TOOLS_WITHOUT_CURL) symlinkSync(executable(name), join(withoutCurl, name));
+    const digest = DIGEST_TOOLS.find((name) => { try { return executable(name); } catch { return false; } });
+    assert.ok(digest, `the host offers one of ${DIGEST_TOOLS.join(" or ")}`);
+    symlinkSync(executable(digest), join(withoutCurl, digest));
     const probe = (environment) => {
       const result = run(context.archive, context.target, ["doctor", "--json"], environment);
-      return { status: result.status, ...JSON.parse(result.stdout).checks.find(({ name }) => name === "ipv6-egress") };
+      return { status: result.status, stderr: result.stderr, ...JSON.parse(result.stdout || "{\"checks\":[]}").checks.find(({ name }) => name === "ipv6-egress") };
     };
 
     // when
@@ -451,7 +453,7 @@ test("given a host without curl or an application still starting, when doctor pr
     const starting = probe(context.environment);
 
     // then
-    assert.equal(missingCurl.status, 0, "a host without curl is no finding");
+    assert.equal(missingCurl.status, 0, `a host without curl is no finding: ${missingCurl.stderr}`);
     assert.equal(missingCurl.state, "UNKNOWN");
     assert.match(missingCurl.detail, /curl is missing/);
     assert.equal(starting.state, "PASS", "a starting container already answers exec");
