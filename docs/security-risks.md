@@ -410,7 +410,8 @@ A High or Critical npm finding that the newest published release has, in the sam
 and dependency scope, does not block the next release and needs no exception or expiry. Withholding
 the release would not remove the finding from the instances that run the current one, and would
 delay every other fix it carries. The finding stays listed as pre-existing in each release record,
-whose status reads `passed-with-baseline`, and the Tuesday audit keeps failing while it exists.
+whose status reads `passed-with-baseline` unless an exception applies as well, and the Tuesday
+audit keeps failing while it exists.
 Trivy findings have no such baseline. Reconsider if a release must certify the absence of known npm
 advisories, or if a finding stays unfixed upstream past its remediation deadline.
 
