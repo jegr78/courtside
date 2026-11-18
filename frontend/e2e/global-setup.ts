@@ -14,6 +14,7 @@ import { awaitReadiness } from "./application-readiness";
 import { requireBuiltAfterItsSources } from "./build-freshness";
 import {
   applicationLogBuffer,
+  applicationTimingRecording,
   collectBrowserDiagnostics,
   retainBrowserDiagnostics,
   type BrowserDiagnostics,
@@ -753,8 +754,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     // between can be handed the same number before Tomcat ever binds it.
     const port = await availableLoopbackPort();
     const baseURL = `http://127.0.0.1:${port}`;
+    const diagnosticsDirectory = resolve("test-results", "browser-diagnostics");
+    mkdirSync(diagnosticsDirectory, { recursive: true });
+    const timing = applicationTimingRecording(diagnosticsDirectory);
     const applicationEnvironment = {
       ...process.env,
+      ...timing.environment,
       SERVER_PORT: String(port),
       SPRING_DATASOURCE_URL: `jdbc:postgresql://${postgres.getHost()}:${postgres.getMappedPort(5432)}/courtside`,
       SPRING_DATASOURCE_USERNAME: "courtside",
@@ -780,7 +785,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
-      application = spawn(java, ["-jar", applicationJar()], {
+      application = spawn(java, [...timing.javaArguments, "-jar", applicationJar()], {
         env: applicationEnvironment,
         stdio: ["ignore", "pipe", "pipe"]
       });

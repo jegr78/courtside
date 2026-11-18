@@ -114,6 +114,7 @@ jobs:
             frontend/test-results/**/*.png
             frontend/test-results/**/error-context.md
             frontend/test-results/browser-diagnostics/*.json
+            frontend/test-results/browser-diagnostics/*.log
             frontend/test-results/browser-gate-outcome.json
             frontend/test-results/resource-environment.json
             frontend/test-results/resource-timeline.json
@@ -180,5 +181,6 @@ jobs:
             frontend/test-results/**/trace.zip
             frontend/test-results/**/*.png
             frontend/test-results/browser-diagnostics/*.json
+            frontend/test-results/browser-diagnostics/*.log
           if-no-files-found: error
           retention-days: 14

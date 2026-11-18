@@ -4,9 +4,11 @@ import { rmSync } from "node:fs";
 import type { DockerDiagnosticCommand } from "./browser-diagnostics";
 import {
   applicationLogBuffer,
+  applicationTimingRecording,
   classifyBrowserFailure,
   collectBrowserDiagnostics,
   diagnoseUnexpectedBrowserTest,
+  dockerDiagnosticCommand,
   observeBrowserDisconnect,
   retainBrowserDiagnostics
 } from "./browser-diagnostics";
@@ -125,6 +127,49 @@ describe("browser diagnostics", () => {
     expect(rejectionHandlerAttached).toBe(true);
     await expect(finish()).rejects.toBe(failure);
     expect(browser.listenerCount("disconnected")).toBe(0);
+  });
+
+  it("given a container that logs to both streams, when its logs are read, then both are kept in the order they were written", async () => {
+    // given
+    const run = vi.fn((args: string[]) => Promise.resolve(args[0] === "logs"
+      ? { stdout: "2026-11-17T21:42:30.100000000Z out first\n2026-11-17T21:42:42.700000000Z out last\n",
+        stderr: "2026-11-17T21:42:30.864000000Z err middle\n" }
+      : { stdout: "{}", stderr: "a warning that is not JSON\n" }));
+    const command = dockerDiagnosticCommand(run);
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "chromium", "test-timeout", command);
+
+    // then
+    expect(run).toHaveBeenCalledWith(["logs", "--timestamps", "--tail", "200", "container-1"], expect.any(AbortSignal));
+    expect(diagnostics.containerLogs).toBe([
+      "2026-11-17T21:42:30.100000000Z out first",
+      "2026-11-17T21:42:30.864000000Z err middle",
+      "2026-11-17T21:42:42.700000000Z out last"
+    ].join("\n"));
+    expect(diagnostics.containerState).toEqual({});
+    expect(diagnostics.diagnosticErrors).toEqual([]);
+  });
+
+  it("given a diagnostics directory, when the application's timing is recorded, then arrival, duration and JVM pauses land there without query strings", () => {
+    // when
+    const recording = applicationTimingRecording("/work/test-results/browser-diagnostics");
+
+    // then
+    expect(recording.javaArguments).toEqual([
+      "-Xlog:gc,safepoint:file=/work/test-results/browser-diagnostics/application-jvm-%p.log:time,uptime,level,tags"
+    ]);
+    expect(recording.environment).toMatchObject({
+      SERVER_TOMCAT_ACCESSLOG_ENABLED: "true",
+      SERVER_TOMCAT_ACCESSLOG_DIRECTORY: "/work/test-results/browser-diagnostics",
+      SERVER_TOMCAT_ACCESSLOG_PREFIX: "application-access",
+      SERVER_TOMCAT_ACCESSLOG_SUFFIX: ".log",
+      SERVER_TOMCAT_ACCESSLOG_ROTATE: "false"
+    });
+    const pattern = recording.environment.SERVER_TOMCAT_ACCESSLOG_PATTERN;
+    expect(pattern.startsWith("%{begin:"), "the arrival time separates a request held before Tomcat from one held inside it").toBe(true);
+    expect(pattern).toContain(" %U ");
+    expect(pattern, "a query string can carry a token").not.toMatch(/%r|%q/);
   });
 
   it("given a browser container that was killed, when collecting diagnostics, then its cause and bounded logs are retained", async () => {

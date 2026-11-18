@@ -358,7 +358,12 @@ the other green.
 A failed test retains what an analysis needs after the run is over: which test failed, its errors as
 text rather than as the colour codes Playwright writes them in, the last lines the application
 logged, and the state of the browser, proxy and database containers, one JSON file per failure
-under `frontend/test-results/browser-diagnostics`, uploaded with the run. The application log is
+under `frontend/test-results/browser-diagnostics`, uploaded with the run. A container's log keeps
+both of its streams with their timestamps, since Caddy and PostgreSQL write to stderr. Beside the
+JSON files the run keeps `application-access.log`, which holds each request's arrival and end at
+Tomcat by path without its query, and one `application-jvm-<pid>.log` of garbage collection and
+safepoint pauses per application process. Together they tell a request held before the application,
+inside it and by a stopped JVM apart. Neither file carries a value that needs redaction. The application log is
 kept in memory rather than streamed during a successful run; `COURTSIDE_VERBOSE_TEST_LOGS=true`
 enables live output for an explicit diagnosis. Retained logs pass the same redaction a container
 log does before they are written: URLs lose their path and query, a value behind a password, token, cookie or
