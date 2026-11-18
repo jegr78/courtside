@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 import { assertShiftedClock, declaredToolTests, runToolTests, shiftedClockEnvironment, toolInventory }
   from "./tool-tests.mjs";
@@ -105,7 +105,8 @@ test("given a clock offset, when the tool tests are spawned, then the child runs
   // then
   assert.equal(calls[0].options.env.COURTSIDE_CLOCK_OFFSET_DAYS, "400");
   assert.match(calls[0].options.env.NODE_OPTIONS, /--import=file:.*tools\/shift-clock\.mjs$/);
-  assert.equal(calls[0].options.env.TMPDIR.length > 0, true, "the shifted run keeps its own temporary root");
+  assert.notEqual(calls[0].options.env.TMPDIR, process.env.TMPDIR, "the shifted run keeps its own temporary root");
+  assert.match(basename(calls[0].options.env.TMPDIR), /^courtside-tool-tests-/);
   assert.equal(calls[1].options.env.COURTSIDE_CLOCK_OFFSET_DAYS, process.env.COURTSIDE_CLOCK_OFFSET_DAYS);
   assert.equal(shiftedClockEnvironment(400, { NODE_OPTIONS: "--enable-source-maps" }).NODE_OPTIONS
     .startsWith("--enable-source-maps "), true);
