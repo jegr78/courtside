@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import { createRequire } from "node:module";
@@ -15,6 +14,7 @@ import {
   summarizeReliability,
   validateReliabilityRecord
 } from "./webkit-reliability.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const frontendRequire = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = frontendRequire("ajv/dist/2020").default;
@@ -285,7 +285,7 @@ test("given the deadline expires after passing claims, when building the record,
 
 test("given an existing first attempt, when retaining a diagnostic run, then the original cannot be overwritten", () => {
   // given
-  const directory = mkdtempSync(resolve(tmpdir(), "courtside-reliability-"));
+  const directory = temporaryDirectory("courtside-reliability-");
   const first = record();
   const path = retainReliabilityRecord(first, directory);
 

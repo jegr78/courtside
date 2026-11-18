@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { boundedAssessmentFailureReason } from "./security-runner.mjs";
@@ -12,6 +11,7 @@ import {
   alertDiscriminator, recordCovers, resolveAlertAgainst,
   passiveScannerOrigin, requiredPassiveCheckIds, runOwnedProcess, zapVersion
 } from "./security-passive-deployment.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -1249,7 +1249,7 @@ test("given deployment qualification, when its digest or checks differ, then con
 
 test("given an emergency stop, when an owned scanner is running, then it is killed and cleaned up", async () => {
   // given
-  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-passive-stop-")), "STOP");
+  const stopFile = join(temporaryDirectory("courtside-passive-stop-"), "STOP");
   let cleaned = false;
   setTimeout(() => writeFileSync(stopFile, "stop"), 50);
 
@@ -1264,7 +1264,7 @@ test("given an emergency stop, when an owned scanner is running, then it is kill
 
 test("given an emergency stop during native checks, when another request is considered, then it fails closed", async () => {
   // given
-  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-stop-")), "STOP");
+  const stopFile = join(temporaryDirectory("courtside-native-stop-"), "STOP");
   const control = createAssessmentControl(stopFile, new Date(Date.now() + 5_000));
   writeFileSync(stopFile, "stop");
 
@@ -1276,7 +1276,7 @@ test("given an emergency stop during native checks, when another request is cons
 
 test("given an expired assessment deadline, when a native request is considered, then it fails closed", () => {
   // given
-  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-deadline-")), "STOP");
+  const stopFile = join(temporaryDirectory("courtside-native-deadline-"), "STOP");
   const control = createAssessmentControl(stopFile, new Date(Date.now() - 1));
 
   // when / then
@@ -1292,7 +1292,7 @@ test("given a scanner failure, when the process exits, then transient resources 
   // when / then
   await assert.rejects(runOwnedProcess(process.execPath, ["-e", "process.exit(2)"], {
     timeoutMilliseconds: 5_000,
-    stopFile: join(mkdtempSync(join(tmpdir(), "courtside-passive-failure-")), "STOP"),
+    stopFile: join(temporaryDirectory("courtside-passive-failure-"), "STOP"),
     cleanup: async () => { cleaned = true; }
   }), /Owned security process failed/);
   assert.equal(cleaned, true);
@@ -1305,7 +1305,7 @@ test("given a scanner reaches its request boundary, when it is still running, th
   // when / then
   await assert.rejects(runOwnedProcess(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
     timeoutMilliseconds: 5_000,
-    stopFile: join(mkdtempSync(join(tmpdir(), "courtside-passive-budget-")), "STOP"),
+    stopFile: join(temporaryDirectory("courtside-passive-budget-"), "STOP"),
     guard: () => true,
     guardFailure: "The scanner request budget was reached",
     cleanup: async () => { cleaned = true; }
@@ -1335,7 +1335,7 @@ for (const scenario of [
 ]) {
   test(`given a native ${scenario.name} overflow, when the child exits zero before collection, then overflow rejects and cleans up`, async () => {
     // given
-    const directory = mkdtempSync(join(tmpdir(), "courtside-native-overflow-"));
+    const directory = temporaryDirectory("courtside-native-overflow-");
     const marker = join(directory, "DONE");
     let cleanupCalls = 0;
     const producer = `const fs = require('node:fs'); ${scenario.source}
@@ -1354,7 +1354,7 @@ for (const scenario of [
 
 test("given a native output at the byte boundary, when the child exits zero, then all output is retained without cleanup", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-native-boundary-"));
+  const directory = temporaryDirectory("courtside-native-boundary-");
   const marker = join(directory, "DONE");
   let cleanupCalls = 0;
   const producer = "const fs = require('node:fs'); fs.writeSync(1, 'A'.repeat(64)); fs.writeFileSync(process.argv[1], 'done'); process.exit(0);";
@@ -1372,7 +1372,7 @@ test("given a native output at the byte boundary, when the child exits zero, the
 for (const code of [2, 99]) {
   test(`given native accepted exit code ${code}, when no termination was requested, then it resolves without cleanup`, async () => {
     // given
-    const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-accepted-")), "STOP");
+    const stopFile = join(temporaryDirectory("courtside-native-accepted-"), "STOP");
     let cleanupCalls = 0;
     // when
     const result = await runOwnedProcess(process.execPath, ["-e", `process.exit(${code})`], {
@@ -1387,7 +1387,7 @@ for (const code of [2, 99]) {
 
 test("given a native child already exited zero, when its duration callback runs before close, then timeout rejects and cleans up", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-native-timeout-"));
+  const directory = temporaryDirectory("courtside-native-timeout-");
   const marker = join(directory, "DONE");
   let cleanupCalls = 0;
   const producer = "require('node:fs').writeFileSync(process.argv[1], 'done'); process.exit(0);";
@@ -1404,7 +1404,7 @@ test("given a native child already exited zero, when its duration callback runs 
 
 test("given a native child already exited zero, when an emergency stop is observed before close, then stop rejects and cleans up", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-native-stop-race-"));
+  const directory = temporaryDirectory("courtside-native-stop-race-");
   const marker = join(directory, "DONE");
   const stopFile = join(directory, "STOP");
   let cleanupCalls = 0;
@@ -1423,7 +1423,7 @@ test("given a native child already exited zero, when an emergency stop is observ
 
 test("given a native signal with an accepted null exit code, when the child closes, then the signal rejects and cleans up", async () => {
   // given
-  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-signal-")), "STOP");
+  const stopFile = join(temporaryDirectory("courtside-native-signal-"), "STOP");
   let cleanupCalls = 0;
   // when
   const result = runOwnedProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], {
@@ -1438,7 +1438,7 @@ test("given a native signal with an accepted null exit code, when the child clos
 for (const kind of ["close", "error"]) {
   test(`given native ${kind} cleanup throws, when its handler runs, then the owned promise rejects without an unhandled rejection`, async () => {
     // given
-    const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-cleanup-rejection-")), "STOP");
+    const stopFile = join(temporaryDirectory("courtside-native-cleanup-rejection-"), "STOP");
     const moduleUrl = new URL("./security-passive-deployment.mjs", import.meta.url).href;
     assert.equal(existsSync(`${process.execPath}-courtside-absent-executable`), false);
     const producer = `import { runOwnedProcess } from ${JSON.stringify(moduleUrl)};
@@ -1474,7 +1474,7 @@ test("given a native spawn failure, when cleanup succeeds, then the original fai
   // given
   const command = `${process.execPath}-courtside-absent-executable`;
   assert.equal(existsSync(command), false);
-  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-spawn-failure-")), "STOP");
+  const stopFile = join(temporaryDirectory("courtside-native-spawn-failure-"), "STOP");
   let cleanupCalls = 0;
   // when
   const result = runOwnedProcess(command, [], {

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { assessmentImages } from "./security-image-inventory.mjs";
 import { securityImportSourceKey, securityImportSourceRequest } from "./security-openapi-fuzz.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 const composeServices = yaml.load(readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8")).services;
@@ -42,7 +42,7 @@ for (const profile of ["safe", "active", "destructive"]) {
 
 test("given an additional literal runtime image and candidate variables, when resolving inventory, then include arbitrary pinned infrastructure without pulling candidates", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "security-images-"));
+  const directory = temporaryDirectory("security-images-");
   const compose = join(directory, "compose.yaml");
   const image = `example/runtime:1@sha256:${"a".repeat(64)}`;
   writeFileSync(compose, `services:\n  runtime:\n    image: '${image}'\n  app:\n    image: \${COURTSIDE_SECURITY_IMAGE:?required}\n  seeder:\n    image: \${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}\n`);
@@ -52,7 +52,7 @@ test("given an additional literal runtime image and candidate variables, when re
 
 test("given infrastructure sharing an inactive scanner image, when resolving safe inventory, then retain infrastructure and omit only assessment-profile scanners", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "security-images-"));
+  const directory = temporaryDirectory("security-images-");
   const compose = join(directory, "compose.yaml");
   const image = "grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8";
   writeFileSync(compose, `services:\n  runtime:\n    image: "${image}"\n  scanner:\n    profiles: [assessment]\n    image: "${image}"\n`);
@@ -66,7 +66,7 @@ test("given infrastructure sharing an inactive scanner image, when resolving saf
 for (const image of ["axllent/mailpit:latest", "example/runtime:latest", "${UNTRUSTED_IMAGE}", "${COURTSIDE_SECURITY_IMAGE:-foreign:latest}"]) {
   test(`given unsupported runtime image ${image}, when resolving inventory, then fail closed`, () => {
     // given
-    const directory = mkdtempSync(join(tmpdir(), "security-images-"));
+    const directory = temporaryDirectory("security-images-");
     const compose = join(directory, "compose.yaml");
     writeFileSync(compose, `services:\n  runtime:\n    image: '${image}'\n`);
     // when / then
@@ -85,7 +85,7 @@ test("given safe assessment, when resolving images, then destructive scanner is 
 
 test("given an unpinned compose image, when resolving images, then resolution fails closed", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "security-images-"));
+  const directory = temporaryDirectory("security-images-");
   const compose = join(directory, "compose.yaml");
   writeFileSync(compose, "services:\n  database:\n    image: postgres:18-alpine\n");
 

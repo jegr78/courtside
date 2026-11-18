@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { describeFindings, findingReport } from "./security-tool-acknowledgement.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const cli = new URL("./security-tool-acknowledgement.mjs", import.meta.url).pathname;
 
 function workspace() {
-  return mkdtempSync(join(tmpdir(), "courtside-acknowledgement-"));
+  return temporaryDirectory("courtside-acknowledgement-");
 }
 
 function evidenceDirectory(root, name, candidates, specificationDigest) {

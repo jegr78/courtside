@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -12,6 +11,7 @@ import {
   findCandidateRun,
   verifyCandidateEvidence
 } from "./release-candidate-evidence.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const tool = fileURLToPath(new URL("./release-candidate-evidence.mjs", import.meta.url));
 const commit = "a".repeat(40);
@@ -178,7 +178,7 @@ test("given a rehearsal on a branch, when a rehearsal looks it up, then the bran
 
 test("given the command line, when a candidate writes its evidence, then the verification reads it back with the archive", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-candidate-evidence-"));
+  const directory = temporaryDirectory("courtside-candidate-evidence-");
   const archive = join(directory, "courtside-deployment-0.1.0.zip");
   writeFileSync(archive, "archive bytes");
   const environment = { ...process.env, GITHUB_REPOSITORY: "jegr78/courtside", GITHUB_RUN_ID: "42",

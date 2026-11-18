@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import { openCandidateCount, zapVersion } from "./security-passive-deployment.mjs";
@@ -15,6 +13,7 @@ import {
   redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
   validateSecurityTarget
 } from "./security-runner.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 test("given the same target identity in a different property order, when fingerprinting it, then the identity is stable", () => {
   // given
@@ -201,7 +200,7 @@ test("given a planned catalog test, when selecting it, then the run cannot claim
 
 test("given a target verifier failure, when executing a run, then the immutable first attempt is incomplete", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = buildSecurityPlan(input());
 
   // when
@@ -223,7 +222,7 @@ test("given a target verifier failure, when executing a run, then the immutable 
 
 test("given an unregistered assessment tool, when execution starts, then no adapter is invoked", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   let executed = false;
   const plan = buildSecurityPlan(input({
     tools: [{ id: "scanner", version: "1.0.0", testIds: [] }]
@@ -244,7 +243,7 @@ test("given an unregistered assessment tool, when execution starts, then no adap
 
 test("given selected assessment tests, when execution starts, then no adapter is invoked", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   let executed = false;
   const plan = buildSecurityPlan(input({
     tools: [{ id: "target-identity", version: "1.0.0", testIds: ["CSA-SESS-001"] }],
@@ -266,7 +265,7 @@ test("given selected assessment tests, when execution starts, then no adapter is
 
 test("given only the identity prerequisite, when execution finishes, then assessment remains incomplete", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
 
   // when
   const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
@@ -284,7 +283,7 @@ test("given only the identity prerequisite, when execution finishes, then assess
 
 test("given the bounded passive suite, when every check passes, then its evidence governs the outcome", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = buildSecurityPlan(input({
     profile: "safe",
     authorization: undefined,
@@ -313,7 +312,7 @@ test("given the bounded passive suite, when every check passes, then its evidenc
 
 test("given passing checks and scanner alerts, when the run finishes, then the reason names the triage", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = buildSecurityPlan(input({
     profile: "safe",
     authorization: undefined,
@@ -345,7 +344,7 @@ test("given passing checks and scanner alerts, when the run finishes, then the r
 
 test("given the bounded active suites, when every attack check passes, then their evidence governs the outcome", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = activePlan();
   const planned = shippedAuthorizationPlan(plan).total;
   const limits = {};
@@ -389,7 +388,7 @@ test("given the bounded active suites, when every attack check passes, then thei
 
 test("given fuzzing changed domain state, when executing the active plan, then later probes are skipped", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   let authorizationCalled = false;
 
   // when
@@ -461,7 +460,7 @@ test("given a missing request plan, when the active run is budgeted, then it is 
 
 test("given a contract the active profile cannot assess, when the run is budgeted, then it is refused before any request with both numbers named", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = activePlan();
   let zapCalled = false;
 
@@ -483,7 +482,7 @@ test("given a contract the active profile cannot assess, when the run is budgete
 
 test("given the destructive abuse suite, when recovery and integrity pass, then its evidence governs the outcome", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const plan = buildSecurityPlan(input({
     profile: "destructive",
     authorization: "authorize-destructive-run-0001",
@@ -528,7 +527,7 @@ test("given sensitive diagnostics, when retaining them, then credentials and ses
 
 test("given a changed target identity, when the prerequisite runs, then execution stops incomplete", async () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
 
   // when
   const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
@@ -543,7 +542,7 @@ test("given a changed target identity, when the prerequisite runs, then executio
 
 test("given an interrupted run, when recovering it, then only its exact identity is changed", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const root = temporaryDirectory("courtside-security-run-");
   const own = securityRunPaths(root, "run-0001", 1);
   const other = securityRunPaths(root, "run-0002", 1);
   mkdirSync(own.directory, { recursive: true });

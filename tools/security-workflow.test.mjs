@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
@@ -266,7 +266,7 @@ test("given normalized passive evidence, when uploading the assessment artifact,
 for (const present of [true, false]) {
   test(`given a passive assessment ${present ? "that wrote" : "that stopped before"} its normalized record, when the workflow captures it, then the record is ${present ? "retained" : "named as missing"}`, () => {
     // given
-    const directory = mkdtempSync(join(tmpdir(), "passive-record-"));
+    const directory = temporaryDirectory("passive-record-");
     const runId = "run-0003";
     const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
     mkdirSync(evidence, { recursive: true });
@@ -300,7 +300,7 @@ test("given normalized active evidence, when an active or baseline workflow reta
   assert.match(records.with.path, /^\s*build\/security-gate\/openapi-fuzz\.json$/m);
   assert.ok(steps.indexOf(capture) < steps.findIndex((step) => step.name === "Remove the disposable security target"));
   for (const [profile, attempt] of [["active", 1], ["baseline", 2]]) {
-    const directory = mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-"));
+    const directory = temporaryDirectory("courtside-fuzz-evidence-");
     try {
       for (const index of [1, 2]) {
         const source = join(directory, "build/security/example-run/assessment", `attempt-${index}`, "evidence");

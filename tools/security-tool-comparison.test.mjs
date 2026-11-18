@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
@@ -8,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { assertExactEvidenceLists, compareSecurityToolRuns, comparisonSummary, exhaustedAuthorizationBudget,
   exhaustedAuthorizationRemark, unacknowledgedFindings, untoleratedBaseFailures } from "./security-tool-comparison.mjs";
 import { requiredPassiveCheckIds } from "./security-passive-deployment.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -83,7 +83,7 @@ function runFixture(root, name, overrides = {}) {
 
 test("given paired immutable runs, when comparing a tool update, then new findings and provenance remain bound", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const base = runFixture(root, "base");
@@ -113,7 +113,7 @@ test("given paired immutable runs, when comparing a tool update, then new findin
 
 test("given an unattributed incomplete baseline, when the candidate passes, then the repair can be compared", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const base = runFixture(root, "base", {
@@ -148,7 +148,7 @@ test("given an unattributed incomplete baseline, when the candidate passes, then
 
 test("given an unattributed incomplete baseline, when the candidate stays incomplete, then comparison fails closed", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const base = runFixture(root, "base");
@@ -171,7 +171,7 @@ test("given an unattributed incomplete baseline, when the candidate stays incomp
 
 test("given runs for different fixtures or incomplete tool evidence, when comparing them, then the report fails closed", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const base = runFixture(root, "base");
@@ -215,7 +215,7 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
 
 test("given a run that assessed another revision's application, when comparing, then the report fails closed", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const elsewhere = { imageDigest: fingerprint("a"), commit: "7".repeat(40) };
@@ -234,7 +234,7 @@ test("given a run that assessed another revision's application, when comparing, 
 
 test("given runs that assessed the base revision's application, when comparing, then the report fails closed", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const beforeTheChange = { imageDigest: fingerprint("a"), commit: "2".repeat(40) };
@@ -371,7 +371,7 @@ function comparePair(root, base, candidate) {
 
 test("given a base toolchain that ran out of authorization requests on the candidate's contract, when the candidate's matrix passes, then the matrix is recorded as not comparable and the rest is compared", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = exhaustedRun(root, "base");
   const candidate = passingRun(root, "candidate");
 
@@ -386,7 +386,7 @@ test("given a base toolchain that ran out of authorization requests on the candi
 
 test("given a base run that lost its matrix for any other reason, when comparing, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = exhaustedRun(root, "base", { reason: "The authorization suite has no remaining request budget" });
   const candidate = passingRun(root, "candidate");
 
@@ -396,7 +396,7 @@ test("given a base run that lost its matrix for any other reason, when comparing
 
 test("given a base run that lost a tool other than the matrix, when its reason names the exhausted budget, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = exhaustedRun(root, "base", { missing: "openapi-fuzzer" });
   const candidate = passingRun(root, "candidate");
 
@@ -406,7 +406,7 @@ test("given a base run that lost a tool other than the matrix, when its reason n
 
 test("given an exhausted base beside another tool that did not pass, when comparing, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = exhaustedRun(root, "base", { others: "incomplete" });
   const candidate = passingRun(root, "candidate");
 
@@ -416,7 +416,7 @@ test("given an exhausted base beside another tool that did not pass, when compar
 
 test("given a candidate that lost its matrix to the same exhausted budget, when comparing, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = passingRun(root, "base");
   const candidate = exhaustedRun(root, "candidate");
 
@@ -426,7 +426,7 @@ test("given a candidate that lost its matrix to the same exhausted budget, when 
 
 test("given an exhausted base and a candidate matrix that did not pass, when comparing, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const base = exhaustedRun(root, "base");
   const candidate = passingRun(root, "candidate", "incomplete");
 
@@ -436,7 +436,7 @@ test("given an exhausted base and a candidate matrix that did not pass, when com
 
 test("given ZAP evidence that lost a role its policy names, when the runs are compared, then the comparison refuses it", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const root = temporaryDirectory("courtside-tool-comparison-");
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
   const roles = ["MEMBER", "ADMIN"];

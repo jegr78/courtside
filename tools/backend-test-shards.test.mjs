@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { BACKEND_SHARDS, backendShard, backendTestClasses, parseShard, readDurations, shardList } from "./backend-test-shards.mjs";
 import { durationsOf, suiteDuration } from "./backend-test-durations.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
 
 function sourceTree(files) {
-  const root = mkdtempSync(join(tmpdir(), "backend-shards-"));
+  const root = temporaryDirectory("backend-shards-");
   for (const [path, source] of Object.entries(files)) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), source);

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { artifactNameOf, candidateJobs, verifyCandidateEvidence } from "./release-candidate-evidence.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -317,7 +317,7 @@ test("given a green candidate, when its evidence job runs, then the record it wr
   const record = step("evidence", "Record the candidate");
   const upload = jobs.evidence.steps.find((entry) => String(entry.uses).startsWith("actions/upload-artifact"));
   const commit = "d".repeat(40);
-  const directory = mkdtempSync(join(tmpdir(), "courtside-candidate-workflow-"));
+  const directory = temporaryDirectory("courtside-candidate-workflow-");
   mkdirSync(join(directory, "tools"));
   copyFileSync(fileURLToPath(new URL("./release-candidate-evidence.mjs", import.meta.url)),
     join(directory, "tools/release-candidate-evidence.mjs"));
@@ -406,7 +406,7 @@ const releasedLabels = {
 };
 
 function candidateLabels(labelStep, commit) {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-candidate-labels-"));
+  const directory = temporaryDirectory("courtside-candidate-labels-");
   const output = join(directory, "github-output");
   writeFileSync(output, "");
   execFileSync("bash", ["-c", labelStep.run], {

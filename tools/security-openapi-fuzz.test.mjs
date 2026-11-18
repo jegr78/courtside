@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -29,6 +28,7 @@ import {
 } from "./security-openapi-fuzz.mjs";
 import { contractOperationIds } from "./contract-operations.mjs";
 import { schemathesisRunArgs, schemathesisScannerFiles } from "./security-schemathesis-configuration.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -400,7 +400,7 @@ test("given repeated and distinct failures, when retaining lifecycle evidence, t
     selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
     runId: "run-0001", targetFingerprint: fingerprint }, {
     maxRequests: 2000, attempt: 1, deadline: new Date(Date.now() + 60_000),
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-")),
+    evidenceDirectory: temporaryDirectory("courtside-fuzz-evidence-"),
     now: () => new Date("2026-08-21T12:00:00Z"),
     runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
       specificationDigest: openApiSpecificationDigest(),
@@ -453,7 +453,7 @@ test("given every state-changing operation, when building negative probes, then 
 test("given a contract chosen for the run, when the fuzzer loads, then it is the one it plans against", () => {
   // given
   const source = fileURLToPath(new URL("../src/main/resources/api/openapi.yaml", import.meta.url));
-  const chosen = join(mkdtempSync(join(tmpdir(), "courtside-contract-")), "openapi.yaml");
+  const chosen = join(temporaryDirectory("courtside-contract-"), "openapi.yaml");
   copyFileSync(source, chosen);
 
   // when
@@ -569,7 +569,7 @@ test("given a mutation probe that was not answered as documented, when the run i
     selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
     runId: "run-0002", targetFingerprint: fingerprint }, {
     maxRequests: 2000, attempt: 1, deadline: new Date(Date.now() + 60_000),
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-")),
+    evidenceDirectory: temporaryDirectory("courtside-fuzz-evidence-"),
     now: () => new Date("2026-08-21T12:00:00Z"),
     runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
       specificationDigest: openApiSpecificationDigest(),

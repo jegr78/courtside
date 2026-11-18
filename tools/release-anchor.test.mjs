@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { anchorRefOf, ensureAnchor, releaseVersionOf } from "./release-anchor.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const commit = "a".repeat(40);
 const tool = new URL("./release-anchor.mjs", import.meta.url).pathname;
@@ -76,7 +76,7 @@ test("given GitHub refuses the anchor, when the candidate ensures it, then the r
 
 // A stand-in gh answers ref lookups from `existing` and records every ref it is asked to create.
 function runTool(arguments_, { existing = "", cwd } = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-anchor-"));
+  const directory = temporaryDirectory("courtside-anchor-");
   writeFileSync(join(directory, "gh"), `#!/usr/bin/env bash
 case "$*" in
   *"git/ref/heads/"*) if [ -n "$EXISTING" ]; then echo "$EXISTING"; else echo "gh: Not Found (HTTP 404)" >&2; exit 1; fi ;;
@@ -93,7 +93,7 @@ esac
 }
 
 function repositoryWithRelease(previous, next) {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-anchor-repo-"));
+  const directory = temporaryDirectory("courtside-anchor-repo-");
   const git = (...arguments_) => execFileSync("git", arguments_, { cwd: directory, encoding: "utf8" }).trim();
   git("init", "-q");
   git("config", "user.email", "jane.doe@example.org");

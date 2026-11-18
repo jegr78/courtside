@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { validateNodeToolchain, writeGitHubOutputs } from "./node-toolchain.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 test("given exact versions, when validating the toolchain, then both versions are retained", () => {
   // given
@@ -29,7 +29,7 @@ for (const candidate of [
 
 test("given a valid toolchain, when writing GitHub outputs, then only validated values are emitted", () => {
   // given
-  const output = join(mkdtempSync(join(tmpdir(), "courtside-toolchain-")), "output");
+  const output = join(temporaryDirectory("courtside-toolchain-"), "output");
 
   // when
   writeGitHubOutputs({ node: "26.5.1", npm: "11.17.0" }, output);
