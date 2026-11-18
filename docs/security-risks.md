@@ -404,6 +404,16 @@ that an anonymous caller receives no file, not what an authenticated account wou
 has no document root, the image is read-only and the published-resource inventory rejects an
 unclassified static resource. Reconsider if authenticated static serving is added.
 
+## A release can ship an npm finding its predecessor already shipped
+
+A High or Critical npm finding that the newest published release has, in the same lockfile copies
+and dependency scope, does not block the next release and needs no exception or expiry. Withholding
+the release would not remove the finding from the instances that run the current one, and would
+delay every other fix it carries. The finding stays listed as pre-existing in each release record,
+whose status reads `passed-with-baseline`, and the Tuesday audit keeps failing while it exists.
+Trivy findings have no such baseline. Reconsider if a release must certify the absence of known npm
+advisories, or if a finding stays unfixed upstream past its remediation deadline.
+
 ## Scheduled failures appear in public issues
 
 The failure tracker opens a public issue naming the workflow, job, failed step, commit range and
