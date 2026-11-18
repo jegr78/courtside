@@ -156,8 +156,20 @@ export function observeBrowserDisconnect(browser: DisconnectSource, diagnose: ()
   };
 }
 
-const dockerCommand: DockerDiagnosticCommand = async (args, signal) =>
-  (await executeFile("docker", args, { maxBuffer: 1024 * 1024, signal })).stdout;
+export type DockerRun = (args: string[], signal: AbortSignal) => Promise<{ stdout: string; stderr: string }>;
+
+// Docker returns a container's stderr on its own stderr, and most servers log there.
+export function dockerDiagnosticCommand(run: DockerRun): DockerDiagnosticCommand {
+  return async (args, signal) => {
+    const { stdout, stderr } = await run(args, signal);
+    if (args[0] !== "logs") return stdout;
+    return [...stdout.split("\n"), ...stderr.split("\n")].filter((line) => line !== "")
+      .sort((left, right) => left.slice(0, 30).localeCompare(right.slice(0, 30))).join("\n");
+  };
+}
+
+const dockerCommand = dockerDiagnosticCommand((args, signal) =>
+  executeFile("docker", args, { maxBuffer: 1024 * 1024, signal }));
 
 function safeLogs(value: string): string {
   return value
@@ -251,6 +263,24 @@ function applicationLog(read: (() => string) | undefined, errors: string[]): str
   }
 }
 
+// Arrival at Tomcat and the JVM's own pauses tell a request held before the application, inside
+// it and by a stopped JVM apart.
+export function applicationTimingRecording(directory: string): { javaArguments: string[]; environment: Record<string, string> } {
+  const instant = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+  return {
+    javaArguments: [`-Xlog:gc,safepoint:file=${directory}/application-jvm-%p.log:time,uptime,level,tags`],
+    environment: {
+      SERVER_TOMCAT_ACCESSLOG_ENABLED: "true",
+      SERVER_TOMCAT_ACCESSLOG_DIRECTORY: directory,
+      SERVER_TOMCAT_ACCESSLOG_PREFIX: "application-access",
+      SERVER_TOMCAT_ACCESSLOG_SUFFIX: ".log",
+      SERVER_TOMCAT_ACCESSLOG_ROTATE: "false",
+      SERVER_TOMCAT_ACCESSLOG_BUFFERED: "false",
+      SERVER_TOMCAT_ACCESSLOG_PATTERN: `%{begin:${instant}}t %{end:${instant}}t %m %U %s %{ms}T %I`
+    }
+  };
+}
+
 export interface ApplicationLogBuffer {
   append(chunk: Buffer | string): void;
   text(): string;
@@ -281,7 +311,7 @@ async function collectContainerDiagnostics(containerId: string, command: DockerD
   const [state, stats, logs] = await Promise.all([
     capture(command, ["inspect", "--format", "{{json .State}}", containerId], diagnosticErrors, timeoutMs),
     capture(command, ["stats", "--no-stream", "--format", "{{json .}}", containerId], diagnosticErrors, timeoutMs),
-    capture(command, ["logs", "--tail", "200", containerId], diagnosticErrors, timeoutMs)
+    capture(command, ["logs", "--timestamps", "--tail", "200", containerId], diagnosticErrors, timeoutMs)
   ]);
   return {
     containerId,
