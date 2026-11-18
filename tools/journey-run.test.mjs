@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const runs = resolve(root, "build", "journeys");
@@ -15,10 +16,11 @@ function walkedDirectories() {
 test("given a run the browser refuses to start, when it ends, then it announces no report it did not write", () => {
   // given
   const before = walkedDirectories();
+  const scratch = temporaryDirectory("courtside-journey-run-");
 
   // when
   const run = spawnSync(process.execPath, [resolve(root, "tools", "journey-run.mjs"), "--project=no-such-project"],
-    { cwd: root, encoding: "utf8" });
+    { cwd: root, encoding: "utf8", env: { ...process.env, TMPDIR: scratch, TEMP: scratch, TMP: scratch } });
   const written = walkedDirectories().filter((directory) => !before.includes(directory));
 
   // then

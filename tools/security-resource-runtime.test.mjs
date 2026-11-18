@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, statSync, mkdirSync, symlinkSync, chmodSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, readdirSync, statSync, mkdirSync, symlinkSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -16,6 +15,7 @@ import { runResourceAbuseAssessment, resourceAbusePolicy, resourceAbuseScriptDig
 import { securityMailObservationImage, captureSecurityMailBaseline } from "./security-mail-observation.mjs";
 import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourceEvidence,
   writeNativeEvidence, retainResourceEvidenceFailure, resourceEvidenceSummary } from "./security-resource-runtime.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const runId = "runtime-example-0001";
 const project = `courtside-security-${runId}`;
@@ -161,7 +161,7 @@ async function harness(input = fixture(), { snapshots = [input.effects, input.ef
     if (args.includes("restart")) restarted = true;
     return { stdout: "" };
   };
-  const directory = join(mkdtempSync(join(tmpdir(), "courtside-runtime-")), "attempt-1");
+  const directory = join(temporaryDirectory("courtside-runtime-"), "attempt-1");
   const mailBaseline = await captureSecurityMailBaseline({ runId, command,
     identity: mailIdentity });
   assert.equal(mailBaseline.status, "complete");
@@ -519,7 +519,7 @@ test("given actual protected drift before cleanup or during effects, when export
       integrityModuleDigest: resourceAbuseIntegrityDigest(), receiptParserDigest: resourceAbuseReceiptParserDigest(),
       journalDigest: effects.journalDigest, integrityEvidenceDigest: phases.integrityEvidenceDigest
     };
-    const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-runtime-verdict-"));
+    const evidenceDirectory = temporaryDirectory("courtside-runtime-verdict-");
     // when
     const result = await runResourceAbuseAssessment({ profile: "destructive", environment: "SECURITY",
       selectedTests: ["CSA-RES-001"], targetFingerprint: fingerprint,

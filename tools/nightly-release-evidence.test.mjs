@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { findArgumentsOf, findNightlyRelease, nightlyRunsOf, validateNightlyReleaseEvidence } from "./nightly-release-evidence.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -20,7 +20,7 @@ const recordStep = yaml.load(readFileSync(
   .find((step) => step.name === "Record the completed build and image contract");
 
 function generated({ build = "success", nightlyImage = "success", releaseGates = "success", attempt = 1 } = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-nightly-evidence-"));
+  const directory = temporaryDirectory("courtside-nightly-evidence-");
   const script = recordStep.run
     .replaceAll("${{ github.sha }}", commit)
     .replaceAll("${{ github.run_id }}", String(runId))

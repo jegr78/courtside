@@ -4,12 +4,12 @@ import { X509Certificate } from "node:crypto";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { createServer, connect } from "node:tls";
 import { once } from "node:events";
 import { createSecurityMailCertificate, securityMailTrustPlan } from "./security-mail-capture.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const script = fileURLToPath(new URL("./security-mail-receipt.py", import.meta.url));
 const identifier = "30000000-0000-0000-0000-000000000001";
@@ -54,7 +54,7 @@ test("given a rootless Docker daemon, when importing trust, then keytool runs as
 
 test("given existing candidate CA anchors and a private relay, when preparing mail trust, then retain both exact certificate identities", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-additive-trust-"));
+  const root = temporaryDirectory("courtside-additive-trust-");
   const defaults = join(root, "defaults");
   const relay = join(root, "relay");
   const keytool = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", "keytool") : "keytool";
@@ -115,7 +115,7 @@ test("given the security mail sink, when reading its deployment, then keep relay
 
 test("given a locally issued dependency certificate, when checking its real TLS peer, then accept both dependency hostnames and reject a different host", async () => {
   // given
-  const directory = join(mkdtempSync(join(tmpdir(), "courtside-mail-state-")), "mail");
+  const directory = join(temporaryDirectory("courtside-mail-state-"), "mail");
   let identity;
   assert.doesNotThrow(() => { identity = createSecurityMailCertificate(directory); });
   const certificate = readFileSync(join(directory, "cert.pem"));

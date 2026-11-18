@@ -4,11 +4,11 @@ import { createInterface } from "node:readline";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const gateway = fileURLToPath(new URL("security-request-gateway.py", import.meta.url));
 
@@ -90,7 +90,7 @@ test("given a private journal header on an ordinary request, when the native gat
   });
   upstream.listen(0, "127.0.0.1");
   await once(upstream, "listening");
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-private-header-"));
+  const directory = temporaryDirectory("courtside-gateway-private-header-");
   const { gatewayProcess, port } = await startGateway(directory, upstream.address().port);
   // when
   const attempt = request({ host: "127.0.0.1", port, method: "GET", path: "/api/public/config",
@@ -112,7 +112,7 @@ test("given a private journal header on an ordinary request, when the native gat
 
 test("given an oversized correlated request, when the native gateway rejects it, then its bounded receipt proves it never reached upstream", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-receipt-"));
+  const directory = temporaryDirectory("courtside-gateway-receipt-");
   const { gatewayProcess, port } = await startGateway(directory);
   const attempt = request({ host: "127.0.0.1", port, method: "POST", path: "/api/session",
     headers: { "Content-Length": "2000001", "Content-Type": "application/x-www-form-urlencoded",
@@ -145,7 +145,7 @@ test("given an oversized correlated request, when the native gateway rejects it,
 
 test("given an oversized body the client keeps uploading, when the gateway refuses it, then the client reads 413 instead of a reset", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-upload-"));
+  const directory = temporaryDirectory("courtside-gateway-upload-");
   const { gatewayProcess, port } = await startGateway(directory);
   const body = Buffer.alloc(2_000_001, "x");
   const head = Buffer.from("POST /api/session HTTP/1.1\r\nHost: scanner-gateway\r\n"
@@ -176,7 +176,7 @@ test("given an oversized body the client keeps uploading, when the gateway refus
 
 test("given an oversized body trickling in, when the gateway discards it, then the connection closes at the overall deadline", { timeout: 15000 }, async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-trickle-"));
+  const directory = temporaryDirectory("courtside-gateway-trickle-");
   const { gatewayProcess, port } = await startGateway(directory);
   const started = performance.now();
   // when
@@ -199,7 +199,7 @@ test("given an oversized body trickling in, when the gateway discards it, then t
 
 test("given repeated oversized requests, when native receipt storage fills, then keep the cap and report incomplete capture", async () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-receipt-cap-"));
+  const directory = temporaryDirectory("courtside-gateway-receipt-cap-");
   const { gatewayProcess, port } = await startGateway(directory);
   // when / then
   try {
@@ -242,7 +242,7 @@ for (const fixture of [
     });
     upstream.listen(0, "127.0.0.1");
     await once(upstream, "listening");
-    const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-invalid-receipt-"));
+    const directory = temporaryDirectory("courtside-gateway-invalid-receipt-");
     const { gatewayProcess, port } = await startGateway(directory, upstream.address().port);
     try {
       // when
@@ -284,7 +284,7 @@ test("given upstream refusals, when the gateway relays them, then only a typed a
   });
   upstream.listen(0, "127.0.0.1");
   await once(upstream, "listening");
-  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-admission-"));
+  const directory = temporaryDirectory("courtside-gateway-admission-");
   const { gatewayProcess, port } = await startGateway(directory, upstream.address().port);
   try {
     // when

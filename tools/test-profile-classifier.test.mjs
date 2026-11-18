@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -10,6 +9,7 @@ import { bindPlanToRun, classifyChanges, classifyChangesAtCommits, classifyPath,
   executedTests, profileSummary, validateGitHubManifest, validateRules,
   validateToolManifest } from "./test-profile-classifier.mjs";
 import { ciJobsForProfiles, loadProfileContract } from "./test-profile-contract.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -765,7 +765,7 @@ test("given a version bump the reviewer can read, when the pull request is class
 
 test("given the pull request event on the command line, when the classifier plans a release bump, then the written plan selects docs", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "profile-plan-"));
+  const directory = temporaryDirectory("profile-plan-");
   const commits = realCommits("94640424");
   const run = (extra) => {
     execFileSync(process.execPath, [fileURLToPath(new URL("./test-profile-classifier.mjs", import.meta.url)),

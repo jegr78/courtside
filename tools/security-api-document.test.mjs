@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { apiDocumentPath } from "./security-api-document.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 function documentFile() {
-  const path = join(mkdtempSync(join(tmpdir(), "courtside-contract-")), "openapi.yaml");
+  const path = join(temporaryDirectory("courtside-contract-"), "openapi.yaml");
   writeFileSync(path, "openapi: 3.1.0\n");
   return path;
 }

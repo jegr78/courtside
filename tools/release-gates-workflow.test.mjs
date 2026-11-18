@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -20,7 +20,7 @@ for (const source of ["registry", "artifact"]) {
   for (const matching of [true, false]) {
     test(`given ${source} transition evidence with matching=${matching}, when the mail gate runs, then only its own candidate can pass`, () => {
       // given
-      const root = mkdtempSync(join(tmpdir(), "mail-gate-binding-"));
+      const root = temporaryDirectory("mail-gate-binding-");
       const image = source === "artifact" ? digest : `ghcr.io/example/courtside@${digest}`;
       const servedImage = `ghcr.io/example/courtside@sha256:${"b".repeat(64)}`;
       const expected = source === "artifact" ? servedImage : image;
@@ -84,7 +84,7 @@ function stepsUsing(job, uses) {
 
 test("given a failed active assessment, when CI retains its first attempt, then normalized tool evidence survives without private runtime data", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "active-assessment-evidence-"));
+  const directory = temporaryDirectory("active-assessment-evidence-");
   const runId = "run-0001";
   const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
   mkdirSync(evidence, { recursive: true });
@@ -116,7 +116,7 @@ test("given a failed active assessment, when CI retains its first attempt, then 
 
 test("given an active assessment that stopped before one tool wrote evidence, when CI retains its first attempt, then the run names the missing record", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "active-assessment-missing-evidence-"));
+  const directory = temporaryDirectory("active-assessment-missing-evidence-");
   const runId = "run-0002";
   const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
   mkdirSync(evidence, { recursive: true });
@@ -136,7 +136,7 @@ test("given an active assessment that stopped before one tool wrote evidence, wh
 });
 
 function resolveImage(environment) {
-  const directory = mkdtempSync(join(tmpdir(), "gate-image-"));
+  const directory = temporaryDirectory("gate-image-");
   const output = join(directory, "output");
   const script = action.runs.steps.find((step) => step.id === "resolve").run;
   const result = spawnSync("bash", ["-e", "-c", script], {

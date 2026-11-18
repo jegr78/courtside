@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -12,6 +11,7 @@ import {
   resourceAdmissionPolicy, resourceCompetingWrites, resourceScenarioOutcomes,
   runResourceAbuseAssessment, validateResourceAbuseEvidence
 } from "./security-resource-abuse.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const digest = `sha256:${"a".repeat(64)}`;
 
@@ -44,7 +44,7 @@ test("given missing actual snapshot capture, when retaining an incomplete execut
   execution.stateAfterRecovery = null;
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
   });
   // then
@@ -136,7 +136,7 @@ test("given bounded resource samples, when evaluating them, then every declared 
 
 test("given a complete destructive execution, when retaining evidence, then recovery and integrity decide success", async () => {
   // given
-  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-resource-abuse-"));
+  const evidenceDirectory = temporaryDirectory("courtside-resource-abuse-");
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
@@ -163,7 +163,7 @@ test("given causally proven booking effects, when the complete snapshot changed,
   execution.integrity = { effects: "passed", cleanup: "passed", recovery: "passed" };
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
     runAbuse: async () => execution
   });
@@ -180,7 +180,7 @@ test("given missing phase proof or a protected mutation, when evaluating a bound
   // when
   const results = [];
   for (const execution of executions) results.push(await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
     runAbuse: async () => execution
   }));
@@ -191,7 +191,7 @@ test("given missing phase proof or a protected mutation, when evaluating a bound
 test("given forged passing phase evidence, when validating its schema, then reject missing snapshots and incomplete or failed phases", async () => {
   // given
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
     runAbuse: async () => successfulExecution()
   });
@@ -215,7 +215,7 @@ test("given unbound integrity artifacts, when evaluating apparently passing phas
   // when
   const results = [];
   for (const execution of executions) results.push(await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
     runAbuse: async () => execution
   }));
@@ -230,7 +230,7 @@ test("given inconsistent competing writes, when evaluating the run, then the ass
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -248,7 +248,7 @@ test("given no rejected competing write, when evaluating the run, then the asses
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -267,7 +267,7 @@ test("given broken duplicate or stale-preview handling, when evaluating the run,
   toctouExecution.competingWrites.toctouCreated = 1;
   toctouExecution.competingWrites.toctouSkipped = 0;
   const context = (execution) => ({
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -291,7 +291,7 @@ test("given an unbounded tool result, when evaluating the run, then the assessme
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -310,7 +310,7 @@ test("given a JVM that warmed above the trip thresholds before the breaker armed
     warmUpSample(3, 40)] };
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
   });
   // then
@@ -326,7 +326,7 @@ test("given a warm-up sample beyond a safety limit, when evaluating, then the ru
   execution.warmUp = { settled: false, durationSeconds: 12, samples: [warmUpSample(1, 115)] };
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
   });
   // then
@@ -342,7 +342,7 @@ test("given breached resource limits, when the tool omits the breaker, then the 
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -367,7 +367,7 @@ test("given a circuit breaker stops before competing writes, when evaluating the
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -389,7 +389,7 @@ test("given an early breaker after one winning write, when no loser or duplicate
   execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"), maxRequests: 1000,
     attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
   });
   // then
@@ -406,7 +406,7 @@ test("given interruption before any request or resource sample, when retaining e
   execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"), maxRequests: 1000,
     attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
   });
   // then
@@ -424,7 +424,7 @@ test("given passing scenario labels without observed race coverage, when evaluat
     duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0, admissionRefused: 0 };
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"), maxRequests: 1000,
     attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
   });
   // then
@@ -441,7 +441,7 @@ test("given a breaker and a proven integrity violation, when evaluating the run,
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -460,7 +460,7 @@ test("given a hard safety limit was crossed, when evaluating the run, then the a
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -478,7 +478,7 @@ test("given changed executable test bytes, when evaluating the run, then the ass
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -496,7 +496,7 @@ test("given missing recovery evidence, when the assessment concludes, then it ca
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"),
     maxRequests: 1000,
     attempt: 1,
     deadline: new Date(Date.now() + 60_000),
@@ -672,7 +672,7 @@ test("given refused competing writes, when evaluating the run, then the assessme
 
   // when
   const result = await runResourceAbuseAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    evidenceDirectory: temporaryDirectory("courtside-resource-abuse-"), maxRequests: 1000,
     attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
   });
 

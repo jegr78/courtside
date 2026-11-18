@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,6 +35,7 @@ import {
 import { contractOperationIds } from "./contract-operations.mjs";
 import { mfaFixtureOperationIds, mfaFixtureFirstAttemptRequests } from "./security-mfa-fixture.mjs";
 import { authenticatedZapPolicy } from "./security-authenticated-zap.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -722,7 +723,7 @@ function oversizedProbe() {
 }
 
 async function startSilentlyClosingServer() {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-authorization-"));
+  const directory = temporaryDirectory("courtside-authorization-");
   const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-keyout", "key.pem", "-out", "cert.pem", "-subj", "/CN=localhost",
     "-addext", "subjectAltName=DNS:localhost"], { cwd: directory, encoding: "utf8" });
@@ -1023,7 +1024,7 @@ async function minimalEvidence() {
 }
 
 async function startAnsweringServer(answer) {
-  const directory = mkdtempSync(join(tmpdir(), "courtside-authorization-"));
+  const directory = temporaryDirectory("courtside-authorization-");
   const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-keyout", "key.pem", "-out", "cert.pem", "-subj", "/CN=localhost",
     "-addext", "subjectAltName=DNS:localhost"], { cwd: directory, encoding: "utf8" });
@@ -1101,7 +1102,7 @@ function inMemoryAuthorizationTarget(attemptsBeforeLimit) {
 test("given the shipped contract and a target that answers every probe at once, when the whole suite runs, then it sends exactly the requests its plan names", async () => {
   // given
   const attemptsBeforeLimit = 5;
-  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-authorization-plan-"));
+  const evidenceDirectory = temporaryDirectory("courtside-authorization-plan-");
   const plan = planAuthorizationRequests(api, { attemptsBeforeLimit, durationSeconds: 1800 });
   const exercised = [];
 

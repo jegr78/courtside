@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -141,7 +141,7 @@ test("given a merged release pull request, when release-please runs on main, the
 // A stand-in gh answers the ref lookup from `existing` and records whether the step tried to create one.
 function writeTag(existing, commit = "c".repeat(40)) {
   const step = candidate.jobs.tag.steps.find((each) => each.name === "Write the tag at the qualified commit");
-  const directory = mkdtempSync(join(tmpdir(), "courtside-tag-"));
+  const directory = temporaryDirectory("courtside-tag-");
   const gh = join(directory, "gh");
   writeFileSync(gh, `#!/usr/bin/env bash
 case "$*" in
@@ -218,7 +218,7 @@ test("given a written tag, when the candidate finishes, then it removes the anch
 
 function removeAnchors(refs, failing = false) {
   const step = candidate.jobs.tag.steps.find((each) => each.name === "Remove the anchors of the tagged version");
-  const directory = mkdtempSync(join(tmpdir(), "courtside-anchors-"));
+  const directory = temporaryDirectory("courtside-anchors-");
   writeFileSync(join(directory, "gh"), `#!/usr/bin/env bash
 case "$*" in
   *matching-refs*) printf '%s\\n' $REFS ;;

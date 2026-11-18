@@ -12,10 +12,11 @@ import {
   validateAuthenticatedZapEvidence
 } from "./security-authenticated-zap.mjs";
 import { zapImage } from "./security-passive-deployment.mjs";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
@@ -103,7 +104,7 @@ test("given missing canary or foreign output, when normalizing alerts, then the 
 
 test("given isolated role sessions and a canary-only scan, when assessing, then redacted evidence passes", async () => {
   // given
-  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-zap-evidence-"));
+  const evidenceDirectory = temporaryDirectory("courtside-zap-evidence-");
   const plan = {
     profile: "active", environment: "SECURITY", runId: "run-0001",
     target: "https://localhost:9443", targetFingerprint: run.targetFingerprint,
@@ -181,7 +182,7 @@ test("given the seeded canary remains after remediation, when assessing, then th
 
   // when / then
   await assert.rejects(runAuthenticatedZapAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-zap-evidence-")),
+    evidenceDirectory: temporaryDirectory("courtside-zap-evidence-"),
     stopFile: join(tmpdir(), "courtside-zap-stop"),
     deadline: new Date(Date.now() + 60_000),
     now: () => new Date("2026-08-21T08:00:00.000Z"),
@@ -207,7 +208,7 @@ test("given a changed executed plan, when assessing, then the evidence fails clo
 
   // when / then
   await assert.rejects(runAuthenticatedZapAssessment(plan, {
-    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-zap-evidence-")),
+    evidenceDirectory: temporaryDirectory("courtside-zap-evidence-"),
     stopFile: join(tmpdir(), "courtside-zap-stop"),
     deadline: new Date(Date.now() + 60_000),
     attempt: 1,
@@ -244,7 +245,7 @@ test("given the shipped account budget, when rendering an active role plan, then
 
 test("given relayed admission refusals, when assessing, then a refused attack cannot read as a passed scan", async () => {
   // given
-  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-zap-evidence-"));
+  const evidenceDirectory = temporaryDirectory("courtside-zap-evidence-");
   const plan = {
     profile: "active", environment: "SECURITY", runId: "run-0001",
     target: "https://localhost:9443", targetFingerprint: run.targetFingerprint,

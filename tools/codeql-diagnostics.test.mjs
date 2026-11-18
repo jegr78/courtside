@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { annotation, extractionProblems, ignoredBy, unextractedFiles } from "./codeql-diagnostics.mjs";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const recorded = JSON.parse(readFileSync(new URL("./codeql-diagnostics.fixture.json", import.meta.url), "utf8"));
 const tool = new URL("./codeql-diagnostics.mjs", import.meta.url).pathname;
@@ -43,7 +43,7 @@ test("given a message with workflow command characters, when it becomes an annot
 
 test("given a SARIF directory from the security job, when the tool runs, then the run log and the evidence name the file", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-"));
+  const directory = temporaryDirectory("codeql-diagnostics-");
   mkdirSync(join(directory, "codeql"));
   writeFileSync(join(directory, "codeql", "javascript.sarif"), JSON.stringify(recorded));
   writeFileSync(join(directory, "summary.md"), "");
@@ -63,7 +63,7 @@ test("given a SARIF directory from the security job, when the tool runs, then th
 
 test("given no SARIF from the analysis, when the tool runs, then the run says so instead of passing silently", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-empty-"));
+  const directory = temporaryDirectory("codeql-diagnostics-empty-");
 
   // when
   const result = spawnSync(process.execPath, [tool, "--sarif", join(directory, "missing"),
@@ -76,7 +76,7 @@ test("given no SARIF from the analysis, when the tool runs, then the run says so
 
 test("given SARIF without tool diagnostics, when the tool runs, then the run says it cannot see extraction problems", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-bare-"));
+  const directory = temporaryDirectory("codeql-diagnostics-bare-");
   mkdirSync(join(directory, "codeql"));
   writeFileSync(join(directory, "codeql", "java.sarif"), JSON.stringify({ version: "2.1.0", runs: [{ results: [] }] }));
 
@@ -113,7 +113,7 @@ test("given a file CodeQL expected but did not extract, when coverage is compare
 
 test("given a SARIF directory where a file was not extracted, when the tool runs, then the run names that file", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-coverage-"));
+  const directory = temporaryDirectory("codeql-diagnostics-coverage-");
   mkdirSync(join(directory, "codeql"));
   const partial = structuredClone(recorded);
   const invocation = partial.runs[0].invocations[0];
@@ -135,7 +135,7 @@ test("given a SARIF directory where a file was not extracted, when the tool runs
 
 test("given SARIF without the expected or extracted file lists, when the tool runs, then the run says it cannot name unextracted files", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-unlisted-"));
+  const directory = temporaryDirectory("codeql-diagnostics-unlisted-");
   mkdirSync(join(directory, "codeql"));
   const unlisted = structuredClone(recorded);
   const invocation = unlisted.runs[0].invocations[0];
@@ -174,7 +174,7 @@ test("given the files git tracks, when the hosted SARIF lists only extracted fil
 
 test("given a repository checkout, when the tool runs with it, then a tracked source file CodeQL did not extract is named", () => {
   // given
-  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-repository-"));
+  const directory = temporaryDirectory("codeql-diagnostics-repository-");
   const checkout = join(directory, "checkout");
   mkdirSync(join(checkout, "src"), { recursive: true });
   for (const file of ["broken.ts", "valid.ts", "Skipped.java"]) writeFileSync(join(checkout, "src", file), "");
