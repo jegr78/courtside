@@ -364,7 +364,10 @@ test("given production browser sources, when building the web root, then metadat
   const callerTemporary = process.env.TMPDIR;
   // Workbox writes its bundle input through tempy, which fixes its root on first load and never removes it.
   process.env.TMPDIR = scratch;
-  context.after(() => { if (callerTemporary === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = callerTemporary; });
+  context.after(() => {
+    if (callerTemporary === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = callerTemporary;
+  });
   const vite = await import(pathToFileURL(join(frontend, "node_modules/vite/dist/node/index.js")).href);
   const loaded = await vite.loadConfigFromFile(
     { command: "build", mode: "production" }, join(frontend, "vite.config.ts"));
