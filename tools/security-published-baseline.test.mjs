@@ -195,6 +195,27 @@ test("given summaries with and without pre-existing findings, when combined into
   assert.deepEqual(record.sources[0].baseline, evaluated.baseline, "the record names the release it was compared against");
 });
 
+test("given a Moderate advisory the published release shares, when evaluated and combined, then it stays informational and marked", () => {
+  // given
+  const moderate = { auditReportVersion: 2, vulnerabilities: { "example-package": { severity: "moderate", range: "<2.0.0",
+    nodes: ["node_modules/example-package"], via: [{ source: 1234, url: "https://github.com/advisories/GHSA-1111-2222-3333",
+      severity: "moderate", range: "<2.0.0" }] } } };
+  const lock = { packages: { "node_modules/example-package": { version: "1.0.0" } } };
+  const unlocked = parseNpmReport(moderate, { version: "11.17.0", subject: "commit" });
+
+  // when
+  const shared = evaluate([candidate(moderate, lock)], baseline(moderate, lock));
+  const mixed = evaluate([candidate(moderate, lock), unlocked], baseline(moderate, lock));
+  const record = combineSecuritySummaries({ summaries: [shared], scope: "scheduled-npm-audit-site", subject: "commit", today });
+
+  // then
+  assert.equal(shared.status, "passed", "a shared Moderate finding does not change the status");
+  assert.equal(shared.informationalFindings[0].inBaseline, true);
+  assert.equal(mixed.informationalFindings.length, 1);
+  assert.equal(mixed.informationalFindings[0].inBaseline, undefined, "one observation outside the baseline makes the finding new");
+  assert.equal(record.informationalFindings[0].inBaseline, true, "the combined record keeps the mark");
+});
+
 test("given a baseline directory, when the policy CLI reads it, then a chosen release is compared and a missing one is named", () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "courtside-baseline-from-"));
