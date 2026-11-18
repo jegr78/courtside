@@ -66,7 +66,7 @@ export function evaluateSecurityReports({
     ? "blocked"
     : assessment?.outcome.outcome === "incomplete"
       ? "incomplete"
-      : acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed";
+      : passedStatus(acceptedFindings, preExistingFindings);
   return {
     schemaVersion: 1, scope, subject, assessmentPolicy, generatedAt: `${today}T00:00:00.000Z`, status,
     evidenceSources: reports.map((report) => ({
@@ -82,6 +82,11 @@ export function evaluateSecurityReports({
     ...(baseline ? { baseline: baselineRecord(baseline) } : {}),
     ...(assessment ? { assessment: structuredClone(assessment) } : {})
   };
+}
+
+function passedStatus(acceptedFindings, preExistingFindings) {
+  if (acceptedFindings.length > 0) return "passed-with-exceptions";
+  return preExistingFindings.length > 0 ? "passed-with-baseline" : "passed";
 }
 
 function baselineIdentity(finding) {
@@ -183,7 +188,7 @@ export function combineSecuritySummaries({
   if (blockingFindings.length > 0) throw new Error("Cannot combine blocked security evidence");
   return {
     schemaVersion: 1, scope, subject, generatedAt: `${today}T00:00:00.000Z`,
-    status: acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed",
+    status: passedStatus(acceptedFindings, preExistingFindings),
     sources: summaries.map((summary) => ({
       scope: summary.scope, subject: summary.subject, status: summary.status,
       assessmentPolicy: summary.assessmentPolicy,
@@ -265,7 +270,7 @@ function validateSummary(summary, today) {
   if (summary.preExistingFindings !== undefined && !Array.isArray(summary.preExistingFindings)) {
     throw new Error("Security summary has invalid preExistingFindings");
   }
-  if (!["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
+  if (!["passed", "passed-with-exceptions", "passed-with-baseline", "blocked", "incomplete"].includes(summary.status)) {
     throw new Error("Security summary has an invalid status");
   }
   const generatedAt = new Date(summary.generatedAt);

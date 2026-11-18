@@ -109,7 +109,7 @@ export function currentDependencyEvidence(summaries, subject) {
       throw new Error("unsupported current security summary");
     }
     if (!["release-build", "scheduled-npm-audit", "scheduled-npm-audit-site"].includes(summary.scope)
-      || !["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
+      || !["passed", "passed-with-exceptions", "passed-with-baseline", "blocked", "incomplete"].includes(summary.status)) {
       throw new Error("unsupported current security summary");
     }
     if (summary.subject !== subject

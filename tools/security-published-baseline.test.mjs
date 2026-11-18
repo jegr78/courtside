@@ -69,7 +69,7 @@ test("given the published release has the same advisory, when evaluated, then it
   const result = evaluate([candidate()], baseline());
 
   // then
-  assert.equal(result.status, "passed");
+  assert.equal(result.status, "passed-with-baseline", "a release that ships a known High gap does not read as clean");
   assert.deepEqual(result.blockingFindings, []);
   assert.ok(result.preExistingFindings.some((finding) => finding.id === picomatch), "the gap stays visible");
   assert.deepEqual(result.baseline, { release: "v0.5.0-rc.7", sources: [
@@ -172,6 +172,7 @@ test("given summaries with and without pre-existing findings, when combined into
 
   // then
   assert.ok(record.preExistingFindings.some((finding) => finding.id === picomatch));
+  assert.equal(record.status, "passed-with-baseline", "the published record says it ships a known gap");
   assert.deepEqual(record.sources[0].baseline, evaluated.baseline, "the record names the release it was compared against");
 });
 
