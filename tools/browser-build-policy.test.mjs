@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 import { browserBuildComments, browserBuildFileName, browserBuildInventoryGaps, browserBuildMarkupComments,
   browserBuildOrigins, browserBuildResource, verifyBrowserBuild, verifyMemberSurface } from "./browser-build-policy.mjs";
 
@@ -358,8 +359,12 @@ test("given the packaged application, when reading how the web root reaches it, 
 
 test("given production browser sources, when building the web root, then metadata and debug artifacts stay absent", async (context) => {
   // given
-  const output = mkdtempSync(join(tmpdir(), "courtside-production-browser-build-"));
-  context.after(() => rmSync(output, { recursive: true, force: true }));
+  const output = temporaryDirectory("courtside-production-browser-build-");
+  const scratch = temporaryDirectory("courtside-production-browser-scratch-");
+  const callerTemporary = process.env.TMPDIR;
+  // Workbox writes its bundle input through tempy, which fixes its root on first load and never removes it.
+  process.env.TMPDIR = scratch;
+  context.after(() => { if (callerTemporary === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = callerTemporary; });
   const vite = await import(pathToFileURL(join(frontend, "node_modules/vite/dist/node/index.js")).href);
   const loaded = await vite.loadConfigFromFile(
     { command: "build", mode: "production" }, join(frontend, "vite.config.ts"));
