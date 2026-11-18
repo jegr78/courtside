@@ -26,13 +26,15 @@ export function evaluateSecurityReports({
     ...finding
   })))
     .toSorted(compareFinding);
+  const published = publishedIdentities(baseline);
+  const preExisting = (finding) => published.has(baselineIdentity(finding));
   const findings = allFindings.filter(isBlocking);
-  const informationalFindings = deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding)));
+  const informationalFindings = markedBaseline(deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding))
+    .map((finding) => (preExisting(finding) ? { ...finding, inBaseline: true } : finding))));
   const matchedExceptions = new Set();
   const blockingFindings = [];
   const acceptedFindings = [];
   const preExistingFindings = [];
-  const published = publishedIdentities(baseline);
   for (const finding of findings) {
     const exception = scopedExceptions.find((candidate) => matches(candidate, finding));
     if (exception) {
@@ -48,7 +50,7 @@ export function evaluateSecurityReports({
           independentReview: exception.independentReview
         }
       });
-    } else if (published.has(baselineIdentity(finding))) {
+    } else if (preExisting(finding)) {
       preExistingFindings.push(finding);
     } else {
       blockingFindings.push(finding);
@@ -82,6 +84,12 @@ export function evaluateSecurityReports({
 function baselineIdentity(finding) {
   if (finding.scanner !== "npm" || !["dev", "prod"].includes(finding.dependencyScope)) return null;
   return `${finding.component}\0${finding.id}\0${finding.dependencyScope}`;
+}
+
+// Only observations carry the flag, so a merged finding is pre-existing when all of them are.
+function markedBaseline(findings) {
+  return findings.map(({ inBaseline, ...finding }) => (finding.observations.every((observation) => observation.inBaseline === true)
+    ? { ...finding, inBaseline: true } : finding));
 }
 
 function publishedIdentities(baseline) {
@@ -160,8 +168,8 @@ export function combineSecuritySummaries({
   }
   const blockingFindings = deduplicateFindings(summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding));
   const acceptedFindings = deduplicateFindings(summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding));
-  const informationalFindings = deduplicateFindings(
-    summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding));
+  const informationalFindings = markedBaseline(deduplicateFindings(
+    summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding)));
   const preExistingFindings = deduplicateFindings(
     summaries.flatMap((summary) => summary.preExistingFindings ?? []).toSorted(compareFinding));
   const assessments = summaries.filter((summary) => summary.assessment).map((summary) => structuredClone(summary.assessment));

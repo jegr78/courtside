@@ -139,7 +139,7 @@ export function currentDependencyEvidence(summaries, subject) {
           ecosystem: scanner === "npm" ? "npm" : "maven",
           manifestPath,
           severity: normalizedSeverity(record.severity ?? observation.severity),
-          inBaseline: field === "preExistingFindings"
+          inBaseline: field === "preExistingFindings" || observation.inBaseline === true
         });
       }
     }

@@ -13,6 +13,7 @@ import {
   runDependencyRemediation,
   skippedDependencyEvidence
 } from "./dependency-remediation.mjs";
+import { evaluateSecurityReports, parseNpmReport } from "./security-findings.mjs";
 
 const policy = JSON.parse(readFileSync(
   fileURLToPath(new URL("../security/dependency-remediation-policy.json", import.meta.url)), "utf8"));
@@ -156,6 +157,27 @@ test("given a finding the published release already has, when its alert is missi
   assert.equal(overdue.findings[0].remediationState, "overdue");
   assert.equal(overdue.releaseReadiness, "ready");
   assert.equal(evaluate([overdueAlert]).releaseReadiness, "blocked", "the same overdue finding outside the baseline still blocks");
+});
+
+test("given a Moderate advisory the published release also has, when its evaluated summary reaches the deadline step, then release readiness ignores it", () => {
+  // given
+  const audit = { auditReportVersion: 2, vulnerabilities: { "example-package": { severity: "moderate", range: "<2.0.0",
+    nodes: ["node_modules/example-package"], via: [{ source: 1234, url: "https://github.com/advisories/GHSA-1111-2222-3333",
+      severity: "moderate", range: "<2.0.0" }] } } };
+  const lockfile = { packages: { "node_modules/example-package": { version: "1.0.0" } } };
+  const report = (subject) => parseNpmReport(audit, { version: "11.17.0", subject, lockfile });
+  const summary = evaluateSecurityReports({
+    reports: [report("a".repeat(40))], exceptions: [], scope: "release-build", subject: "a".repeat(40),
+    assessmentPolicy: "not-applicable", today: "2026-09-07", baseline: { release: "v0.5.0-rc.7", reports: [report("b".repeat(40))] }
+  });
+
+  // when
+  const evidence = currentDependencyEvidence([summary], "a".repeat(40));
+  const result = evaluate([], { currentFindings: evidence.findings });
+
+  // then
+  assert.equal(evidence.findings[0].inBaseline, true, "a Moderate gap of the published release is as pre-existing as a High one");
+  assert.equal(result.releaseReadiness, "ready");
 });
 
 test("given one finding seen both as pre-existing and as new, when reading evidence, then it counts as new", () => {
