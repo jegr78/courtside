@@ -16,10 +16,20 @@ const skippedRecord = () => {
   }
   return record;
 };
-const choose = ({ tags, ancestors, records }) => choosePublishedBaseline({
+const rc7Commit = "4f10fde13589bf75239b9c818f2f1b9891aa0e1e";
+const recordFor = (commit) => {
+  const record = structuredClone(rc7Record);
+  for (const source of record.sources) {
+    source.subject = commit;
+    for (const evidence of source.evidenceSources) evidence.subject = commit;
+  }
+  return record;
+};
+const choose = ({ tags, ancestors, records, commits = {} }) => choosePublishedBaseline({
   subject: "c".repeat(40), tags,
   isStrictAncestor: async (tag) => ancestors.includes(tag),
-  readRecord: async (tag) => records[tag] ?? null
+  readRecord: async (tag) => records[tag] ?? null,
+  commitOf: async (tag) => commits[tag] ?? rc7Commit
 });
 
 test("given published releases, when choosing the baseline, then the newest strict ancestor with a completed npm audit wins", async () => {
@@ -47,6 +57,17 @@ test("given the newest ancestor did not complete its npm audit or has no record,
   assert.equal(skipped.inspected[0].outcome, "npm-audit-not-completed");
   assert.equal(missing.release, "v0.4.0");
   assert.equal(missing.inspected[0].outcome, "no-security-record");
+});
+
+test("given a security record made for another commit than its tag, when choosing, then it cannot vouch and an older release is taken", async () => {
+  // when
+  const choice = await choose({ tags: ["v0.5.0-rc.7", "v0.4.0"], ancestors: ["v0.5.0-rc.7", "v0.4.0"],
+    records: { "v0.5.0-rc.7": rc7Record, "v0.4.0": recordFor("d".repeat(40)) },
+    commits: { "v0.5.0-rc.7": "e".repeat(40), "v0.4.0": "d".repeat(40) } });
+
+  // then
+  assert.equal(choice.release, "v0.4.0", "the lockfile read from the tag must be the one the record audited");
+  assert.deepEqual(choice.inspected[0], { tag: "v0.5.0-rc.7", outcome: "record-subject-mismatch" });
 });
 
 test("given no usable published release, when choosing, then there is no baseline and the reason says why", async () => {
@@ -101,9 +122,9 @@ const github = (records) => async (url) => {
   const path = new URL(url).pathname;
   if (path.endsWith("/releases")) return respond(200, Object.keys(records).map((tag) => ({ tag_name: tag, draft: false })));
   const tag = decodeURIComponent(path.split("/releases/tags/")[1] ?? "");
-  if (tag) return records[tag] ? respond(200, { assets: [{ id: tag.length, name: "security-record.json" }] }) : respond(200, { assets: [] });
-  const asset = Number(path.split("/releases/assets/")[1]);
-  return respond(200, Object.values(records).find((_, index) => Object.keys(records)[index].length === asset));
+  if (tag) return records[tag] ? respond(200, { assets: [{ id: Object.keys(records).indexOf(tag) + 1, name: "security-record.json" }] })
+    : respond(200, { assets: [] });
+  return respond(200, Object.values(records)[Number(path.split("/releases/assets/")[1]) - 1]);
 };
 
 test("given a real history, when ancestry is checked, then an older tag counts and the subject's own tag does not", async () => {
@@ -124,7 +145,7 @@ test("given a real history, when ancestry is checked, then an older tag counts a
 
 test("given published releases on GitHub, when the baseline runs end to end, then the older release's own lockfile is written", async () => {
   // given
-  const { root, commit } = repository();
+  const { root, git, commit } = repository();
   const output = join(root, "baseline");
   try {
     commit('{"lock":"old"}', "v0.1.0");
@@ -132,7 +153,7 @@ test("given published releases on GitHub, when the baseline runs end to end, the
 
     // when
     const choice = await execute(["--subject", head, "--directory", output], { GITHUB_REPOSITORY: "example/courtside", GH_TOKEN: "token" },
-      github({ "v0.2.0": rc7Record, "v0.1.0": rc7Record }), root);
+      github({ "v0.2.0": recordFor(head), "v0.1.0": recordFor(git("rev-parse", "v0.1.0")) }), root);
 
     // then
     assert.equal(choice.release, "v0.1.0");
