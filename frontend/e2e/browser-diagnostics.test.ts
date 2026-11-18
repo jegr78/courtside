@@ -129,7 +129,7 @@ describe("browser diagnostics", () => {
     expect(browser.listenerCount("disconnected")).toBe(0);
   });
 
-  it("given a container that logs to both streams, when its logs are read, then both are kept in the order they were written", async () => {
+  it("given a container that logs to both streams, when its logs are read, then both are kept in the order they were written and stderr is marked", async () => {
     // given
     const run = vi.fn((args: string[]) => Promise.resolve(args[0] === "logs"
       ? { stdout: "2026-11-17T21:42:30.100000000Z out first\n2026-11-17T21:42:42.700000000Z out last\n",
@@ -144,7 +144,7 @@ describe("browser diagnostics", () => {
     expect(run).toHaveBeenCalledWith(["logs", "--timestamps", "--tail", "200", "container-1"], expect.any(AbortSignal));
     expect(diagnostics.containerLogs).toBe([
       "2026-11-17T21:42:30.100000000Z out first",
-      "2026-11-17T21:42:30.864000000Z err middle",
+      "2026-11-17T21:42:30.864000000Z stderr err middle",
       "2026-11-17T21:42:42.700000000Z out last"
     ].join("\n"));
     expect(diagnostics.containerState).toEqual({});

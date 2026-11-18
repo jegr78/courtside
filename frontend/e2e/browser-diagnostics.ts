@@ -163,7 +163,8 @@ export function dockerDiagnosticCommand(run: DockerRun): DockerDiagnosticCommand
   return async (args, signal) => {
     const { stdout, stderr } = await run(args, signal);
     if (args[0] !== "logs") return stdout;
-    return [...stdout.split("\n"), ...stderr.split("\n")].filter((line) => line !== "")
+    const lines = (text: string) => text.split("\n").filter((line) => line !== "");
+    return [...lines(stdout), ...lines(stderr).map((line) => line.replace(/^\S+/, "$& stderr"))]
       .sort((left, right) => left.slice(0, 30).localeCompare(right.slice(0, 30))).join("\n");
   };
 }
