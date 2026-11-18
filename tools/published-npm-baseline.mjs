@@ -95,7 +95,7 @@ function parseArguments(args) {
   return values;
 }
 
-export async function execute(args, environment = process.env, request = fetch, cwd = process.cwd()) {
+export async function execute(args, environment = process.env, request = fetch, cwd = process.cwd(), output = process.stdout) {
   const { subject, directory } = parseArguments(args);
   const repository = environment.GITHUB_REPOSITORY;
   const token = environment.GITHUB_TOKEN ?? environment.GH_TOKEN;
@@ -115,7 +115,7 @@ export async function execute(args, environment = process.env, request = fetch, 
     choice = { release: null, reason: "baseline-unavailable", detail: failure.message.slice(0, 300), inspected: choice?.inspected ?? [] };
     await writePublishedBaseline({ directory, choice, show });
   }
-  process.stdout.write(`npm baseline: ${choice.release ?? `none (${choice.reason}${choice.detail ? `: ${choice.detail}` : ""})`}\n`);
+  output.write(`npm baseline: ${choice.release ?? `none (${choice.reason}${choice.detail ? `: ${choice.detail}` : ""})`}\n`);
   return choice;
 }
 

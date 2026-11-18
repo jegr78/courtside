@@ -117,6 +117,10 @@ function repository() {
   return { root, git, commit };
 }
 
+const sink = () => {
+  const lines = [];
+  return { write: (line) => lines.push(line), text: () => lines.join("") };
+};
 const respond = (status, body) => ({ status, json: async () => body, text: async () => JSON.stringify(body) });
 const github = (records) => async (url) => {
   const path = new URL(url).pathname;
@@ -146,18 +150,20 @@ test("given a real history, when ancestry is checked, then an older tag counts a
 test("given published releases on GitHub, when the baseline runs end to end, then the older release's own lockfile is written", async () => {
   // given
   const { root, git, commit } = repository();
-  const output = join(root, "baseline");
+  const directory = join(root, "baseline");
+  const output = sink();
   try {
     commit('{"lock":"old"}', "v0.1.0");
     const head = commit('{"lock":"new"}', "v0.2.0");
 
     // when
-    const choice = await execute(["--subject", head, "--directory", output], { GITHUB_REPOSITORY: "example/courtside", GH_TOKEN: "token" },
-      github({ "v0.2.0": recordFor(head), "v0.1.0": recordFor(git("rev-parse", "v0.1.0")) }), root);
+    const choice = await execute(["--subject", head, "--directory", directory], { GITHUB_REPOSITORY: "example/courtside", GH_TOKEN: "token" },
+      github({ "v0.2.0": recordFor(head), "v0.1.0": recordFor(git("rev-parse", "v0.1.0")) }), root, output);
 
     // then
     assert.equal(choice.release, "v0.1.0");
-    assert.equal(readFileSync(join(output, "package-lock.json"), "utf8"), '{"lock":"old"}');
+    assert.equal(output.text(), "npm baseline: v0.1.0\n");
+    assert.equal(readFileSync(join(directory, "package-lock.json"), "utf8"), '{"lock":"old"}');
   } finally {
     rmSync(root, { recursive: true });
   }
@@ -166,21 +172,23 @@ test("given published releases on GitHub, when the baseline runs end to end, the
 test("given the GitHub API fails, when the baseline runs, then there is no baseline and the reason and cause are kept", async () => {
   // given
   const { root, commit } = repository();
-  const output = join(root, "baseline");
+  const directory = join(root, "baseline");
+  const output = sink();
   try {
     commit('{"lock":"old"}', "v0.1.0");
     const head = commit('{"lock":"new"}', "v0.2.0");
 
     // when
-    const choice = await execute(["--subject", head, "--directory", output], { GITHUB_REPOSITORY: "example/courtside", GH_TOKEN: "token" },
-      async () => respond(502, {}), root);
+    const choice = await execute(["--subject", head, "--directory", directory], { GITHUB_REPOSITORY: "example/courtside", GH_TOKEN: "token" },
+      async () => respond(502, {}), root, output);
 
     // then
     assert.equal(choice.release, null, "an outage is never read as a baseline");
     assert.equal(choice.reason, "baseline-unavailable");
     assert.match(choice.detail, /HTTP 502/);
-    assert.equal(existsSync(join(output, "package-lock.json")), false);
-    assert.equal(JSON.parse(readFileSync(join(output, "baseline.json"), "utf8")).reason, "baseline-unavailable");
+    assert.match(output.text(), /^npm baseline: none \(baseline-unavailable: .*HTTP 502/, "the step's log says why there is none");
+    assert.equal(existsSync(join(directory, "package-lock.json")), false);
+    assert.equal(JSON.parse(readFileSync(join(directory, "baseline.json"), "utf8")).reason, "baseline-unavailable");
   } finally {
     rmSync(root, { recursive: true });
   }
