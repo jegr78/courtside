@@ -29,7 +29,7 @@ export function evaluateSecurityReports({
   const published = publishedNodes(baseline);
   const preExisting = (finding) => {
     const nodes = published.get(baselineIdentity(finding));
-    return Boolean(nodes) && finding.nodes?.length > 0 && finding.nodes.every((node) => nodes.has(node));
+    return Boolean(nodes) && finding.nodes?.length > 0 && finding.nodes.every((node) => nodes.has(nodeIdentity(node)));
   };
   const findings = allFindings.filter(isBlocking);
   const informationalFindings = markedBaseline(deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding))
@@ -106,9 +106,13 @@ function publishedNodes(baseline) {
   for (const finding of reports.filter((report) => report.scanner === "npm" && report.status === "completed")
     .flatMap((report) => report.findings)) {
     const identity = baselineIdentity({ scanner: "npm", ...finding });
-    if (identity) published.set(identity, new Set([...(published.get(identity) ?? []), ...(finding.nodes ?? [])]));
+    if (identity) published.set(identity, new Set([...(published.get(identity) ?? []), ...(finding.nodes ?? []).map(nodeIdentity)]));
   }
   return published;
+}
+
+function nodeIdentity(node) {
+  return `${node.path}\0${node.scope}`;
 }
 
 function baselineRecord(baseline) {
@@ -376,13 +380,21 @@ export function parseNpmReport(input, metadata = {}) {
       cwes: [...new Set(advisory.cwe ?? [])].toSorted(),
       reachability: "not-assessed",
       dependencyScope,
-      nodes: Array.isArray(finding.nodes) ? [...new Set(finding.nodes.map(String))].toSorted() : []
+      nodes: lockfileNodes(finding.nodes, metadata.lockfile)
     }));
   });
   return {
     scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
     subject: metadata.subject ?? "unknown", findings
   };
+}
+
+function lockfileNodes(nodes, lockfile) {
+  if (!Array.isArray(nodes)) return [];
+  return [...new Set(nodes.map(String))].toSorted().map((path) => {
+    const entry = lockfile?.packages?.[path];
+    return { path, scope: entry && typeof entry === "object" ? (entry.dev === true ? "dev" : "prod") : "unknown" };
+  });
 }
 
 function lockfileScope(nodes, lockfile) {

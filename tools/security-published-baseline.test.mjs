@@ -118,6 +118,25 @@ test("given a second copy of a package the published release has, when evaluated
     "the same two copies in the published release are pre-existing");
 });
 
+test("given one copy of a package that moved from development to production, when evaluated, then that copy blocks", () => {
+  // given
+  const input = audit();
+  const copy = "node_modules/tinyglobby/node_modules/picomatch";
+  input.vulnerabilities.picomatch.nodes.push(copy);
+  const published = lockfile();
+  delete published.packages["node_modules/picomatch"].dev;
+  published.packages[copy] = { ...lockfile().packages["node_modules/picomatch"] };
+  const shipped = structuredClone(published);
+  delete shipped.packages[copy].dev;
+
+  // when
+  const result = evaluate([candidate(input, shipped)], baseline(input, published));
+
+  // then
+  assert.ok(result.blockingFindings.some((finding) => finding.id === picomatch),
+    "a copy the published release kept as a build tool is new exposure once it ships, though the finding was production before");
+});
+
 test("given no usable baseline, when evaluated, then findings block as before and the reason is recorded", () => {
   // given
   const skipped = { release: "v0.5.0-rc.7", reports: [parseNpmReport({ schemaVersion: 1, status: "skipped", reason: "service-unavailable" },
