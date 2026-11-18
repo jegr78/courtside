@@ -8,12 +8,15 @@ import { collectPublishedReleaseTags } from "./published-release-tags.mjs";
 
 const run = promisify(execFile);
 
-function npmCompleted(record) {
-  return record?.sources?.find((source) => source.scope === "release-build")?.evidenceSources
-    ?.some((source) => source.scanner === "npm" && source.status === "completed") === true;
+function releaseBuild(record) {
+  return record?.sources?.find((source) => source.scope === "release-build");
 }
 
-export async function choosePublishedBaseline({ subject, tags, isStrictAncestor, readRecord, maxReleases = 20 }) {
+function npmCompleted(record) {
+  return releaseBuild(record)?.evidenceSources?.some((source) => source.scanner === "npm" && source.status === "completed") === true;
+}
+
+export async function choosePublishedBaseline({ subject, tags, isStrictAncestor, readRecord, commitOf, maxReleases = 20 }) {
   if (!/^[a-f0-9]{40}$/.test(subject ?? "")) throw new Error("subject must be an immutable commit SHA");
   const ordered = tags.map(parseVersion).filter(Boolean).sort((left, right) => precedence(right, left)).map((version) => version.tag);
   const inspected = [];
@@ -26,6 +29,10 @@ export async function choosePublishedBaseline({ subject, tags, isStrictAncestor,
     const record = await readRecord(tag);
     if (!record) {
       inspected.push({ tag, outcome: "no-security-record" });
+      continue;
+    }
+    if (releaseBuild(record)?.subject !== await commitOf(tag)) {
+      inspected.push({ tag, outcome: "record-subject-mismatch" });
       continue;
     }
     if (!npmCompleted(record)) {
@@ -88,7 +95,7 @@ function parseArguments(args) {
   return values;
 }
 
-export async function execute(args, environment = process.env, request = fetch, cwd = process.cwd()) {
+export async function execute(args, environment = process.env, request = fetch, cwd = process.cwd(), output = process.stdout) {
   const { subject, directory } = parseArguments(args);
   const repository = environment.GITHUB_REPOSITORY;
   const token = environment.GITHUB_TOKEN ?? environment.GH_TOKEN;
@@ -100,6 +107,7 @@ export async function execute(args, environment = process.env, request = fetch, 
     choice = await choosePublishedBaseline({
       subject, tags,
       isStrictAncestor: (tag) => strictAncestor(tag, subject, cwd),
+      commitOf: async (tag) => (await git(["rev-parse", `${tag}^{commit}`], cwd)).stdout.trim(),
       readRecord: (tag) => securityRecord({ repository, token, apiUrl, tag, request })
     });
     await writePublishedBaseline({ directory, choice, show });
@@ -107,7 +115,7 @@ export async function execute(args, environment = process.env, request = fetch, 
     choice = { release: null, reason: "baseline-unavailable", detail: failure.message.slice(0, 300), inspected: choice?.inspected ?? [] };
     await writePublishedBaseline({ directory, choice, show });
   }
-  process.stdout.write(`npm baseline: ${choice.release ?? `none (${choice.reason}${choice.detail ? `: ${choice.detail}` : ""})`}\n`);
+  output.write(`npm baseline: ${choice.release ?? `none (${choice.reason}${choice.detail ? `: ${choice.detail}` : ""})`}\n`);
   return choice;
 }
 

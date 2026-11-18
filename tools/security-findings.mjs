@@ -26,13 +26,18 @@ export function evaluateSecurityReports({
     ...finding
   })))
     .toSorted(compareFinding);
+  const published = publishedNodes(baseline);
+  const preExisting = (finding) => {
+    const nodes = published.get(baselineIdentity(finding));
+    return Boolean(nodes) && finding.nodes?.length > 0 && finding.nodes.every((node) => nodes.has(nodeIdentity(node)));
+  };
   const findings = allFindings.filter(isBlocking);
-  const informationalFindings = deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding)));
+  const informationalFindings = markedBaseline(deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding))
+    .map((finding) => (preExisting(finding) ? { ...finding, inBaseline: true } : finding))));
   const matchedExceptions = new Set();
   const blockingFindings = [];
   const acceptedFindings = [];
   const preExistingFindings = [];
-  const published = publishedIdentities(baseline);
   for (const finding of findings) {
     const exception = scopedExceptions.find((candidate) => matches(candidate, finding));
     if (exception) {
@@ -48,7 +53,7 @@ export function evaluateSecurityReports({
           independentReview: exception.independentReview
         }
       });
-    } else if (published.has(baselineIdentity(finding))) {
+    } else if (preExisting(finding)) {
       preExistingFindings.push(finding);
     } else {
       blockingFindings.push(finding);
@@ -61,7 +66,7 @@ export function evaluateSecurityReports({
     ? "blocked"
     : assessment?.outcome.outcome === "incomplete"
       ? "incomplete"
-      : acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed";
+      : passedStatus(acceptedFindings, preExistingFindings);
   return {
     schemaVersion: 1, scope, subject, assessmentPolicy, generatedAt: `${today}T00:00:00.000Z`, status,
     evidenceSources: reports.map((report) => ({
@@ -79,16 +84,35 @@ export function evaluateSecurityReports({
   };
 }
 
+function passedStatus(acceptedFindings, preExistingFindings) {
+  if (acceptedFindings.length > 0) return "passed-with-exceptions";
+  return preExistingFindings.length > 0 ? "passed-with-baseline" : "passed";
+}
+
 function baselineIdentity(finding) {
   if (finding.scanner !== "npm" || !["dev", "prod"].includes(finding.dependencyScope)) return null;
   return `${finding.component}\0${finding.id}\0${finding.dependencyScope}`;
 }
 
-function publishedIdentities(baseline) {
+// Only observations carry the flag, so a merged finding is pre-existing when all of them are.
+function markedBaseline(findings) {
+  return findings.map(({ inBaseline, ...finding }) => (finding.observations.every((observation) => observation.inBaseline === true)
+    ? { ...finding, inBaseline: true } : finding));
+}
+
+function publishedNodes(baseline) {
   const reports = baseline?.release ? baseline.reports ?? [] : [];
-  return new Set(reports.filter((report) => report.scanner === "npm" && report.status === "completed")
-    .flatMap((report) => report.findings.map((finding) => baselineIdentity({ scanner: "npm", ...finding })))
-    .filter(Boolean));
+  const published = new Map();
+  for (const finding of reports.filter((report) => report.scanner === "npm" && report.status === "completed")
+    .flatMap((report) => report.findings)) {
+    const identity = baselineIdentity({ scanner: "npm", ...finding });
+    if (identity) published.set(identity, new Set([...(published.get(identity) ?? []), ...(finding.nodes ?? []).map(nodeIdentity)]));
+  }
+  return published;
+}
+
+function nodeIdentity(node) {
+  return `${node.path}\0${node.scope}`;
 }
 
 function baselineRecord(baseline) {
@@ -160,15 +184,15 @@ export function combineSecuritySummaries({
   }
   const blockingFindings = deduplicateFindings(summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding));
   const acceptedFindings = deduplicateFindings(summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding));
-  const informationalFindings = deduplicateFindings(
-    summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding));
+  const informationalFindings = markedBaseline(deduplicateFindings(
+    summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding)));
   const preExistingFindings = deduplicateFindings(
     summaries.flatMap((summary) => summary.preExistingFindings ?? []).toSorted(compareFinding));
   const assessments = summaries.filter((summary) => summary.assessment).map((summary) => structuredClone(summary.assessment));
   if (blockingFindings.length > 0) throw new Error("Cannot combine blocked security evidence");
   return {
     schemaVersion: 1, scope, subject, generatedAt: `${today}T00:00:00.000Z`,
-    status: acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed",
+    status: passedStatus(acceptedFindings, preExistingFindings),
     sources: summaries.map((summary) => ({
       scope: summary.scope, subject: summary.subject, status: summary.status,
       assessmentPolicy: summary.assessmentPolicy,
@@ -250,7 +274,7 @@ function validateSummary(summary, today) {
   if (summary.preExistingFindings !== undefined && !Array.isArray(summary.preExistingFindings)) {
     throw new Error("Security summary has invalid preExistingFindings");
   }
-  if (!["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
+  if (!["passed", "passed-with-exceptions", "passed-with-baseline", "blocked", "incomplete"].includes(summary.status)) {
     throw new Error("Security summary has an invalid status");
   }
   const generatedAt = new Date(summary.generatedAt);
@@ -355,13 +379,22 @@ export function parseNpmReport(input, metadata = {}) {
       ].map((alias) => alias.toUpperCase()))].toSorted(),
       cwes: [...new Set(advisory.cwe ?? [])].toSorted(),
       reachability: "not-assessed",
-      dependencyScope
+      dependencyScope,
+      nodes: lockfileNodes(finding.nodes, metadata.lockfile)
     }));
   });
   return {
     scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
     subject: metadata.subject ?? "unknown", findings
   };
+}
+
+function lockfileNodes(nodes, lockfile) {
+  if (!Array.isArray(nodes)) return [];
+  return [...new Set(nodes.map(String))].toSorted().map((path) => {
+    const entry = lockfile?.packages?.[path];
+    return { path, scope: entry && typeof entry === "object" ? (entry.dev === true ? "dev" : "prod") : "unknown" };
+  });
 }
 
 function lockfileScope(nodes, lockfile) {
@@ -578,7 +611,9 @@ function main(args) {
   if (result.status === "blocked") {
     const ids = result.blockingFindings.map((finding) => `${finding.scanner}:${finding.id}:${finding.target}`).join(", ");
     const reason = ids || result.assessment?.outcome.reason || "security policy rejected the evidence";
-    throw new Error(`Actionable security findings: ${reason}`);
+    const missing = result.baseline?.release === null
+      ? ` (no npm baseline: ${result.baseline.reason}${result.baseline.detail ? `: ${result.baseline.detail}` : ""})` : "";
+    throw new Error(`Actionable security findings: ${reason}${missing}`);
   }
   if (result.status === "incomplete") throw new Error("Security evidence is incomplete");
 }

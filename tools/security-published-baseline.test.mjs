@@ -69,7 +69,7 @@ test("given the published release has the same advisory, when evaluated, then it
   const result = evaluate([candidate()], baseline());
 
   // then
-  assert.equal(result.status, "passed");
+  assert.equal(result.status, "passed-with-baseline", "a release that ships a known High gap does not read as clean");
   assert.deepEqual(result.blockingFindings, []);
   assert.ok(result.preExistingFindings.some((finding) => finding.id === picomatch), "the gap stays visible");
   assert.deepEqual(result.baseline, { release: "v0.5.0-rc.7", sources: [
@@ -98,6 +98,43 @@ test("given a development dependency that became a production dependency, when e
   // then
   assert.ok(result.blockingFindings.some((finding) => finding.id === picomatch && finding.dependencyScope === "prod"),
     "shipping a gap that was only a build tool before is a new exposure");
+});
+
+test("given a second copy of a package the published release has, when evaluated, then the new copy blocks", () => {
+  // given
+  const input = audit();
+  const lock = lockfile();
+  const copy = "node_modules/tinyglobby/node_modules/picomatch";
+  input.vulnerabilities.picomatch.nodes.push(copy);
+  lock.packages[copy] = { ...lock.packages["node_modules/picomatch"] };
+
+  // when
+  const result = evaluate([candidate(input, lock)], baseline());
+
+  // then
+  assert.ok(result.blockingFindings.some((finding) => finding.id === picomatch),
+    "a copy the published release does not ship is a new exposure, though package, advisory and scope match");
+  assert.ok(evaluate([candidate(input, lock)], baseline(input, lock)).preExistingFindings.some((finding) => finding.id === picomatch),
+    "the same two copies in the published release are pre-existing");
+});
+
+test("given one copy of a package that moved from development to production, when evaluated, then that copy blocks", () => {
+  // given
+  const input = audit();
+  const copy = "node_modules/tinyglobby/node_modules/picomatch";
+  input.vulnerabilities.picomatch.nodes.push(copy);
+  const published = lockfile();
+  delete published.packages["node_modules/picomatch"].dev;
+  published.packages[copy] = { ...lockfile().packages["node_modules/picomatch"] };
+  const shipped = structuredClone(published);
+  delete shipped.packages[copy].dev;
+
+  // when
+  const result = evaluate([candidate(input, shipped)], baseline(input, published));
+
+  // then
+  assert.ok(result.blockingFindings.some((finding) => finding.id === picomatch),
+    "a copy the published release kept as a build tool is new exposure once it ships, though the finding was production before");
 });
 
 test("given no usable baseline, when evaluated, then findings block as before and the reason is recorded", () => {
@@ -154,7 +191,29 @@ test("given summaries with and without pre-existing findings, when combined into
 
   // then
   assert.ok(record.preExistingFindings.some((finding) => finding.id === picomatch));
+  assert.equal(record.status, "passed-with-baseline", "the published record says it ships a known gap");
   assert.deepEqual(record.sources[0].baseline, evaluated.baseline, "the record names the release it was compared against");
+});
+
+test("given a Moderate advisory the published release shares, when evaluated and combined, then it stays informational and marked", () => {
+  // given
+  const moderate = { auditReportVersion: 2, vulnerabilities: { "example-package": { severity: "moderate", range: "<2.0.0",
+    nodes: ["node_modules/example-package"], via: [{ source: 1234, url: "https://github.com/advisories/GHSA-1111-2222-3333",
+      severity: "moderate", range: "<2.0.0" }] } } };
+  const lock = { packages: { "node_modules/example-package": { version: "1.0.0" } } };
+  const unlocked = parseNpmReport(moderate, { version: "11.17.0", subject: "commit" });
+
+  // when
+  const shared = evaluate([candidate(moderate, lock)], baseline(moderate, lock));
+  const mixed = evaluate([candidate(moderate, lock), unlocked], baseline(moderate, lock));
+  const record = combineSecuritySummaries({ summaries: [shared], scope: "scheduled-npm-audit-site", subject: "commit", today });
+
+  // then
+  assert.equal(shared.status, "passed", "a shared Moderate finding does not change the status");
+  assert.equal(shared.informationalFindings[0].inBaseline, true);
+  assert.equal(mixed.informationalFindings.length, 1);
+  assert.equal(mixed.informationalFindings[0].inBaseline, undefined, "one observation outside the baseline makes the finding new");
+  assert.equal(record.informationalFindings[0].inBaseline, true, "the combined record keeps the mark");
 });
 
 test("given a baseline directory, when the policy CLI reads it, then a chosen release is compared and a missing one is named", () => {
@@ -191,10 +250,13 @@ test("given a baseline directory, when the policy CLI reads it, then a chosen re
     assert.equal(chosen.status, 0, chosen.stderr);
     assert.equal(none.status, 1, "without a baseline the gap blocks as before");
     assert.deepEqual(noneSummary.baseline, { release: null, reason: "no-published-ancestor-with-completed-npm-audit" });
+    assert.match(none.stderr, /no npm baseline: no-published-ancestor-with-completed-npm-audit/,
+      "a block without a baseline says why there was none");
     assert.equal(unaudited.status, 1);
     assert.match(unaudited.stderr, /npm-audit\.json/, "a chosen release whose audit is missing fails closed and says what is missing");
     assert.equal(older.status, 1, "a gap the published release did not have still fails");
     assert.match(older.stderr, new RegExp(`npm:${picomatch}:picomatch`));
+    assert.doesNotMatch(older.stderr, /no npm baseline/, "a block against a chosen baseline names no missing one");
   } finally {
     rmSync(directory, { recursive: true });
   }
