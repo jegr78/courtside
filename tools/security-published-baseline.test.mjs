@@ -100,6 +100,24 @@ test("given a development dependency that became a production dependency, when e
     "shipping a gap that was only a build tool before is a new exposure");
 });
 
+test("given a second copy of a package the published release has, when evaluated, then the new copy blocks", () => {
+  // given
+  const input = audit();
+  const lock = lockfile();
+  const copy = "node_modules/tinyglobby/node_modules/picomatch";
+  input.vulnerabilities.picomatch.nodes.push(copy);
+  lock.packages[copy] = { ...lock.packages["node_modules/picomatch"] };
+
+  // when
+  const result = evaluate([candidate(input, lock)], baseline());
+
+  // then
+  assert.ok(result.blockingFindings.some((finding) => finding.id === picomatch),
+    "a copy the published release does not ship is a new exposure, though package, advisory and scope match");
+  assert.ok(evaluate([candidate(input, lock)], baseline(input, lock)).preExistingFindings.some((finding) => finding.id === picomatch),
+    "the same two copies in the published release are pre-existing");
+});
+
 test("given no usable baseline, when evaluated, then findings block as before and the reason is recorded", () => {
   // given
   const skipped = { release: "v0.5.0-rc.7", reports: [parseNpmReport({ schemaVersion: 1, status: "skipped", reason: "service-unavailable" },

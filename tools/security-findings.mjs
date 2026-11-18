@@ -26,8 +26,11 @@ export function evaluateSecurityReports({
     ...finding
   })))
     .toSorted(compareFinding);
-  const published = publishedIdentities(baseline);
-  const preExisting = (finding) => published.has(baselineIdentity(finding));
+  const published = publishedNodes(baseline);
+  const preExisting = (finding) => {
+    const nodes = published.get(baselineIdentity(finding));
+    return Boolean(nodes) && finding.nodes?.length > 0 && finding.nodes.every((node) => nodes.has(node));
+  };
   const findings = allFindings.filter(isBlocking);
   const informationalFindings = markedBaseline(deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding))
     .map((finding) => (preExisting(finding) ? { ...finding, inBaseline: true } : finding))));
@@ -92,11 +95,15 @@ function markedBaseline(findings) {
     ? { ...finding, inBaseline: true } : finding));
 }
 
-function publishedIdentities(baseline) {
+function publishedNodes(baseline) {
   const reports = baseline?.release ? baseline.reports ?? [] : [];
-  return new Set(reports.filter((report) => report.scanner === "npm" && report.status === "completed")
-    .flatMap((report) => report.findings.map((finding) => baselineIdentity({ scanner: "npm", ...finding })))
-    .filter(Boolean));
+  const published = new Map();
+  for (const finding of reports.filter((report) => report.scanner === "npm" && report.status === "completed")
+    .flatMap((report) => report.findings)) {
+    const identity = baselineIdentity({ scanner: "npm", ...finding });
+    if (identity) published.set(identity, new Set([...(published.get(identity) ?? []), ...(finding.nodes ?? [])]));
+  }
+  return published;
 }
 
 function baselineRecord(baseline) {
@@ -363,7 +370,8 @@ export function parseNpmReport(input, metadata = {}) {
       ].map((alias) => alias.toUpperCase()))].toSorted(),
       cwes: [...new Set(advisory.cwe ?? [])].toSorted(),
       reachability: "not-assessed",
-      dependencyScope
+      dependencyScope,
+      nodes: Array.isArray(finding.nodes) ? [...new Set(finding.nodes.map(String))].toSorted() : []
     }));
   });
   return {
