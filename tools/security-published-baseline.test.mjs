@@ -210,10 +210,13 @@ test("given a baseline directory, when the policy CLI reads it, then a chosen re
     assert.equal(chosen.status, 0, chosen.stderr);
     assert.equal(none.status, 1, "without a baseline the gap blocks as before");
     assert.deepEqual(noneSummary.baseline, { release: null, reason: "no-published-ancestor-with-completed-npm-audit" });
+    assert.match(none.stderr, /no npm baseline: no-published-ancestor-with-completed-npm-audit/,
+      "a block without a baseline says why there was none");
     assert.equal(unaudited.status, 1);
     assert.match(unaudited.stderr, /npm-audit\.json/, "a chosen release whose audit is missing fails closed and says what is missing");
     assert.equal(older.status, 1, "a gap the published release did not have still fails");
     assert.match(older.stderr, new RegExp(`npm:${picomatch}:picomatch`));
+    assert.doesNotMatch(older.stderr, /no npm baseline/, "a block against a chosen baseline names no missing one");
   } finally {
     rmSync(directory, { recursive: true });
   }

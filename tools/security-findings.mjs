@@ -599,7 +599,9 @@ function main(args) {
   if (result.status === "blocked") {
     const ids = result.blockingFindings.map((finding) => `${finding.scanner}:${finding.id}:${finding.target}`).join(", ");
     const reason = ids || result.assessment?.outcome.reason || "security policy rejected the evidence";
-    throw new Error(`Actionable security findings: ${reason}`);
+    const missing = result.baseline?.release === null
+      ? ` (no npm baseline: ${result.baseline.reason}${result.baseline.detail ? `: ${result.baseline.detail}` : ""})` : "";
+    throw new Error(`Actionable security findings: ${reason}${missing}`);
   }
   if (result.status === "incomplete") throw new Error("Security evidence is incomplete");
 }
