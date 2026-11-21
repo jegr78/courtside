@@ -290,7 +290,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: temurin
@@ -458,7 +458,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - id: java
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -517,7 +517,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -558,7 +558,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -614,7 +614,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -674,7 +674,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -720,7 +720,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -759,7 +759,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: temurin
@@ -866,7 +866,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -923,7 +923,7 @@ jobs:
           languages: java-kotlin,javascript-typescript
           queries: security-extended
           config-file: ./.github/codeql/codeql-config.yml
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           java-version: '25'
           distribution: 'temurin'
