@@ -2,7 +2,7 @@ name: courtside-mail-smoke
 
 services:
   mail:
-    image: stalwartlabs/stalwart:v1.1.0@sha256:f772aa6ef8cd8018969fa491640f1436b0270eb14e2c219b5f37f1a77020837e
+    image: stalwartlabs/stalwart:v1.1.1@sha256:5ebdf474b237161742fe4309396af4ae8797c938e8e6eb7e2d4837332c4f9851
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -29,7 +29,7 @@ services:
       - "127.0.0.1::8080"
 
   proxy:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     security_opt:
       - no-new-privileges:true
     environment:
@@ -41,7 +41,7 @@ services:
       - caddy-config:/config
 
   mail-certificate:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -67,7 +67,7 @@ services:
       retries: 2
 
   mail-reload:
-    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+    image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -97,7 +97,7 @@ services:
       retries: 2
 
   sink:
-    image: axllent/mailpit:v1.33@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    image: axllent/mailpit:v1.34@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
     security_opt:
       - no-new-privileges:true
     ports:
@@ -124,7 +124,7 @@ services:
     entrypoint: ["sh", "/mail/render.sh", "bootstrap", "base", "journey"]
 
   apply:
-    image: stalwartlabs/cli:1.0.14@sha256:5b70732cb69cdab3ff0894c501544cf0bfa180fa75bcd0eeba4eebe04c1064e1
+    image: stalwartlabs/cli:2.0.0@sha256:8588aa3ea88ed740f83292ab37760869541df3da39cd1c8e6494fb43ece888c9
     security_opt:
       - no-new-privileges:true
     cap_drop:
