@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const frontend = (): string => fileURLToPath(new URL("..", import.meta.url));
 
 export const PINNED_BROWSER_IMAGE =
-  "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d";
+  "mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579";
 
 // Qualifying against something a club does not run proves nothing about what it does, so every
 // reference here is read from the deployment rather than repeated beside it.

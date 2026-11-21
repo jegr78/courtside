@@ -130,7 +130,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   mail:
-    image: axllent/mailpit:v1.33@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    image: axllent/mailpit:v1.34@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -161,7 +161,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   password-breach:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -192,7 +192,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   callback:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     pull_policy: never
     command: ["caddy", "respond", "--listen", ":8080", "--body", "callback-ok"]
     read_only: true
@@ -216,7 +216,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   proxy:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     pull_policy: never
     read_only: true
     tmpfs:
@@ -319,7 +319,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.33.2@sha256:b6521357a7262c725cf10c6237fdf075b6d027219c0aca93c9930497d1824c85
+    image: schemathesis/schemathesis:v4.33.4@sha256:708d934c8208a8f785bdf1b1610476e691f1efda0b7a3cb9ce7536d0f3280eec
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
@@ -348,7 +348,7 @@ services:
 
   k6-abuse:
     profiles: [assessment]
-    image: grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8
+    image: grafana/k6:2.4.0@sha256:d41bb79cd8de5a7ad619b53570e3712633e8bff0937010a5c6c57a4747e7a276
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true

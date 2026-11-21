@@ -21,7 +21,7 @@ services:
       retries: 20
 
   api-ui:
-    image: swaggerapi/swagger-ui:v5.34.1@sha256:59ee9021a8884437c7fd8aae79e0a46ee6b6dd3afd7f24a587c4501585fde53b
+    image: swaggerapi/swagger-ui:v5.35.0@sha256:3e7305b17cb806a2925ed16145eae469a6084ab50d82fcec7ede600bba91650b
     user: "101:101"
     security_opt:
       - no-new-privileges:true
@@ -34,7 +34,7 @@ services:
       - frontend
 
   api-proxy:
-    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     depends_on:
       - api-ui
     extra_hosts:
