@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0-rc.8](https://github.com/jegr78/courtside/compare/v0.5.0-rc.7...v0.5.0-rc.8) (2026-11-21)
+
+
+### Bug fixes
+
+* bump the deployment images, frontend packages, Playwright, Maven and CI actions ([#2048](https://github.com/jegr78/courtside/issues/2048)) ([1ccfb3f](https://github.com/jegr78/courtside/commit/1ccfb3f1c7b426da83f5834b75327f5a4082e66b))
+* name the reason when the nightly image selection refuses a revision ([#2051](https://github.com/jegr78/courtside/issues/2051)) ([ad9491c](https://github.com/jegr78/courtside/commit/ad9491c32abebfd7949f94c67d298e3bcc04ec0b))
+
 ## 0.5.0 (2026-11-09)
 
 ### Features
