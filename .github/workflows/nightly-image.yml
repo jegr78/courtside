@@ -127,7 +127,7 @@ jobs:
               else "" end' "$evidence/verification.json") ||
               refuse "the verification evidence of run $verification_run is not readable JSON"
             if [[ -n "$reason" ]]; then
-              message="the first-attempt evidence of run $verification_run does not admit $commit: $reason"
+              message="the verification evidence of run $verification_run does not admit $commit: $reason"
               if [[ "${GITHUB_RUN_ATTEMPT:-1}" != 1 ]]; then
                 message+="; a rerun reuses that evidence, so dispatch build.yml afresh"
               fi
