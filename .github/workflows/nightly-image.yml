@@ -85,6 +85,10 @@ jobs:
           REQUESTED_VERIFICATION_RUN: ${{ inputs.verification_run }}
         run: |
           set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
           commit="$REQUESTED_COMMIT"
           verification_run="$REQUESTED_VERIFICATION_RUN"
           publish="$REQUESTED_PUBLISH"
@@ -92,9 +96,10 @@ jobs:
             commit="$GITHUB_SHA"
             publish=false
           else
-            [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
-            [[ "$verification_run" =~ ^[1-9][0-9]*$ ]]
-            [[ "$verification_run" = "$GITHUB_RUN_ID" ]]
+            [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || refuse "the requested commit is not a full 40-character SHA"
+            [[ "$verification_run" =~ ^[1-9][0-9]*$ ]] || refuse "the verification run is not a run id"
+            [[ "$verification_run" = "$GITHUB_RUN_ID" ]] ||
+              refuse "verification run $verification_run is not this run $GITHUB_RUN_ID"
             if [[ "$publish" = true && "$GITHUB_REF" != 'refs/heads/main' ]]; then
               echo "::error::nightly publication requires a verified build from refs/heads/main"
               exit 1
@@ -107,13 +112,27 @@ jobs:
               exit 1
             fi
             git fetch --no-tags origin "+refs/heads/$branch:refs/remotes/origin/$branch"
-            git cat-file -e "${commit}^{commit}"
-            git merge-base --is-ancestor "$commit" "refs/remotes/origin/$branch"
+            git cat-file -e "${commit}^{commit}" 2> /dev/null || refuse "commit $commit is not in this checkout"
+            git merge-base --is-ancestor "$commit" "refs/remotes/origin/$branch" ||
+              refuse "commit $commit is not on $branch"
             evidence="$RUNNER_TEMP/nightly-verification"
-            jq -e --arg commit "$commit" --argjson runId "$verification_run" '
-              .schemaVersion == 1 and .releaseReadiness == "complete" and
-              .commit == $commit and .runId == $runId and .attempt == 1 and .firstAttempt == true' \
-              "$evidence/verification.json" > /dev/null
+            [[ -f "$evidence/verification.json" ]] || refuse "no verification evidence of run $verification_run was downloaded"
+            reason=$(jq -r --arg commit "$commit" --argjson runId "$verification_run" '
+              if .schemaVersion != 1 then "it has schema version \(.schemaVersion), not 1"
+              elif .commit != $commit then "it records commit \(.commit), not \($commit)"
+              elif .runId != $runId then "it records run \(.runId), not \($runId)"
+              elif .attempt != 1 or .firstAttempt != true then "it records attempt \(.attempt), not the first attempt"
+              elif .releaseReadiness != "complete" then "its release readiness is \(.releaseReadiness): " +
+                ([.jobs // {} | to_entries[] | select(.value != "success") | "\(.key) \(.value)"] | join(", "))
+              else "" end' "$evidence/verification.json") ||
+              refuse "the verification evidence of run $verification_run is not readable JSON"
+            if [[ -n "$reason" ]]; then
+              message="the first-attempt evidence of run $verification_run does not admit $commit: $reason"
+              if [[ "${GITHUB_RUN_ATTEMPT:-1}" != 1 ]]; then
+                message+="; a rerun reuses that evidence, so dispatch build.yml afresh"
+              fi
+              refuse "$message"
+            fi
           fi
           published_revision=""
           if docker pull "$IMAGE:nightly" > /dev/null 2>&1; then
@@ -127,7 +146,8 @@ jobs:
             build=false
           fi
           base_version=$(git show "$commit:frontend/package.json" | jq -r '.version | split("-")[0]')
-          [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+            refuse "frontend/package.json at $commit carries no x.y.z version"
           version="$base_version-nightly.${GITHUB_RUN_ID}"
           {
             echo "build=$build"
