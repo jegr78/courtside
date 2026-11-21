@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import test from "node:test";
+import { temporaryDirectory } from "./temporary-directory.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -36,11 +39,130 @@ test("given a verified build call, when its source revision is selected, then on
   assert.match(select, /evidence="\$RUNNER_TEMP\/nightly-verification"/);
   assert.match(select, /set -euo pipefail/);
   assert.match(select, /"\$verification_run" = "\$GITHUB_RUN_ID"/);
-  assert.match(select, /\.releaseReadiness == "complete"/);
-  assert.match(select, /\.commit == \$commit and \.runId == \$runId and \.attempt == 1/);
   assert.match(select, /if \[\[ -z "\$verification_run" \]\]/);
   assert.match(select, /commit="\$GITHUB_SHA"/);
   assert.match(select, /REQUESTED_PUBLISH: \$\{\{ inputs\.publish \}\}/);
+});
+
+function selectionFixture() {
+  const root = temporaryDirectory("nightly-selection-");
+  const environment = { PATH: `${join(root, "bin")}:${process.env.PATH}`, HOME: root, GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "Jane Doe", GIT_AUTHOR_EMAIL: "jane.doe@example.org",
+    GIT_COMMITTER_NAME: "Jane Doe", GIT_COMMITTER_EMAIL: "jane.doe@example.org" };
+  const work = join(root, "work");
+  const git = (...args) => execFileSync("git", args, { cwd: work, env: environment, encoding: "utf8" }).trim();
+  const commitVersion = (version) => {
+    writeFileSync(join(work, "frontend", "package.json"), JSON.stringify({ version }));
+    git("add", "frontend/package.json");
+    git("commit", "-q", "-m", `chore: version ${version}`);
+    return git("rev-parse", "HEAD");
+  };
+  mkdirSync(join(root, "bin"));
+  writeFileSync(join(root, "bin", "docker"), "#!/bin/sh\nexit 1\n");
+  chmodSync(join(root, "bin", "docker"), 0o755);
+  execFileSync("git", ["init", "-q", "--bare", join(root, "origin.git")], { env: environment });
+  mkdirSync(join(work, "frontend"), { recursive: true });
+  git("init", "-q", "-b", "main");
+  git("remote", "add", "origin", join(root, "origin.git"));
+  const released = commitVersion("0.5.0-rc.8");
+  const unversioned = commitVersion("next");
+  git("push", "-q", "origin", "main");
+  git("switch", "-q", "-c", "side", released);
+  const unmerged = commitVersion("0.5.0-rc.9");
+  return { root, work, environment, released, unversioned, unmerged };
+}
+
+function generatedEvidence(fixture, { commit, runId, attempt, security = "success" }) {
+  const buildWorkflow = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
+  const generator = buildWorkflow.jobs.build.steps.find((step) => /> build\/nightly\/verification\.json/.test(step.run ?? ""));
+  const directory = temporaryDirectory("nightly-evidence-");
+  const script = generator.run.replace("${{ github.sha }}", commit).replace("${{ github.run_id }}", String(runId))
+    .replace("${{ github.run_attempt }}", String(attempt));
+  const results = Object.fromEntries(Object.keys(generator.env).map((name) => [name, "success"]));
+  execFileSync("bash", ["-c", script], { cwd: directory,
+    env: { ...fixture.environment, ...results, SECURITY_RESULT: security, GITHUB_STEP_SUMMARY: join(directory, "summary") } });
+  return join(directory, "build", "nightly", "verification.json");
+}
+
+function runSelection(fixture, { commit, verificationRun = "77", runId = "77", runAttempt = "1", evidence }) {
+  const selection = workflow.jobs.select.steps.find((step) => step.id === "selection");
+  const temp = temporaryDirectory("nightly-runner-");
+  mkdirSync(join(temp, "nightly-verification"));
+  if (evidence) copyFileSync(evidence, join(temp, "nightly-verification", "verification.json"));
+  const output = join(temp, "output");
+  const result = spawnSync("bash", ["-c", selection.run], { cwd: fixture.work, encoding: "utf8", env: {
+    ...fixture.environment, DEFAULT_BRANCH: "main", GH_TOKEN: "", IMAGE: "ghcr.io/example/courtside",
+    REQUESTED_COMMIT: commit, REQUESTED_PUBLISH: "true", REQUESTED_REBUILD: "true",
+    REQUESTED_VERIFICATION_RUN: verificationRun, GITHUB_SHA: fixture.released, GITHUB_REF: "refs/heads/main",
+    GITHUB_RUN_ID: runId, GITHUB_RUN_ATTEMPT: runAttempt, RUNNER_TEMP: temp, GITHUB_OUTPUT: output,
+    GITHUB_STEP_SUMMARY: join(temp, "summary") } });
+  return { status: result.status, log: result.stdout + result.stderr,
+    output: existsSync(output) ? readFileSync(output, "utf8") : "" };
+}
+
+test("given complete first-attempt evidence, when the selection runs, then it selects the verified revision", () => {
+  // given
+  const fixture = selectionFixture();
+  const evidence = generatedEvidence(fixture, { commit: fixture.released, runId: 77, attempt: 1 });
+
+  // when
+  const selection = runSelection(fixture, { commit: fixture.released, evidence });
+
+  // then
+  assert.equal(selection.status, 0, selection.log);
+  assert.match(selection.output, new RegExp(`^commit=${fixture.released}$`, "m"));
+  assert.match(selection.output, /^version=0\.5\.0-nightly\.77$/m);
+});
+
+test("given a selection the guards refuse, when it runs, then the log names the refused condition", () => {
+  // given
+  const fixture = selectionFixture();
+  const evidence = (options) => generatedEvidence(fixture, { commit: fixture.released, runId: 77, attempt: 1, ...options });
+  const rewritten = (fields) => {
+    const path = evidence();
+    writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, "utf8")), ...fields }));
+    return path;
+  };
+  const unreadable = join(temporaryDirectory("nightly-evidence-"), "verification.json");
+  writeFileSync(unreadable, "{");
+  const cases = [
+    ["a rerun over incomplete first-attempt evidence",
+      { commit: fixture.released, runAttempt: "2", evidence: evidence({ security: "failure" }) },
+      /::error::.*release readiness is incomplete: security failure; .*dispatch build\.yml afresh/],
+    ["evidence of a later attempt", { commit: fixture.released, evidence: evidence({ attempt: 2 }) },
+      /::error::.*records attempt 2, not the first attempt/],
+    ["evidence of another commit", { commit: fixture.released, evidence: evidence({ commit: fixture.unmerged }) },
+      new RegExp(`::error::.*records commit ${fixture.unmerged}, not ${fixture.released}`)],
+    ["evidence of another run", { commit: fixture.released, evidence: evidence({ runId: 78 }) },
+      /::error::.*records run 78, not 77/],
+    ["evidence of another schema", { commit: fixture.released, evidence: rewritten({ schemaVersion: 2 }) },
+      /::error::.*has schema version 2, not 1/],
+    ["unreadable evidence", { commit: fixture.released, evidence: unreadable },
+      /::error::the verification evidence of run 77 is not readable JSON/],
+    ["no evidence", { commit: fixture.released }, /::error::no verification evidence of run 77/],
+    ["a shortened commit", { commit: "abc1234", evidence: evidence() }, /::error::the requested commit is not a full/],
+    ["a malformed run id", { commit: fixture.released, verificationRun: "077", evidence: evidence() },
+      /::error::the verification run is not a run id/],
+    ["another run's id", { commit: fixture.released, verificationRun: "78", evidence: evidence() },
+      /::error::verification run 78 is not this run 77/],
+    ["an unknown commit", { commit: "f".repeat(40), evidence: evidence() },
+      new RegExp(`::error::commit ${"f".repeat(40)} is not in this checkout`)],
+    ["a commit outside main", { commit: fixture.unmerged, evidence: evidence({ commit: fixture.unmerged }) },
+      new RegExp(`::error::commit ${fixture.unmerged} is not on main`)],
+    ["a revision without a release version",
+      { commit: fixture.unversioned, evidence: evidence({ commit: fixture.unversioned }) },
+      new RegExp(`::error::frontend/package\\.json at ${fixture.unversioned} carries no x\\.y\\.z version`)]
+  ];
+
+  for (const [name, input, reason] of cases) {
+    // when
+    const selection = runSelection(fixture, input);
+
+    // then
+    assert.equal(selection.status, 1, `${name} is refused`);
+    assert.match(selection.log, reason, `${name} names its reason`);
+    assert.equal(selection.output, "", `${name} selects nothing`);
+  }
 });
 
 test("given a complete build, when it finishes, then it calls the image workflow with the same revision and evidence", () => {

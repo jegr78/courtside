@@ -60,7 +60,7 @@ test("given a verified build on a release branch, when the nightly image selects
     assert.match(selection, /if \[\[ "\$GITHUB_REF" =~ \^refs\/heads\/release\/\[0-9\]\+\\\.\[0-9\]\+\$ \]\]; then\n\s+branch="\$\{GITHUB_REF#refs\/heads\/\}"/);
     assert.match(selection, /elif \[\[ "\$GITHUB_REF" == refs\/heads\/release\/\* \]\]; then\n\s+echo "::error::[^"]+"\n\s+exit 1/,
       "a branch that only looks like a release line is refused rather than checked against main");
-    assert.match(selection, /git fetch --no-tags origin "\+refs\/heads\/\$branch:refs\/remotes\/origin\/\$branch"\n\s+git cat-file -e "\$\{commit\}\^\{commit\}"\n\s+git merge-base --is-ancestor "\$commit" "refs\/remotes\/origin\/\$branch"/);
+    assert.match(selection, /git fetch --no-tags origin "\+refs\/heads\/\$branch:refs\/remotes\/origin\/\$branch"\n\s+git cat-file -e "\$\{commit\}\^\{commit\}"[^\n]*\n\s+git merge-base --is-ancestor "\$commit" "refs\/remotes\/origin\/\$branch"/);
     assert.doesNotMatch(selection, /origin\/\$DEFAULT_BRANCH/, "a patch commit is not on main and never will be");
     assert.match(selection, /if \[\[ "\$publish" = true && "\$GITHUB_REF" != 'refs\/heads\/main' \]\]/,
       "publication still requires main");
