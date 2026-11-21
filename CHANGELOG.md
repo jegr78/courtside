@@ -32,6 +32,8 @@
 
 ### Bug fixes
 
+* bump the deployment images, frontend packages, Playwright, Maven and CI actions ([#2048](https://github.com/jegr78/courtside/issues/2048)) ([1ccfb3f](https://github.com/jegr78/courtside/commit/1ccfb3f1c7b426da83f5834b75327f5a4082e66b))
+* name the reason when the nightly image selection refuses a revision ([#2051](https://github.com/jegr78/courtside/issues/2051)) ([ad9491c](https://github.com/jegr78/courtside/commit/ad9491c32abebfd7949f94c67d298e3bcc04ec0b))
 * offer sign-in once on the public plan ([#2025](https://github.com/jegr78/courtside/issues/2025)) ([40a5076](https://github.com/jegr78/courtside/commit/40a5076865fdeb7dc531b12c057ab9f995aa1407)), closes [#2022](https://github.com/jegr78/courtside/issues/2022)
 * charge no guest fee on an external booking ([#2016](https://github.com/jegr78/courtside/issues/2016)) ([5933c44](https://github.com/jegr78/courtside/commit/5933c443fd2053097f07a7029d2b91d4bb47219f))
 * end a door hold when a closure, a disabled account or a switched-off card takes away its right ([#2015](https://github.com/jegr78/courtside/issues/2015)) ([0a2a386](https://github.com/jegr78/courtside/commit/0a2a386f71a0477caef332227cdc07c91238a00d))
