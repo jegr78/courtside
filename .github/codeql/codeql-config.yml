@@ -1,3 +1,6 @@
 paths-ignore:
   - frontend/coverage/**/*
   - site/.vitepress/**
+query-filters:
+  - exclude:
+      id: js/http-to-file-access

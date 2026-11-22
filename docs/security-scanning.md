@@ -104,6 +104,8 @@ does not rerun the static scanners.
 
 False positives are never suppressed by a broad scanner rule or permanent ignore file. They use the same precise, expiring exception path and disappear from the exception file when the scanner no longer reports them.
 
+CodeQL's `js/http-to-file-access` is the one rule that is not run. Its every finding was in Node tooling under `tools/` and `acceptance/` that stores network answers as a run's evidence by design, and each was dismissed. The product's JavaScript runs in the browser without a file system, and the Java analysis keeps its own rules. `js/file-access-to-http` keeps running, because one of its findings was fixed in the code rather than dismissed.
+
 ## Updating tools
 
 Actions are pinned to full commit hashes. Dependabot proposes action and container updates, and the required build qualifies them by behaviour. The shared Trivy preparation action pins the CLI version and restores the database cache once per job. Native Trivy checks
