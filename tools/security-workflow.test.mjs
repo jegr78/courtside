@@ -167,6 +167,19 @@ test("given dependency remediation policy, when maintainers apply it, then clock
   assert.match(assessment, /ASVS 15\.1\.1[\s\S]+ASVS 15\.2\.1[\s\S]+immutable/i);
 });
 
+test("given the CodeQL configuration, when its queries are filtered, then only the network-to-file rule is left out and the policy names it", () => {
+  // given
+  const yaml = createRequire(import.meta.url)("../frontend/node_modules/js-yaml");
+
+  // when
+  const filters = yaml.load(codeql)["query-filters"];
+
+  // then
+  assert.deepEqual(filters, [{ exclude: { id: "js/http-to-file-access" } }],
+    "every other security-extended rule keeps running, js/file-access-to-http included");
+  assert.match(policy, /`js\/http-to-file-access`[^.]+not run/, "the one excluded rule is a documented policy, not a silent filter");
+});
+
 test("given a pull request, when the required build runs, then dependency, source and built Java surfaces are scanned", () => {
   // when / then
   assert.match(build, /actions\/dependency-review-action@[a-f0-9]{40}/);
