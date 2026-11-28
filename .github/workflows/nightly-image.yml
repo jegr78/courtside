@@ -523,13 +523,13 @@ jobs:
       - name: Prepare publication evidence directory
         run: mkdir -p build
 
-      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: anchore/sbom-action@dfcb83b97731532d72be422cbc51ee64adb6fd56 # v0.24.4
         with:
           image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
           output-file: build/courtside-nightly.spdx.json
           upload-artifact: false
 
-      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: anchore/sbom-action@dfcb83b97731532d72be422cbc51ee64adb6fd56 # v0.24.4
         with:
           image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
           output-file: build/courtside-booking-seed-nightly.spdx.json
