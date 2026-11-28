@@ -2,7 +2,7 @@ name: courtside-dev
 
 services:
   db:
-    image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+    image: postgres:19-alpine@sha256:cac45fb483caee3668946088a1c0532db89d5285c28dbfeac889b4068296e06f
     restart: unless-stopped
     environment:
       POSTGRES_DB: courtside_dev
@@ -21,7 +21,7 @@ services:
       retries: 20
 
   api-ui:
-    image: swaggerapi/swagger-ui:v5.35.0@sha256:3e7305b17cb806a2925ed16145eae469a6084ab50d82fcec7ede600bba91650b
+    image: swaggerapi/swagger-ui:v5.36.0@sha256:a6c9dae9b7bf7aa691ad8cf76574d0a9c3c8ce6e0d3946d6bb55acc36f24c4e5
     user: "101:101"
     security_opt:
       - no-new-privileges:true

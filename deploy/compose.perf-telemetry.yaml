@@ -8,7 +8,7 @@ services:
   postgres-exporter:
     cpus: 0.25
     mem_limit: 128m
-    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    image: prometheuscommunity/postgres-exporter:v0.21.1@sha256:3b8e05a84282cd1199ad2fb6c66f362738bf4c68c1547d8f4226a34a7dd6d8d7
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -61,7 +61,7 @@ services:
     mem_limit: 512m
     tmpfs:
       - /tmp:size=256m,mode=1777
-    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    image: grafana/grafana:13.3.2@sha256:81556409ba48b2b922e0adb69a2511337d8ba7578f11962eefa6149a2d815101
     read_only: true
     security_opt:
       - no-new-privileges:true
