@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+    image: postgres:19-alpine@sha256:cac45fb483caee3668946088a1c0532db89d5285c28dbfeac889b4068296e06f
     pull_policy: never
     environment:
       POSTGRES_DB: courtside_security
@@ -319,7 +319,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.33.4@sha256:708d934c8208a8f785bdf1b1610476e691f1efda0b7a3cb9ce7536d0f3280eec
+    image: schemathesis/schemathesis:v4.34.2@sha256:30deb47f14b2d0e0cccb181226bbff4d70965ff47ab703b369d2996b6773eb83
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
